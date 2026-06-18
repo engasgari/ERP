@@ -1,0 +1,220 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\PayrollItem;
+use Illuminate\Database\Seeder;
+
+class StandardPayrollSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $wageSource = [
+            'source_title' => 'بخشنامه تعیین حداقل مزد سال ۱۴۰۵ - سازمان تأمین اجتماعی',
+            'source_url' => 'https://students.tamin.ir/news/item/197539',
+        ];
+
+        $insuranceSource = [
+            'source_title' => 'نحوه محاسبه حق‌بیمه و میزان آن - سازمان تأمین اجتماعی',
+            'source_url' => 'https://mss.tamin.ir/news/item/6526',
+        ];
+
+        $items = [
+            [
+                'code' => 'minimum_daily_wage',
+                'title' => 'حداقل مزد روزانه ۱۴۰۵',
+                'type' => 'earning',
+                'calculation_type' => 'reference',
+                'default_amount' => 5541850,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 10,
+            ] + $wageSource,
+            [
+                'code' => 'minimum_monthly_wage',
+                'title' => 'حداقل حقوق ماهانه ۱۴۰۵',
+                'type' => 'earning',
+                'calculation_type' => 'reference',
+                'default_amount' => 166255500,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 20,
+            ] + $wageSource,
+            [
+                'code' => 'housing_allowance',
+                'title' => 'حق مسکن',
+                'type' => 'earning',
+                'calculation_type' => 'fixed',
+                'default_amount' => 30000000,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 30,
+            ] + $wageSource,
+            [
+                'code' => 'food_allowance',
+                'title' => 'بن کارگری / کمک هزینه اقلام مصرفی',
+                'type' => 'earning',
+                'calculation_type' => 'fixed',
+                'default_amount' => 22000000,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 40,
+            ] + $wageSource,
+            [
+                'code' => 'marriage_allowance',
+                'title' => 'حق تأهل',
+                'type' => 'earning',
+                'calculation_type' => 'manual',
+                'default_amount' => 5000000,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 50,
+            ] + $wageSource,
+            [
+                'code' => 'child_allowance',
+                'title' => 'حق اولاد برای هر فرزند',
+                'type' => 'earning',
+                'calculation_type' => 'manual',
+                'default_amount' => 16625550,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => true,
+                'sort_order' => 60,
+            ] + $wageSource,
+            [
+                'code' => 'seniority_monthly',
+                'title' => 'پایه سنوات ماهانه',
+                'type' => 'earning',
+                'calculation_type' => 'manual',
+                'default_amount' => 5000010,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => true,
+                'sort_order' => 70,
+            ] + $wageSource,
+            [
+                'code' => 'transportation_allowance',
+                'title' => 'ایاب و ذهاب',
+                'type' => 'earning',
+                'calculation_type' => 'fixed',
+                'default_amount' => 0,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => false,
+                'sort_order' => 80,
+                'source_title' => 'آیتم داخلی قابل تنظیم',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'bonus',
+                'title' => 'پاداش',
+                'type' => 'earning',
+                'calculation_type' => 'manual',
+                'default_amount' => 0,
+                'taxable' => true,
+                'insurable' => false,
+                'is_statutory' => false,
+                'sort_order' => 90,
+                'source_title' => 'آیتم داخلی قابل تنظیم',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'employee_insurance',
+                'title' => 'بیمه سهم کارمند',
+                'type' => 'deduction',
+                'calculation_type' => 'percentage',
+                'default_rate' => 7,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => true,
+                'sort_order' => 200,
+            ] + $insuranceSource,
+            [
+                'code' => 'salary_tax',
+                'title' => 'مالیات حقوق',
+                'type' => 'deduction',
+                'calculation_type' => 'percentage',
+                'default_rate' => 0,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => true,
+                'sort_order' => 210,
+                'source_title' => 'قابل تنظیم بر اساس جدول مالیات حقوق سالانه',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'employer_insurance',
+                'title' => 'بیمه سهم کارفرما',
+                'type' => 'earning',
+                'calculation_type' => 'percentage',
+                'default_rate' => 20,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => true,
+                'sort_order' => 211,
+            ] + $insuranceSource,
+            [
+                'code' => 'unemployment_insurance',
+                'title' => 'بیمه بیکاری سهم کارفرما',
+                'type' => 'earning',
+                'calculation_type' => 'percentage',
+                'default_rate' => 3,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => true,
+                'sort_order' => 212,
+            ] + $insuranceSource,
+            [
+                'code' => 'loan',
+                'title' => 'قسط وام',
+                'type' => 'deduction',
+                'calculation_type' => 'manual',
+                'default_amount' => 0,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => false,
+                'sort_order' => 220,
+                'source_title' => 'آیتم داخلی قابل تنظیم',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'advance',
+                'title' => 'مساعده',
+                'type' => 'deduction',
+                'calculation_type' => 'manual',
+                'default_amount' => 0,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => false,
+                'sort_order' => 230,
+                'source_title' => 'آیتم داخلی قابل تنظیم',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'penalty',
+                'title' => 'جریمه و کسورات انضباطی',
+                'type' => 'deduction',
+                'calculation_type' => 'manual',
+                'default_amount' => 0,
+                'taxable' => false,
+                'insurable' => false,
+                'is_statutory' => false,
+                'sort_order' => 240,
+                'source_title' => 'آیتم داخلی قابل تنظیم',
+                'source_url' => null,
+            ],
+        ];
+
+        foreach ($items as $item) {
+            PayrollItem::updateOrCreate(
+                ['code' => $item['code']],
+                $item + ['is_active' => true]
+            );
+        }
+    }
+}

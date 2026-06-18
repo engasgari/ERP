@@ -1,0 +1,327 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    background: #f1f5f9;
+}
+
+body {
+    font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
+}
+
+.erp-shell h1,
+.erp-shell h2,
+.erp-shell h3 {
+    color: #0f172a;
+    letter-spacing: 0;
+}
+
+.erp-shell header h2,
+.erp-shell main h2 {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+}
+
+.erp-shell .py-12 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
+
+.erp-shell .bg-white.rounded-lg,
+.erp-shell .bg-white.overflow-hidden,
+.erp-shell form.bg-white,
+.erp-shell .shadow-md,
+.erp-shell .shadow-sm {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04) !important;
+}
+
+.erp-shell .p-6 {
+    padding: 1rem !important;
+}
+
+.erp-shell .mb-6 {
+    margin-bottom: 1rem !important;
+}
+
+.erp-shell table {
+    width: 100%;
+    border-collapse: separate !important;
+    border-spacing: 0;
+    overflow: hidden;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 0.5rem;
+    background: #fff;
+    font-size: 0.8125rem;
+}
+
+.erp-shell thead,
+.erp-shell .bg-gray-200 {
+    background: #f8fafc !important;
+}
+
+.erp-shell th {
+    border-color: #e2e8f0 !important;
+    padding: 0.625rem 0.75rem !important;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.erp-shell td {
+    border-color: #e2e8f0 !important;
+    padding: 0.625rem 0.75rem !important;
+    color: #334155;
+    vertical-align: top;
+}
+
+.erp-shell tbody tr:hover {
+    background: #f8fafc !important;
+}
+
+.erp-shell input,
+.erp-shell select,
+.erp-shell textarea {
+    border-color: #cbd5e1 !important;
+    border-radius: 0.5rem !important;
+    font-size: 0.875rem !important;
+}
+
+.erp-shell select {
+    direction: rtl;
+    text-align: right;
+    background-position: left 0.75rem center !important;
+    padding-left: 2.25rem !important;
+    padding-right: 0.75rem !important;
+}
+
+.erp-shell input:focus,
+.erp-shell select:focus,
+.erp-shell textarea:focus {
+    border-color: #0d9488 !important;
+    box-shadow: 0 0 0 1px #0d9488 !important;
+}
+
+.erp-shell a[class*="bg-blue"],
+.erp-shell button[class*="bg-blue"],
+.erp-shell .bg-blue-500,
+.erp-shell .bg-blue-600 {
+    background-color: #0d9488 !important;
+}
+
+.erp-shell a[class*="bg-blue"]:hover,
+.erp-shell button[class*="bg-blue"]:hover {
+    background-color: #0f766e !important;
+}
+
+.erp-shell a[class*="bg-yellow"],
+.erp-shell button[class*="bg-yellow"] {
+    background-color: #64748b !important;
+}
+
+.erp-shell a[class*="bg-purple"],
+.erp-shell button[class*="bg-purple"] {
+    background-color: #2563eb !important;
+}
+
+.erp-shell a[class*="bg-red"],
+.erp-shell button[class*="bg-red"] {
+    background-color: #dc2626 !important;
+}
+
+.erp-shell a[class*="bg-"],
+.erp-shell button[class*="bg-"] {
+    border-radius: 0.375rem !important;
+    padding: 0.375rem 0.75rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 700;
+}
+
+.erp-shell .text-2xl {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+}
+
+.erp-shell .text-lg {
+    font-size: 0.95rem !important;
+}
+
+.erp-shell .gap-4 {
+    gap: 0.75rem !important;
+}
+
+/* Unified application buttons: neutral gray and navy palette. */
+.erp-shell main a[class*="bg-"],
+.erp-shell main button[class*="bg-"],
+.erp-shell main .btn,
+.erp-shell main a.btn,
+.erp-shell main button.btn,
+.erp-shell main button[type="submit"],
+.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]),
+.erp-shell main input[type="submit"],
+.erp-shell main a.inline-flex[class*="px-"],
+.erp-shell main a.inline-block[class*="px-"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.35rem !important;
+    min-height: 2.15rem !important;
+    max-width: 100% !important;
+    border: 1px solid #334155 !important;
+    border-radius: 0.5rem !important;
+    background: #334155 !important;
+    color: #fff !important;
+    padding: 0.45rem 0.85rem !important;
+    font-size: 0.76rem !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12) !important;
+    transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease !important;
+}
+
+.erp-shell main a[class*="bg-"]:hover,
+.erp-shell main button[class*="bg-"]:hover,
+.erp-shell main .btn:hover,
+.erp-shell main button[type="submit"]:hover,
+.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]):hover,
+.erp-shell main input[type="submit"]:hover,
+.erp-shell main a.inline-flex[class*="px-"]:hover,
+.erp-shell main a.inline-block[class*="px-"]:hover {
+    border-color: #0f172a !important;
+    background: #0f172a !important;
+    color: #fff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px rgba(15, 23, 42, 0.18) !important;
+}
+
+.erp-shell main a[class*="bg-gray"],
+.erp-shell main button[class*="bg-gray"],
+.erp-shell main a[class*="bg-slate"],
+.erp-shell main button[class*="bg-slate"],
+.erp-shell main .btn-secondary,
+.erp-shell main .btn-outline-primary,
+.erp-shell main a[href*="index"]:not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-emerald"]),
+.erp-shell main a[href*="show"]:not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-emerald"]) {
+    border-color: #cbd5e1 !important;
+    background: #f1f5f9 !important;
+    color: #1f2937 !important;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07) !important;
+}
+
+.erp-shell main a[class*="bg-gray"]:hover,
+.erp-shell main button[class*="bg-gray"]:hover,
+.erp-shell main a[class*="bg-slate"]:hover,
+.erp-shell main button[class*="bg-slate"]:hover,
+.erp-shell main .btn-secondary:hover,
+.erp-shell main .btn-outline-primary:hover,
+.erp-shell main a[href*="index"]:not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-emerald"]):hover,
+.erp-shell main a[href*="show"]:not([class*="bg-blue"]):not([class*="bg-indigo"]):not([class*="bg-emerald"]):hover {
+    border-color: #94a3b8 !important;
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.erp-shell main a[class*="text-blue"],
+.erp-shell main button[class*="text-blue"],
+.erp-shell main a[class*="text-amber"],
+.erp-shell main button[class*="text-amber"],
+.erp-shell main a[class*="text-red"],
+.erp-shell main button[class*="text-red"],
+.erp-shell main a[class*="text-emerald"],
+.erp-shell main button[class*="text-emerald"],
+.erp-shell main a[class*="text-purple"],
+.erp-shell main button[class*="text-purple"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 1.9rem !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 0.45rem !important;
+    background: #f1f5f9 !important;
+    color: #1f2937 !important;
+    padding: 0.32rem 0.65rem !important;
+    font-size: 0.74rem !important;
+    font-weight: 900 !important;
+    text-decoration: none !important;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06) !important;
+}
+
+.erp-shell main a[class*="text-blue"]:hover,
+.erp-shell main button[class*="text-blue"]:hover,
+.erp-shell main a[class*="text-amber"]:hover,
+.erp-shell main button[class*="text-amber"]:hover,
+.erp-shell main a[class*="text-red"]:hover,
+.erp-shell main button[class*="text-red"]:hover,
+.erp-shell main a[class*="text-emerald"]:hover,
+.erp-shell main button[class*="text-emerald"]:hover,
+.erp-shell main a[class*="text-purple"]:hover,
+.erp-shell main button[class*="text-purple"]:hover {
+    border-color: #94a3b8 !important;
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.erp-shell main .line-remove,
+.erp-shell main button[aria-label],
+.erp-shell main .statement-modal-header button {
+    min-height: auto !important;
+    border-color: #cbd5e1 !important;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    box-shadow: none !important;
+}
+
+.erp-project-detail,
+.erp-project-detail * {
+    min-width: 0;
+}
+
+.erp-project-detail table {
+    min-width: 0 !important;
+    table-layout: fixed;
+}
+
+.erp-project-detail td,
+.erp-project-detail th,
+.erp-project-detail p,
+.erp-project-detail div {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.erp-project-costing .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.erp-project-costing table {
+    min-width: 0 !important;
+}
+
+.erp-project-costing .grid {
+    min-width: 0;
+}
+
+.erp-project-costing input,
+.erp-project-costing select,
+.erp-project-costing textarea,
+.erp-project-costing button,
+.erp-project-costing a {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.erp-project-costing form.grid {
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)) !important;
+}
+
+.erp-project-costing form.grid input[name="description"] {
+    grid-column: 1 / -1;
+}
