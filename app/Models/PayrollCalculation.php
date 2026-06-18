@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class PayrollCalculation extends Model
 {
@@ -59,5 +60,15 @@ class PayrollCalculation extends Model
     public function accountingEntry(): HasOne
     {
         return $this->hasOne(PayrollAccountingEntry::class, 'payroll_calculation_id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(PayrollPayment::class, 'payroll_calculation_id');
+    }
+
+    public function accountingDocument(): MorphOne
+    {
+        return $this->morphOne(AccountingDocument::class, 'source');
     }
 }

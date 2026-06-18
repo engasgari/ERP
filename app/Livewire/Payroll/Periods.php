@@ -19,6 +19,7 @@ class Periods extends Component
     public int $month = 0;
     public string $notes = '';
     public int $perPage = 12;
+    public array $paymentDrafts = [];
 
     protected $queryString = [
         'year' => ['except' => 0],
@@ -124,6 +125,36 @@ class Periods extends Component
         session()->flash('success', 'دوره حقوق بسته شد.');
     }
 
+    public function registerPayment(int $calculationId): void
+    {
+        $calculation = PayrollCalculation::with(['period', 'employee.party', 'payments'])->findOrFail($calculationId);
+
+        $this->validate([
+            "paymentDrafts.$calculationId.payment_date" => ['required', 'string', 'max:20'],
+            "paymentDrafts.$calculationId.method" => ['required', 'in:cash,bank'],
+            "paymentDrafts.$calculationId.amount" => ['nullable', 'numeric', 'min:1'],
+            "paymentDrafts.$calculationId.reference_number" => ['nullable', 'string', 'max:100'],
+            "paymentDrafts.$calculationId.description" => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $payment = app(NewPayrollEngineService::class)->payWithDetails($calculation, [
+                'payment_date' => jalaliToGregorianDate($this->paymentDrafts[$calculationId]['payment_date']) ?: now()->toDateString(),
+                'amount' => $this->paymentDrafts[$calculationId]['amount'] ?? null,
+                'method' => $this->paymentDrafts[$calculationId]['method'] ?? 'bank',
+                'reference_number' => $this->paymentDrafts[$calculationId]['reference_number'] ?? null,
+                'description' => $this->paymentDrafts[$calculationId]['description'] ?? null,
+            ], auth()->id());
+        } catch (\Throwable $e) {
+            session()->flash('error', $e->getMessage());
+            return;
+        }
+
+        unset($this->paymentDrafts[$calculationId]);
+
+        session()->flash('success', 'پرداخت حقوق ثبت شد و سند حسابداری پرداخت شماره ' . ($payment->accountingDocument?->number ?: '-') . ' ایجاد شد.');
+    }
+
     public function render()
     {
         $periods = PayrollPeriod::withCount(['attendanceCalculations', 'salaries'])
@@ -138,7 +169,8 @@ class Periods extends Component
             ->orderByDesc('month')
             ->paginate($this->perPage);
 
-        $calculations = PayrollCalculation::with(['employee.party', 'period', 'accountingEntry', 'payslip'])
+        $calculations = PayrollCalculation::with(['employee.party', 'period', 'accountingEntry', 'accountingDocument', 'payslip', 'payments.accountingDocument'])
+            ->withSum('payments', 'amount')
             ->whereHas('period', function ($query): void {
                 $query->where('year', $this->year)->where('month', $this->month);
             })

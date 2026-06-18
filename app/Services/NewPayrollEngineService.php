@@ -356,18 +356,59 @@ class NewPayrollEngineService
 
     public function pay(PayrollCalculation $calculation, ?string $reference = null): PayrollPayment
     {
-        return PayrollPayment::updateOrCreate(
+        return $this->payWithDetails($calculation, [
+            'payment_date' => now()->toDateString(),
+            'amount' => $calculation->net_payable,
+            'method' => 'bank',
+            'reference_number' => $reference ?: 'PAY-' . $calculation->id,
+            'description' => 'پرداخت حقوق از موتور جدید',
+        ]);
+    }
+
+    public function payWithDetails(PayrollCalculation $calculation, array $data, ?int $userId = null): PayrollPayment
+    {
+        $calculation->loadMissing('period', 'employee.party', 'payments');
+
+        if (! in_array($calculation->period?->status, ['approved', 'closed'], true)) {
+            throw new \RuntimeException('فقط حقوق دوره تایید شده یا بسته شده قابل پرداخت است.');
+        }
+
+        $alreadyPaid = (float) $calculation->payments->sum('amount');
+        $remaining = round((float) $calculation->net_payable - $alreadyPaid, 2);
+        $amount = round((float) ($data['amount'] ?? $remaining), 2);
+
+        if ($amount <= 0) {
+            throw new \RuntimeException('مبلغ پرداخت باید بیشتر از صفر باشد.');
+        }
+
+        if ($amount - $remaining > 0.01) {
+            throw new \RuntimeException('مبلغ پرداخت نمی‌تواند بیشتر از مانده حقوق باشد.');
+        }
+
+        $payment = PayrollPayment::updateOrCreate(
             ['payroll_calculation_id' => $calculation->id],
             [
                 'employee_id' => $calculation->employee_id,
-                'payment_date' => now()->toDateString(),
-                'amount' => $calculation->net_payable,
-                'method' => 'bank',
-                'reference_number' => $reference ?: 'PAY-' . $calculation->id,
+                'payment_date' => $data['payment_date'] ?? now()->toDateString(),
+                'amount' => $amount,
+                'method' => $data['method'] ?? 'bank',
+                'reference_number' => $data['reference_number'] ?? ('PAY-' . $calculation->id),
                 'status' => 'paid',
-                'description' => 'پرداخت حقوق از موتور جدید',
+                'description' => $data['description'] ?? 'پرداخت حقوق از موتور جدید',
+                'accounting_document_id' => null,
             ]
         );
+
+        $document = $this->accountingPosting->fromPayrollPayment($payment->refresh(), $userId);
+
+        $payment->update(['accounting_document_id' => $document->id]);
+
+        $remainingAfterPayment = round($remaining - $amount, 2);
+        $calculation->update([
+            'status' => $remainingAfterPayment <= 0.01 ? 'paid' : 'partial',
+        ]);
+
+        return $payment->refresh();
     }
 
     private function postAccountingDocuments(PayrollPeriod $period, Collection $calculations): void
@@ -377,7 +418,7 @@ class NewPayrollEngineService
                 return;
             }
 
-            $employee = $calculation->employee()->with('defaultProject')->first();
+            $employee = $calculation->employee()->with('defaultProject', 'party')->first();
             if (! $employee) {
                 return;
             }
@@ -432,6 +473,7 @@ class NewPayrollEngineService
                 0,
                 $netPayable,
                 'حقوق پرداختنی ' . $employee->full_name . ' - ' . $period->persian_title,
+                partyId: $employee->party_id,
                 projectId: $employee->default_project_id
             );
 

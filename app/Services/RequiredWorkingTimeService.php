@@ -46,6 +46,17 @@ class RequiredWorkingTimeService
             ->first();
 
         if (! $assignment?->workGroup) {
+            $legacyGroup = $employee->workGroups()
+                ->with(['shift', 'calendar'])
+                ->whereNotNull('work_shift_id')
+                ->whereNotNull('work_calendar_id')
+                ->orderByDesc('work_group_employee.id')
+                ->first();
+
+            if ($legacyGroup) {
+                return $legacyGroup;
+            }
+
             throw new AttendancePrerequisiteException('گروه کاری فعال برای پرسنل تخصیص داده نشده است.');
         }
 

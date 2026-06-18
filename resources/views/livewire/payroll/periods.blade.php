@@ -185,12 +185,19 @@
                     <th class="px-3 py-3 text-right font-semibold text-slate-700">حقوق ناخالص</th>
                     <th class="px-3 py-3 text-right font-semibold text-slate-700">کسورات</th>
                     <th class="px-3 py-3 text-right font-semibold text-slate-700">خالص</th>
+                    <th class="px-3 py-3 text-right font-semibold text-slate-700">بستانکاری</th>
                     <th class="px-3 py-3 text-right font-semibold text-slate-700">سند حسابداری</th>
+                    <th class="px-3 py-3 text-right font-semibold text-slate-700">پرداخت</th>
                     <th class="px-3 py-3 text-right font-semibold text-slate-700">پیش‌فیش</th>
                 </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
                 @forelse($calculations as $calculation)
+                    @php
+                        $paidAmount = (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'));
+                        $remainingAmount = max(0, (float) $calculation->net_payable - $paidAmount);
+                        $payableCredit = (float) ($calculation->accountingEntry?->salary_payable_credit ?? $calculation->net_payable);
+                    @endphp
                     <tr>
                         <td class="px-3 py-3 font-semibold text-slate-900">{{ $calculation->employee->full_name }}</td>
                         <td class="px-3 py-3 text-slate-700">
@@ -210,8 +217,24 @@
                             @endif
                         </td>
                         <td class="px-3 py-3 text-slate-700">
+                            <div class="font-semibold text-slate-900">{{ number_format($payableCredit) }}</div>
+                            <div class="mt-1 text-xs text-slate-500">
+                                {{ $remainingAmount > 0 ? 'مانده برای پرداخت: ' . number_format($remainingAmount) : 'تسویه شده' }}
+                            </div>
+                        </td>
+                        <td class="px-3 py-3 text-slate-700">
                             {{ $calculation->accountingEntry?->entry_number ?: '-' }}
                             <div class="text-xs text-slate-500">{{ $calculation->accountingEntry?->status ?: 'ثبت نشده' }}</div>
+                        </td>
+                        <td class="px-3 py-3 text-slate-700">
+                            @if($calculation->payments->isNotEmpty())
+                                <div class="font-semibold text-emerald-700">{{ number_format($paidAmount) }}</div>
+                                <div class="mt-1 text-xs text-slate-500">
+                                    سند: {{ $calculation->payments->first()?->accountingDocument?->number ?: '-' }}
+                                </div>
+                            @else
+                                <span class="text-xs text-slate-500">هنوز پرداخت نشده</span>
+                            @endif
                         </td>
                         <td class="px-3 py-3 text-slate-700">
                             {{ $calculation->payslip?->number ?: '-' }}
@@ -219,11 +242,96 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-3 py-8 text-center text-slate-500">برای ماه انتخاب‌شده هنوز محاسبه‌ای وجود ندارد.</td>
+                        <td colspan="8" class="px-3 py-8 text-center text-slate-500">برای ماه انتخاب‌شده هنوز محاسبه‌ای وجود ندارد.</td>
                     </tr>
                 @endforelse
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h3 class="text-lg font-bold text-slate-900">پرداخت حقوق</h3>
+                <p class="mt-1 text-sm text-slate-500">پرداخت را جدا از محاسبه ثبت کنید تا سند حسابداری پرداخت فقط بعد از تسویه صادر شود.</p>
+            </div>
+            <div class="text-sm text-slate-500">
+                {{ number_format($calculations->filter(fn ($calculation) => $calculation->status !== 'failed' && ((float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'))) > 0)->count()) }} مورد باز
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            @forelse($calculations->filter(fn ($calculation) => $calculation->status !== 'failed' && ((float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'))) > 0) as $calculation)
+                @php
+                    $paymentAmount = (float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'));
+                @endphp
+                <form wire:submit.prevent="registerPayment({{ $calculation->id }})" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                        <div>
+                            <div class="font-semibold text-slate-900">{{ $calculation->employee->full_name }}</div>
+                            <div class="mt-1 text-sm text-slate-600">
+                                دوره {{ $calculation->period?->persian_title }} -
+                                مانده پرداخت: <span class="font-semibold text-emerald-700">{{ number_format($paymentAmount) }}</span>
+                            </div>
+                            <div class="mt-1 text-xs text-slate-500">
+                                بستانکاری ثبت‌شده: {{ number_format((float) ($calculation->accountingEntry?->salary_payable_credit ?? $calculation->net_payable)) }}
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:min-w-[760px]">
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">تاریخ پرداخت</span>
+                                <input type="text"
+                                       wire:model.defer="paymentDrafts.{{ $calculation->id }}.payment_date"
+                                       value="{{ data_get($paymentDrafts, $calculation->id . '.payment_date', todayJalaliDate()) }}"
+                                       data-jalali-datepicker
+                                       inputmode="numeric"
+                                       dir="ltr"
+                                       placeholder="1405/03/17"
+                                       class="mt-1 w-full rounded-md border-gray-300 text-right">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">روش</span>
+                                <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.method" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                                    <option value="bank">بانکی</option>
+                                    <option value="cash">نقدی</option>
+                                </select>
+                            </label>
+
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">مبلغ</span>
+                                <input type="number"
+                                       step="1"
+                                       min="1"
+                                       wire:model.defer="paymentDrafts.{{ $calculation->id }}.amount"
+                                       value="{{ $paymentAmount }}"
+                                       class="mt-1 w-full rounded-md border-gray-300 text-right">
+                            </label>
+
+                            <label class="block">
+                                <span class="text-sm font-medium text-slate-700">شماره مرجع</span>
+                                <input type="text" wire:model.defer="paymentDrafts.{{ $calculation->id }}.reference_number" class="mt-1 w-full rounded-md border-gray-300 text-right" placeholder="اختیاری">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <label class="block flex-1">
+                            <span class="text-sm font-medium text-slate-700">توضیحات</span>
+                            <input type="text" wire:model.defer="paymentDrafts.{{ $calculation->id }}.description" class="mt-1 w-full rounded-md border-gray-300 text-right" placeholder="پرداخت کامل / بخشی">
+                        </label>
+
+                        <button type="submit" wire:loading.attr="disabled" wire:target="registerPayment({{ $calculation->id }})" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                            <span wire:loading.remove wire:target="registerPayment({{ $calculation->id }})">ثبت پرداخت</span>
+                            <span wire:loading wire:target="registerPayment({{ $calculation->id }})">در حال ثبت...</span>
+                        </button>
+                    </div>
+                </form>
+            @empty
+                <div class="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">برای ثبت پرداخت، ابتدا باید محاسبه حقوق انجام شود.</div>
+            @endforelse
         </div>
     </div>
 </div>

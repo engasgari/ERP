@@ -8,6 +8,7 @@ use App\Models\ChartAccount;
 use App\Models\InventoryDocument;
 use App\Models\Invoice;
 use App\Models\PayrollAccountingSetting;
+use App\Models\PayrollPayment;
 use App\Models\PaymentVoucher;
 use App\Models\ReceiptVoucher;
 use App\Models\Salary;
@@ -325,6 +326,51 @@ class AccountingPostingService
             'accounting_document_id' => $document->id,
             'posted_at' => now(),
         ]);
+
+        return $document;
+    }
+
+    public function fromPayrollPayment(PayrollPayment $payment, ?int $userId = null): AccountingDocument
+    {
+        $payment->loadMissing('calculation.employee.party');
+
+        if ($payment->accounting_document_id) {
+            return $payment->accountingDocument;
+        }
+
+        $employee = $payment->employee;
+        $period = $payment->calculation?->period;
+        $employeeName = $employee?->full_name ?: 'پرسنل #' . $payment->employee_id;
+        $periodTitle = $period?->persian_title ?: 'دوره نامشخص';
+        $method = $payment->method ?: 'bank';
+        $treasuryCode = $method === 'cash' ? '1201' : '1202';
+        $salaryPayableCode = $this->payrollAccountCode('salary_payable', '2104');
+        $amount = (float) $payment->amount;
+
+        $document = $this->automatic(
+            source: $payment,
+            type: 'payment',
+            date: $payment->payment_date->toDateString(),
+            description: 'پرداخت حقوق ' . $employeeName . ' - ' . $periodTitle,
+            lines: [
+                $this->line(
+                    $salaryPayableCode,
+                    $amount,
+                    0,
+                    'تسویه حقوق پرداختنی ' . $employeeName . ' - ' . $periodTitle,
+                    partyId: $employee?->party_id
+                ),
+                $this->line(
+                    $treasuryCode,
+                    0,
+                    $amount,
+                    $method === 'cash' ? 'پرداخت از صندوق' : 'پرداخت از بانک'
+                ),
+            ],
+            userId: $userId ?? $payment->calculation?->approved_by
+        );
+
+        $payment->update(['accounting_document_id' => $document->id]);
 
         return $document;
     }

@@ -161,6 +161,8 @@ class PayrollCalculationService
             $salaryIds = Salary::where('payroll_period_id', $period->id)->pluck('id');
 
             if ($calculationIds->isNotEmpty()) {
+                $paymentIds = PayrollPayment::whereIn('payroll_calculation_id', $calculationIds)->pluck('id');
+
                 PayrollCalculationLine::whereIn('payroll_calculation_id', $calculationIds)->delete();
                 PayrollAccountingEntry::whereIn('payroll_calculation_id', $calculationIds)->delete();
                 InsuranceRecord::whereIn('payroll_calculation_id', $calculationIds)->delete();
@@ -176,6 +178,17 @@ class PayrollCalculationService
                         $document->lines()->delete();
                         $document->forceDelete();
                     });
+
+                if ($paymentIds->isNotEmpty()) {
+                    AccountingDocument::query()
+                        ->where('source_type', PayrollPayment::class)
+                        ->whereIn('source_id', $paymentIds)
+                        ->get()
+                        ->each(function (AccountingDocument $document): void {
+                            $document->lines()->delete();
+                            $document->forceDelete();
+                        });
+                }
 
                 PayrollAudit::where('auditable_type', PayrollCalculation::class)
                     ->whereIn('auditable_id', $calculationIds)
