@@ -54,8 +54,14 @@
                 ['label' => 'شیفت‌های کاری', 'route' => 'work-shifts.index'],
                 ['label' => 'تقویم کاری', 'route' => 'work-calendars.index'],
                 ['label' => 'گروه‌های کاری', 'route' => 'work-groups.index'],
+            ],
+        ],
+          [
+            'label' => 'حقوق و دستمزد',
+            'route' => 'employees.index',
+            'active' => ['employees.*', 'organization-units.*', 'jobs.*', 'positions.*', 'employment-orders.*', 'employment-contracts.*', 'employee-documents.*', 'work-logs.*', 'work-shifts.*', 'work-calendars.*', 'work-groups.*', 'attendance.*', 'salaries.*', 'payroll.*'],
+            'children' => [
                 ['label' => 'لیست کارکرد', 'route' => 'work-logs.index'],
-                ['type' => 'divider'],
                 ['label' => 'محاسبه کارکرد', 'route' => 'attendance.calculations'],
                 ['label' => 'خلاصه کارکرد ماهانه', 'route' => 'attendance.summaries'],
                 ['label' => 'درخواست‌های مرخصی', 'route' => 'attendance.leaves'],
