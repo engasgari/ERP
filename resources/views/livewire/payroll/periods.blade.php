@@ -266,7 +266,7 @@
                 @php
                     $paymentAmount = (float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'));
                 @endphp
-                <form wire:submit.prevent="registerPayment({{ $calculation->id }})" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <form wire:key="payroll-payment-form-{{ $calculation->id }}" wire:submit.prevent="registerPayment({{ $calculation->id }})" class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                             <div class="font-semibold text-slate-900">{{ $calculation->employee->full_name }}</div>

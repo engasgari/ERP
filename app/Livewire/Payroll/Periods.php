@@ -177,6 +177,22 @@ class Periods extends Component
             ->orderByDesc('employee_id')
             ->get();
 
+        foreach ($calculations as $calculation) {
+            $remaining = max(0, (float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? 0));
+
+            if ($calculation->status === 'failed' || $remaining <= 0) {
+                continue;
+            }
+
+            $this->paymentDrafts[$calculation->id] = array_merge([
+                'payment_date' => todayJalaliDate(),
+                'method' => 'bank',
+                'amount' => $remaining,
+                'reference_number' => '',
+                'description' => 'پرداخت حقوق',
+            ], $this->paymentDrafts[$calculation->id] ?? []);
+        }
+
         $items = PayrollItem::orderBy('type')
             ->orderBy('sort_order')
             ->get();
