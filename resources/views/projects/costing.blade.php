@@ -28,7 +28,6 @@
                     <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">مواد مصرفی</th><td class="border border-gray-300 p-3">{{ number_format($summary['material_cost']) }}</td></tr>
                     <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">دستمزد مستقیم</th><td class="border border-gray-300 p-3">{{ number_format($summary['labor_cost']) }}</td></tr>
                     <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">خدمات و خرید مستقیم</th><td class="border border-gray-300 p-3">{{ number_format($summary['service_cost']) }}</td></tr>
-                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">سربار تخصیص‌یافته</th><td class="border border-gray-300 p-3">{{ number_format($summary['overhead_cost']) }}</td></tr>
                     </tbody>
                 </table>
 
@@ -41,26 +40,6 @@
                     </tbody>
                 </table>
             </div>
-
-            <section class="print:hidden rounded-md border border-slate-200 bg-slate-50 p-4">
-                <h3 class="mb-3 text-base font-black text-slate-800">ثبت سربار پروژه</h3>
-                <form method="POST" action="{{ route('projects.overheads.store', $project) }}" class="grid grid-cols-1 gap-3 md:grid-cols-6">
-                    @csrf
-                    <select name="method" class="rounded-md border-slate-300">
-                        <option value="manual">دستی</option>
-                        <option value="labor_hours">بر اساس ساعت کار</option>
-                        <option value="material_cost">بر اساس مواد</option>
-                        <option value="project_value">بر اساس ارزش پروژه</option>
-                        <option value="fixed_percentage">درصد ثابت</option>
-                    </select>
-                    <input name="base_amount" type="number" step="0.01" min="0" dir="ltr" placeholder="مبنای محاسبه" class="rounded-md border-slate-300">
-                    <input name="rate" type="number" step="0.0001" min="0" dir="ltr" placeholder="نرخ" class="rounded-md border-slate-300">
-                    <input name="amount" type="number" step="0.01" min="0" dir="ltr" required placeholder="مبلغ سربار (ریال)" class="rounded-md border-slate-300">
-                    <input name="allocated_date" inputmode="numeric" dir="ltr" placeholder="تاریخ" value="{{ todayJalaliDate() }}" class="rounded-md border-slate-300">
-                    <button class="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white">ثبت سربار</button>
-                    <input name="description" placeholder="توضیح" class="rounded-md border-slate-300 md:col-span-6">
-                </form>
-            </section>
 
             <section>
                 <h3 class="mb-3 text-base font-black text-slate-800">سفارش‌های تولید مرتبط</h3>
@@ -85,7 +64,7 @@
                                 <td class="border border-gray-300 p-2 print:hidden"><a href="{{ route('production-orders.show', $order) }}" class="font-bold text-blue-700">جزئیات</a></td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="border border-gray-300 p-5 text-center text-slate-500">سفارش تولیدی ثبت نشده است.</td></tr>
+                            <tr><td colspan="5" class="border border-gray-300 p-5 text-center text-slate-500">سفارشی تولیدی ثبت نشده است.</td></tr>
                         @endforelse
                         </tbody>
                     </table>

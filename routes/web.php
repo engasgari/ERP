@@ -165,9 +165,6 @@ Route::middleware('auth')->group(function () {
     Route::get('projects/{project}/costing/print', [ProjectCostController::class, 'print'])
         ->middleware('permission:projects.view')
         ->name('projects.costing.print');
-    Route::post('projects/{project}/overheads', [ProjectCostController::class, 'storeOverhead'])
-        ->middleware('permission:projects.manage')
-        ->name('projects.overheads.store');
     Route::post('production-orders/{productionOrder}/consume', [ProductionOrderController::class, 'consume'])
         ->middleware('permission:projects.manage')
         ->name('production-orders.consume');

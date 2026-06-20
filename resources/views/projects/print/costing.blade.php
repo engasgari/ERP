@@ -50,7 +50,6 @@
         <tr><td>مواد مصرفی</td><td class="text-left" dir="ltr">{{ number_format($summary['material_cost']) }}</td></tr>
         <tr><td>دستمزد مستقیم</td><td class="text-left" dir="ltr">{{ number_format($summary['labor_cost']) }}</td></tr>
         <tr><td>خدمات و خرید مستقیم</td><td class="text-left" dir="ltr">{{ number_format($summary['service_cost']) }}</td></tr>
-        <tr><td>سربار تخصیص‌یافته</td><td class="text-left" dir="ltr">{{ number_format($summary['overhead_cost']) }}</td></tr>
         </tbody>
         <tfoot>
         <tr>
@@ -94,7 +93,7 @@
             </tr>
         @empty
             <tr>
-                <td colspan="4" style="text-align: center;">سفارش تولیدی ثبت نشده است.</td>
+                <td colspan="4" style="text-align: center;">سفارشی تولیدی ثبت نشده است.</td>
             </tr>
         @endforelse
         </tbody>

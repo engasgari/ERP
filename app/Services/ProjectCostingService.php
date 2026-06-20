@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\BomVersion;
-use App\Models\ProductionOrder;
+use App\Models\PayrollCalculation;
 use App\Models\Project;
+use App\Models\Salary;
+use App\Models\ProductionOrder;
+use App\Models\PayrollAccountingSetting;
 use Illuminate\Support\Facades\DB;
 
 class ProjectCostingService
@@ -13,10 +16,10 @@ class ProjectCostingService
     {
         $revenue = $this->projectRevenue($project);
         $materialCost = $this->materialCost($project);
-        $laborCost = (float) $project->workLogs()->sum('total_amount');
+        $laborCost = $this->directLaborCost($project);
         $serviceCost = $this->serviceCost($project);
-        $overheadCost = (float) $project->overheadAllocations()->sum('amount');
-        $totalCost = $materialCost + $laborCost + $serviceCost + $overheadCost;
+        $overheadCost = 0.0;
+        $totalCost = $materialCost + $laborCost + $serviceCost;
         $profit = $revenue - $totalCost;
         $margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
         $budget = (float) $project->budget;
@@ -71,6 +74,20 @@ class ProjectCostingService
         ])->all();
     }
 
+    public function directLaborCost(Project $project): float
+    {
+        $salaryExpenseCode = $this->salaryExpenseAccountCode();
+
+        return (float) DB::table('accounting_document_lines as lines')
+            ->join('accounting_documents as docs', 'docs.id', '=', 'lines.accounting_document_id')
+            ->join('chart_accounts as accounts', 'accounts.id', '=', 'lines.chart_account_id')
+            ->where('lines.project_id', $project->id)
+            ->where('docs.status', 'posted')
+            ->whereIn('docs.source_type', [PayrollCalculation::class, Salary::class])
+            ->where('accounts.code', $salaryExpenseCode)
+            ->sum('lines.debit');
+    }
+
     private function projectRevenue(Project $project): float
     {
         $financialRevenue = (float) $project->financialTransactions()
@@ -86,13 +103,21 @@ class ProjectCostingService
         return $financialRevenue + $invoiceRevenue;
     }
 
-    private function serviceCost(Project $project): float
+    public function serviceCost(Project $project): float
     {
         return (float) DB::table('invoices')
             ->where('project_id', $project->id)
             ->where('direction', 'purchase')
             ->where('status', 'confirmed')
             ->sum('total_amount');
+    }
+
+    private function salaryExpenseAccountCode(): string
+    {
+        return PayrollAccountingSetting::query()
+            ->where('key', 'salary_expense')
+            ->where('is_active', true)
+            ->value('account_code') ?: '5202';
     }
 
     private function materialCost(Project $project): float

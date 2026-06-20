@@ -75,6 +75,7 @@ class RequiredWorkingTimeService
     {
         $requiredDays = 0;
         $requiredMinutes = 0;
+        $monthlyCapMinutes = $isHourly ? PHP_INT_MAX : 192 * 60;
         $daily = [];
         $date = $period->starts_at->copy();
 
@@ -89,7 +90,8 @@ class RequiredWorkingTimeService
 
             $dailyMinutes = (int) round(((float) ($shift?->daily_work_hours ?: 8)) * 60);
             $isWorkingDay = $this->isWorkingDay($date, $calendar);
-            $plannedMinutes = (! $isHourly && $isWorkingDay) ? $dailyMinutes : 0;
+            $remainingMinutes = max(0, $monthlyCapMinutes - $requiredMinutes);
+            $plannedMinutes = (! $isHourly && $isWorkingDay) ? min($dailyMinutes, $remainingMinutes) : 0;
 
             if ($plannedMinutes > 0) {
                 $requiredDays++;

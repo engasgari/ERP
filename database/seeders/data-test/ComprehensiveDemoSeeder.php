@@ -49,6 +49,7 @@ use App\Models\WorkCalendar;
 use App\Models\WorkGroup;
 use App\Models\WorkLog;
 use App\Models\WorkShift;
+use App\Support\WorkCalendarDefaults;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -590,7 +591,7 @@ class ComprehensiveDemoSeeder extends Seeder
         );
         $calendar = WorkCalendar::updateOrCreate(
             ['code' => 'CAL-DEMO-1405'],
-            ['name' => 'تقویم کاری ۱۴۰۵', 'jalali_year' => 1405, 'working_days' => [0, 1, 2, 3, 4], 'weekend_days' => [5, 6], 'holidays' => [], 'is_default' => true, 'is_active' => true]
+            ['name' => 'تقویم کاری ۱۴۰۵', 'jalali_year' => 1405] + WorkCalendarDefaults::defaultCalendar(1405) + ['is_default' => true, 'is_active' => true]
         );
         $group = WorkGroup::updateOrCreate(
             ['code' => 'WG-DEMO-001'],

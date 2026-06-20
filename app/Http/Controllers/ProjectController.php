@@ -10,7 +10,6 @@ use App\Models\Party;
 use App\Models\ProductionOrder;
 use App\Models\Project;
 use App\Models\ProjectCostSnapshot;
-use App\Models\ProjectOverheadAllocation;
 use App\Models\TreasuryTransaction;
 use App\Models\User;
 use App\Models\WorkLog;
@@ -119,7 +118,6 @@ class ProjectController extends Controller
             'سفارش تولید' => ProductionOrder::where('project_id', $project->id)->count(),
             'ردیف سند حسابداری' => AccountingDocumentLine::where('project_id', $project->id)->count(),
             'تراکنش خزانه' => TreasuryTransaction::where('project_id', $project->id)->count(),
-            'سربار پروژه' => ProjectOverheadAllocation::where('project_id', $project->id)->count(),
             'اسنپ‌شات بهای تمام‌شده' => ProjectCostSnapshot::where('project_id', $project->id)->count(),
         ];
 

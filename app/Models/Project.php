@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ProjectCostingService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,11 +74,6 @@ class Project extends Model
         return $this->hasMany(ProductionOrder::class);
     }
 
-    public function overheadAllocations(): HasMany
-    {
-        return $this->hasMany(ProjectOverheadAllocation::class);
-    }
-
     public function costSnapshots(): HasMany
     {
         return $this->hasMany(ProjectCostSnapshot::class);
@@ -110,14 +106,20 @@ class Project extends Model
             ->where('type', 'expense')
             ->sum('amount');
 
-        $laborCosts = (float) $this->workLogs()->sum('total_amount');
+        $laborCosts = $this->total_labor_cost;
+        $serviceCosts = $this->total_service_cost;
 
-        return $financialExpenses + $laborCosts + $this->total_warehouse_cost;
+        return $financialExpenses + $laborCosts + $serviceCosts + $this->total_warehouse_cost;
     }
 
     public function getTotalLaborCostAttribute(): float
     {
-        return (float) $this->workLogs()->sum('total_amount');
+        return app(ProjectCostingService::class)->directLaborCost($this);
+    }
+
+    public function getTotalServiceCostAttribute(): float
+    {
+        return app(ProjectCostingService::class)->serviceCost($this);
     }
 
     public function getTotalWorkHoursAttribute(): float

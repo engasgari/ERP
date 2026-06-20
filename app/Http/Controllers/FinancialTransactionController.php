@@ -212,7 +212,7 @@ class FinancialTransactionController extends Controller
         // محاسبات مالی
         $totalIncome = (float) $project->financialTransactions()->where('type', 'income')->sum('amount');
         $totalExpense = (float) $project->financialTransactions()->where('type', 'expense')->sum('amount');
-        $totalLaborCost = (float) $project->workLogs()->sum('total_amount');
+        $totalLaborCost = $project->total_labor_cost;
 
         // محاسبه سود ناخالص و خالص
         $grossProfit = $totalIncome - $totalExpense ; // سود قبل از کسر حقوق

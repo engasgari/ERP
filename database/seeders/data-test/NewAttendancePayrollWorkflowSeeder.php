@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\WorkCalendar;
 use App\Models\WorkGroup;
 use App\Models\WorkShift;
+use App\Support\WorkCalendarDefaults;
 use App\Services\NewPayrollEngineService;
 use App\Services\PayrollCalculationService;
 use Carbon\Carbon;
@@ -55,7 +56,10 @@ class NewAttendancePayrollWorkflowSeeder extends Seeder
                 ['code' => 'SHIFT-NIGHT', 'name' => 'شیفت شب', 'start_time' => '22:00:00', 'end_time' => '06:00:00', 'daily_work_hours' => 8],
             ])->map(fn ($row) => WorkShift::updateOrCreate(['code' => $row['code']], $row + ['break_minutes' => 60, 'overtime_multiplier' => 1.4, 'late_tolerance_minutes' => 10, 'early_leave_tolerance_minutes' => 10, 'is_active' => true]));
 
-            $calendar = WorkCalendar::updateOrCreate(['code' => 'CAL-1405-NEW'], ['name' => 'تقویم کاری ۱۴۰۵', 'jalali_year' => 1405, 'working_days' => [0, 1, 2, 3, 4, 6], 'weekend_days' => [5], 'holidays' => [], 'is_default' => true, 'is_active' => true]);
+            $calendar = WorkCalendar::updateOrCreate(
+                ['code' => 'CAL-1405-NEW'],
+                ['name' => 'تقویم کاری ۱۴۰۵', 'jalali_year' => 1405] + WorkCalendarDefaults::defaultCalendar(1405) + ['is_default' => true, 'is_active' => true]
+            );
             $groups = $shifts->map(fn ($shift, $i) => WorkGroup::updateOrCreate(['code' => 'WG-NEW-' . ($i + 1)], ['name' => 'گروه ' . $shift->name, 'work_shift_id' => $shift->id, 'work_calendar_id' => $calendar->id, 'is_active' => true]));
 
             // $firstNames = ['لیلا', 'مریم', 'زهرا', 'سارا', 'نگار', 'رضا', 'علی', 'محمد', 'حسین', 'امیر', 'نیما', 'کیان', 'ندا', 'الهام', 'فرهاد', 'آرمان', 'پویا', 'مهسا', 'سپیده', 'شهاب'];

@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call(AccessControlSeeder::class);
         $this->call(BusinessCoreSeeder::class);
+        $this->call(WorkCalendarSeeder::class);
         $this->call(AccountingTreasurySeeder::class);
         $this->call(StandardPayrollSeeder::class);
         $this->call(SmallBusinessHrSeeder::class);

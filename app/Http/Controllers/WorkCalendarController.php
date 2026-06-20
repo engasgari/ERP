@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WorkCalendar;
+use App\Support\WorkCalendarDefaults;
 use Illuminate\Http\Request;
 
 class WorkCalendarController extends Controller
@@ -23,6 +24,7 @@ class WorkCalendarController extends Controller
         $data['working_days'] = $this->csv($request->input('working_days'));
         $data['weekend_days'] = $this->csv($request->input('weekend_days'));
         $data['holidays'] = $this->csv($request->input('holidays'));
+        $data = $this->applyDefaults($data);
         WorkCalendar::create($data);
 
         return redirect()->route('work-calendars.index')->with('success', 'تقویم کاری ثبت شد.');
@@ -39,6 +41,7 @@ class WorkCalendarController extends Controller
         $data['working_days'] = $this->csv($request->input('working_days'));
         $data['weekend_days'] = $this->csv($request->input('weekend_days'));
         $data['holidays'] = $this->csv($request->input('holidays'));
+        $data = $this->applyDefaults($data);
         $workCalendar->update($data);
 
         return redirect()->route('work-calendars.index')->with('success', 'تقویم کاری ویرایش شد.');
@@ -82,5 +85,20 @@ class WorkCalendarController extends Controller
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function applyDefaults(array $data): array
+    {
+        $year = (int) ($data['jalali_year'] ?? 0);
+
+        if (in_array($year, [1404, 1405], true)) {
+            $defaults = WorkCalendarDefaults::defaultCalendar($year);
+
+            $data['working_days'] = $data['working_days'] ?: $defaults['working_days'];
+            $data['weekend_days'] = $data['weekend_days'] ?: $defaults['weekend_days'];
+            $data['holidays'] = $data['holidays'] ?: $defaults['holidays'];
+        }
+
+        return $data;
     }
 }

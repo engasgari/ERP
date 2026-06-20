@@ -13,6 +13,7 @@ use App\Models\WorkCalendar;
 use App\Models\WorkGroup;
 use App\Models\WorkLog;
 use App\Models\WorkShift;
+use App\Support\WorkCalendarDefaults;
 use App\Services\PayrollCalculationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -54,9 +55,9 @@ class CalculatorShamsiSeeder extends Seeder
             [
                 'name' => 'تقویم کاری شمسی ۱۴۰۵',
                 'jalali_year' => self::JALALI_YEAR,
-                'working_days' => [0, 1, 2, 3, 4],
-                'weekend_days' => [5, 6],
-                'holidays' => [],
+                'working_days' => WorkCalendarDefaults::workingDays(),
+                'weekend_days' => WorkCalendarDefaults::weekendDays(),
+                'holidays' => WorkCalendarDefaults::calendar(self::JALALI_YEAR)['holidays'],
                 'is_default' => true,
                 'is_active' => true,
                 'description' => 'تقویم demo برای تست محاسبه حقوق و حضور و غیاب شمسی',
