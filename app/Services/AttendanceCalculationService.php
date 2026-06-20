@@ -4,71 +4,62 @@ namespace App\Services;
 
 use App\Models\AttendanceCalculation;
 use App\Models\Employee;
+use App\Models\MonthlyAttendance;
 use App\Models\PayrollPeriod;
-use App\Models\WorkLog;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceCalculationService
 {
+    public function __construct(private readonly NewAttendanceEngineService $attendanceEngine)
+    {
+    }
+
     public function calculatePeriod(PayrollPeriod $period): Collection
     {
-        $logs = WorkLog::query()
-            ->with('employee')
-            ->whereBetween('work_date', [$period->starts_at, $period->ends_at])
-            ->get()
-            ->groupBy('employee_id');
+        $attendances = $this->attendanceEngine->processPeriod($period)->loadMissing('employee.party');
 
-        return DB::transaction(function () use ($period, $logs) {
+        return DB::transaction(function () use ($period, $attendances) {
             AttendanceCalculation::where('payroll_period_id', $period->id)->delete();
 
-            return $logs->map(function (Collection $employeeLogs, int $employeeId) use ($period) {
-                $employee = $employeeLogs->first()->employee ?: Employee::find($employeeId);
-                $normalHours = 0.0;
-                $overtimeHours = 0.0;
-
-                foreach ($employeeLogs as $log) {
-                    $hours = (float) $log->hours;
-                    $explicitOvertime = (float) ($log->overtime_hours ?? 0);
-
-                    if ($explicitOvertime > 0) {
-                        $overtimeHours += $explicitOvertime;
-                        $normalHours += max(0, $hours - $explicitOvertime);
-                    } else {
-                        $normalHours += min($hours, 8);
-                        $overtimeHours += max(0, $hours - 8);
-                    }
-                }
-
+            return $attendances->map(function (MonthlyAttendance $attendance) use ($period) {
+                $employee = $attendance->employee ?: Employee::find($attendance->employee_id);
                 $hourlyRate = $this->resolveHourlyRate($employee);
                 $overtimeRate = $this->resolveOvertimeRate($employee, $hourlyRate);
-                $missionHours = (float) $employeeLogs->sum('mission_hours');
-                $delayHours = (float) $employeeLogs->sum('delay_hours');
-                $earlyLeaveHours = (float) $employeeLogs->sum('early_leave_hours');
-                $absenceHours = (float) $employeeLogs->sum('absence_hours');
-                $laborCost = ($normalHours * $hourlyRate) + ($overtimeHours * $overtimeRate) + ($missionHours * $hourlyRate);
+                $workedHours = (float) ($attendance->worked_hours ?? $attendance->normal_hours ?? 0);
+                $overtimeHours = (float) ($attendance->overtime_hours ?? 0);
+                $missionHours = (float) ($attendance->mission_hours ?? 0);
+                $delayHours = (float) ($attendance->delay_hours ?? 0);
+                $earlyLeaveHours = (float) ($attendance->early_leave_hours ?? 0);
+                $absenceHours = (float) ($attendance->absence_hours ?? 0);
+                $leaveHours = (float) ($attendance->leave_hours ?? 0);
+                $payableHours = (float) ($attendance->payable_hours ?? 0);
+                $laborCost = (($attendance->net_payable_hours ?? $workedHours) * $hourlyRate)
+                    + ($overtimeHours * $overtimeRate)
+                    + ($missionHours * $hourlyRate);
 
                 return AttendanceCalculation::create([
                     'payroll_period_id' => $period->id,
-                    'employee_id' => $employeeId,
+                    'employee_id' => $attendance->employee_id,
                     'project_id' => null,
-                    'normal_hours' => $normalHours,
+                    'normal_hours' => $workedHours,
                     'overtime_hours' => $overtimeHours,
                     'delay_hours' => $delayHours,
                     'early_leave_hours' => $earlyLeaveHours,
                     'mission_hours' => $missionHours,
                     'absence_hours' => $absenceHours,
-                    'leave_hours' => (float) $employeeLogs->sum('leave_hours'),
-                    'holiday_hours' => 0,
-                    'night_hours' => 0,
-                    'payable_hours' => $normalHours + $overtimeHours + $missionHours,
+                    'leave_hours' => $leaveHours,
+                    'holiday_hours' => (float) ($attendance->holiday_hours ?? 0),
+                    'night_hours' => (float) ($attendance->night_hours ?? 0),
+                    'payable_hours' => $payableHours,
                     'hourly_rate' => $hourlyRate,
                     'labor_cost' => $laborCost,
                     'status' => 'calculated',
                     'meta' => [
-                        'work_log_count' => $employeeLogs->count(),
-                        'work_days' => $employeeLogs->pluck('work_date')->unique()->count(),
+                        'work_day_count' => count((array) ($attendance->meta['daily'] ?? [])),
+                        'working_days' => (int) ($attendance->working_days ?? $attendance->work_days ?? 0),
                         'overtime_rate' => $overtimeRate,
+                        'net_payable_hours' => (float) ($attendance->net_payable_hours ?? 0),
                     ],
                 ]);
             })->values();

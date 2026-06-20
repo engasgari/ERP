@@ -38,7 +38,7 @@ class NewPayrollEngineService
         $this->assertAttendanceCalculated($period);
 
         return DB::transaction(function () use ($period) {
-            $calculations = MonthlyAttendance::with('employee.party')
+            $calculations = MonthlyAttendance::with(['employee.party', 'employee.employmentOrders'])
                 ->where('payroll_period_id', $period->id)
                 ->orderBy('employee_id')
                 ->get()
@@ -89,8 +89,9 @@ class NewPayrollEngineService
         $overtimeRate = $hourlyRate * 1.4;
         $nightRate = $hourlyRate * 0.35;
         $holidayRate = $hourlyRate * 1.4;
+        $netPayableHours = (float) ($attendance->net_payable_hours ?? $attendance->payable_hours ?? $attendance->normal_hours ?? 0);
         $baseSalary = $isHourly
-            ? (float) $attendance->normal_hours * $hourlyRate
+            ? $netPayableHours * $hourlyRate
             : (float) ($order?->base_salary ?: $employee->base_salary ?: 0);
 
         if ($isHourly) {
@@ -102,7 +103,7 @@ class NewPayrollEngineService
             $netPayable = $gross;
 
             $lines = collect([
-                ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'hours' => (float) $attendance->normal_hours, 'rate' => $hourlyRate, 'amount' => $gross],
+                ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'hours' => $netPayableHours, 'rate' => $hourlyRate, 'amount' => $gross],
             ])->filter(fn ($line) => (float) $line['amount'] > 0)->values();
 
             $lines->push(...collect([
@@ -215,7 +216,7 @@ class NewPayrollEngineService
         }
 
         $lines = collect([
-            ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'hours' => (float) $attendance->normal_hours, 'rate' => $hourlyRate, 'amount' => $baseSalary],
+            ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'hours' => $netPayableHours, 'rate' => $hourlyRate, 'amount' => $baseSalary],
             ['code' => 'overtime', 'title' => 'اضافه‌کاری', 'type' => 'earning', 'hours' => (float) $attendance->overtime_hours, 'rate' => $overtimeRate, 'amount' => (float) $attendance->overtime_hours * $overtimeRate],
             ['code' => 'mission', 'title' => 'ماموریت', 'type' => 'earning', 'hours' => (float) $attendance->mission_hours, 'rate' => $hourlyRate, 'amount' => (float) $attendance->mission_hours * $hourlyRate],
             ['code' => 'night_shift', 'title' => 'شب‌کاری', 'type' => 'earning', 'hours' => (float) $attendance->night_hours, 'rate' => $nightRate, 'amount' => (float) $attendance->night_hours * $nightRate],
@@ -623,13 +624,19 @@ class NewPayrollEngineService
 
     private function approvedOrderFor(Employee $employee, PayrollPeriod $period): ?EmploymentOrder
     {
-        return $employee->employmentOrders()
+        $orders = $employee->relationLoaded('employmentOrders')
+            ? $employee->employmentOrders
+            : $employee->employmentOrders()->get();
+
+        return $orders
             ->where('status', 'approved')
-            ->whereDate('effective_date', '<=', $period->ends_at)
-            ->where(function ($query) use ($period) {
-                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $period->starts_at);
+            ->filter(function (EmploymentOrder $order) use ($period): bool {
+                return $order->effective_date
+                    && $order->effective_date->lte($period->ends_at)
+                    && (! $order->end_date || $order->end_date->gte($period->starts_at));
             })
-            ->latest('effective_date')
+            ->sortByDesc('effective_date')
+            ->sortByDesc('id')
             ->first();
     }
 

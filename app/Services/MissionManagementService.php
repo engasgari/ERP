@@ -60,19 +60,27 @@ class MissionManagementService
                 ->diffInMinutes(Carbon::parse($startDate . ' ' . $data['start_time']));
         }
 
-        $totalDays = (float) ($data['total_days'] ?? 0);
+        $totalDays = isset($data['total_days']) && $data['total_days'] !== ''
+            ? (float) $data['total_days']
+            : 0.0;
         if ($type === 'daily' && $totalDays <= 0 && $startDate && $endDate) {
             $totalDays = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
         }
 
-        return $data + [
+        if ($type === 'daily' && $durationMinutes <= 0 && $totalDays > 0) {
+            $durationMinutes = (int) round($totalDays * 480);
+        }
+
+        return array_merge($data, [
             'request_type' => $type,
             'mission_date' => $data['mission_date'] ?? $startDate,
             'start_date' => $startDate,
             'end_date' => $endDate,
             'duration_minutes' => $durationMinutes,
-            'hours' => $data['hours'] ?? round($durationMinutes / 60, 2),
+            'hours' => isset($data['hours']) && $data['hours'] !== ''
+                ? $data['hours']
+                : round($durationMinutes / 60, 2),
             'total_days' => $totalDays,
-        ];
+        ]);
     }
 }

@@ -11,183 +11,134 @@ use App\Models\Employee;
 use App\Models\EmploymentOrder;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollPeriod;
-use App\Models\WorkCalendar;
 use App\Models\WorkGroup;
+use App\Models\WorkGroupEmployee;
 use App\Models\WorkLog;
-use App\Models\WorkShift;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class NewAttendanceEngineService
 {
-    public function processPeriod(PayrollPeriod $period, ?int $employeeId = null, bool $includeAllActive = false): Collection
+    public function __construct(private readonly AttendanceDayCalculatorService $dayCalculator)
     {
-        if ($employeeId) {
-            $employeeIds = collect([$employeeId]);
-        } elseif ($includeAllActive) {
-            $employeeIds = Employee::query()
-                ->where(function ($query): void {
-                    $query->where('is_active', true)->orWhere('status', 'active');
-                })
-                ->pluck('id');
-        } else {
-            $employeeIds = WorkLog::query()
-                ->whereBetween('work_date', [$period->starts_at, $period->ends_at])
-                ->pluck('employee_id')
-                ->merge(AttendanceRawLog::query()
-                    ->whereBetween('logged_at', [$period->starts_at, $period->ends_at])
-                    ->pluck('employee_id'))
-                ->merge(AttendanceLeave::query()
-                    ->where('status', 'approved')
-                    ->where(function ($query) use ($period): void {
-                        $query->where(function ($dated) use ($period): void {
-                            $dated->whereDate('start_date', '<=', $period->ends_at)
-                                ->whereDate('end_date', '>=', $period->starts_at);
-                        })->orWhereBetween('leave_date', [$period->starts_at, $period->ends_at]);
-                    })
-                    ->pluck('employee_id'))
-                ->merge(AttendanceMission::query()
-                    ->where('status', 'approved')
-                    ->where(function ($query) use ($period): void {
-                        $query->where(function ($dated) use ($period): void {
-                            $dated->whereDate('start_date', '<=', $period->ends_at)
-                                ->whereDate('end_date', '>=', $period->starts_at);
-                        })->orWhereBetween('mission_date', [$period->starts_at, $period->ends_at]);
-                    })
-                    ->pluck('employee_id'))
-                ->filter()
-                ->unique()
-                ->values();
-        }
-
-        return Employee::query()
-            ->whereIn('id', $employeeIds)
-            ->with(['party'])
-            ->get()
-            ->map(fn (Employee $employee) => $this->processEmployee($period, $employee));
     }
 
-    public function processEmployee(PayrollPeriod $period, Employee $employee): MonthlyAttendance
+    public function processPeriod(PayrollPeriod $period, ?int $employeeId = null, bool $includeAllActive = false): Collection
     {
+        $employeeIds = $this->resolveEmployeeIds($period, $employeeId, $includeAllActive);
+
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
+
+        $employees = Employee::query()
+            ->whereIn('id', $employeeIds)
+            ->with([
+                'party',
+                'employmentOrders',
+                'workGroupAssignments.workGroup.shift',
+                'workGroupAssignments.workGroup.calendar',
+            ])
+            ->get()
+            ->keyBy('id');
+
+        $periodData = $this->loadPeriodData($period, $employeeIds);
+
+        return $employees
+            ->values()
+            ->map(fn (Employee $employee) => $this->processEmployee($period, $employee, $periodData));
+    }
+
+    public function processEmployee(PayrollPeriod $period, Employee $employee, ?array $periodData = null): MonthlyAttendance
+    {
+        $periodData ??= $this->loadPeriodData($period, collect([$employee->id]));
+
         $requiredTime = app(RequiredWorkingTimeService::class);
-        $order = $requiredTime->activeDecree($employee, $period);
+        $order = $this->approvedOrderFor($employee, $period);
         $isHourly = $this->isHourlyEmployee($employee, $order);
         $monthRequiredTime = $requiredTime->month($employee, $period, $isHourly);
-        $normalMinutes = $overtimeMinutes = $delayMinutes = $earlyLeaveMinutes = 0;
-        $holidayMinutes = $nightMinutes = $leaveMinutes = $missionMinutes = $absenceMinutes = 0;
-        $dailyLeaveDays = $dailyMissionDays = 0.0;
-        $presentDays = $workDays = 0;
+
+        $calendarDays = $period->starts_at->daysInMonth;
+        $workingDays = 0;
+        $presentDays = 0;
         $plannedMinutes = 0;
+        $workedMinutes = 0;
+        $breakMinutes = 0;
+        $delayMinutes = 0;
+        $earlyLeaveMinutes = 0;
+        $leaveMinutes = 0;
+        $missionMinutes = 0;
+        $absenceMinutes = 0;
+        $overtimeMinutes = 0;
+        $holidayMinutes = 0;
+        $netPayableMinutes = 0;
+        $payableMinutes = 0;
+        $nightMinutes = 0;
+        $dailyLeaveDays = 0.0;
+        $dailyMissionDays = 0.0;
         $daily = [];
-
-        $workLogsByDate = WorkLog::query()
-            ->where('employee_id', $employee->id)
-            ->whereBetween('work_date', [$period->starts_at, $period->ends_at])
-            ->orderBy('work_date')
-            ->orderBy('id')
-            ->get()
-            ->groupBy(fn (WorkLog $log) => $log->work_date?->toDateString() ?? (string) $log->work_date);
-
-        $rawLogsByDate = AttendanceRawLog::query()
-            ->where('employee_id', $employee->id)
-            ->whereBetween('logged_at', [$period->starts_at, $period->ends_at])
-            ->orderBy('logged_at')
-            ->get()
-            ->groupBy(fn (AttendanceRawLog $log) => $log->logged_at->toDateString());
-
-        $leaves = AttendanceLeave::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', 'approved')
-            ->where(function ($query) use ($period): void {
-                $query->where(function ($dated) use ($period): void {
-                    $dated->whereDate('start_date', '<=', $period->ends_at)
-                        ->whereDate('end_date', '>=', $period->starts_at);
-                })->orWhereBetween('leave_date', [$period->starts_at, $period->ends_at]);
-            })
-            ->get();
-
-        $missions = AttendanceMission::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', 'approved')
-            ->where(function ($query) use ($period): void {
-                $query->where(function ($dated) use ($period): void {
-                    $dated->whereDate('start_date', '<=', $period->ends_at)
-                        ->whereDate('end_date', '>=', $period->starts_at);
-                })->orWhereBetween('mission_date', [$period->starts_at, $period->ends_at]);
-            })
-            ->get();
 
         $date = $period->starts_at->copy();
         while ($date->lte($period->ends_at)) {
             $dateKey = $date->toDateString();
-            $dayRequired = $monthRequiredTime['daily'][$dateKey];
-            $workGroup = $dayRequired['work_group'];
-            $shift = $dayRequired['shift'];
-            $dailyMinutes = $dayRequired['daily_minutes'];
-            $isWorkingDay = $dayRequired['is_working_day'];
-            $dayPlanned = $dayRequired['planned_minutes'];
+            $workGroup = $this->workGroupForDate($employee, $date);
+            $employeeWorkLogs = $periodData['work_logs'][$employee->id] ?? collect();
+            $employeeRawLogs = $periodData['raw_logs'][$employee->id] ?? collect();
+            $dayWorkLogs = $employeeWorkLogs[$dateKey] ?? collect();
+            $dayRawLogs = $employeeRawLogs[$dateKey] ?? collect();
+            $dayLogs = $dayWorkLogs->isNotEmpty() ? $dayWorkLogs : $dayRawLogs;
+            $dayLeaves = $periodData['leaves'][$employee->id] ?? collect();
+            $dayMissions = $periodData['missions'][$employee->id] ?? collect();
 
-            if ($dayPlanned > 0) {
-                $workDays++;
-                $plannedMinutes += $dayPlanned;
+            $metrics = $this->dayCalculator->calculate(
+                $date,
+                $workGroup,
+                $dayLogs,
+                $dayLeaves,
+                $dayMissions,
+            );
+
+            if ((int) $metrics['planned_minutes'] > 0) {
+                $workingDays++;
+                $plannedMinutes += (int) $metrics['planned_minutes'];
             }
 
-            $dayLogs = $workLogsByDate->get($dateKey, collect());
-            $worked = (int) round((float) $dayLogs->sum('hours') * 60);
-            $explicitOvertime = (int) round((float) $dayLogs->sum('overtime_hours') * 60);
-            $dayDelay = (int) round((float) $dayLogs->sum('delay_hours') * 60);
-            $dayEarly = (int) round((float) $dayLogs->sum('early_leave_hours') * 60);
-            $firstLog = $dayLogs->sortBy(fn (WorkLog $log) => $log->check_in_time ?: $log->start_time)->first();
-            $lastLog = $dayLogs->sortByDesc(fn (WorkLog $log) => $log->check_out_time ?: $log->end_time)->first();
+            $workedMinutes += (int) $metrics['worked_minutes'];
+            $breakMinutes += (int) $metrics['break_minutes'];
+            $delayMinutes += (int) $metrics['delay_minutes'];
+            $earlyLeaveMinutes += (int) $metrics['early_leave_minutes'];
+            $leaveMinutes += (int) $metrics['leave_minutes'];
+            $missionMinutes += (int) $metrics['mission_minutes'];
+            $absenceMinutes += (int) $metrics['absence_minutes'];
+            $overtimeMinutes += (int) $metrics['overtime_minutes'];
+            $holidayMinutes += (int) $metrics['holiday_minutes'];
+            $netPayableMinutes += (int) $metrics['net_payable_minutes'];
+            $payableMinutes += (int) $metrics['payable_minutes'];
+            $dailyLeaveDays += (float) $metrics['leave_days'];
+            $dailyMissionDays += (float) $metrics['mission_days'];
 
-            if ($worked === 0) {
-                [$worked, $dayDelay, $dayEarly, $firstLog, $lastLog] = $this->rawLogWork($date, $rawLogsByDate->get($dateKey, collect()), $shift);
-            }
-
-            $dayLeave = $this->approvedMinutesForDate($leaves, $date, $dailyMinutes);
-            $dayMission = $this->approvedMinutesForDate($missions, $date, $dailyMinutes);
-            $leaveMinutes += $dayLeave['minutes'];
-            $missionMinutes += $dayMission['minutes'];
-            $dailyLeaveDays += $dayLeave['days'];
-            $dailyMissionDays += $dayMission['days'];
-
-            $availablePlanned = max(0, $dayPlanned - $dayLeave['minutes'] - $dayMission['minutes']);
-            if ($isHourly) {
-                $dayNormal = $worked;
-                $dayOvertime = 0;
-                $dayHoliday = 0;
-                $dayAbsence = 0;
-                $dayDelay = 0;
-                $dayEarly = 0;
-            } else {
-                $dayNormal = $isWorkingDay ? min($worked, $dailyMinutes) : 0;
-                $dayOvertime = $explicitOvertime > 0 ? $explicitOvertime : max(0, $worked - $availablePlanned);
-                $dayHoliday = $isWorkingDay ? 0 : $worked + $dayMission['minutes'];
-                $dayAbsence = max(0, $dayPlanned - $worked - $dayLeave['minutes'] - $dayMission['minutes']);
-            }
-
-            $normalMinutes += $dayNormal;
-            $overtimeMinutes += $dayOvertime;
-            $holidayMinutes += $dayHoliday;
-            $delayMinutes += $dayDelay;
-            $earlyLeaveMinutes += $dayEarly;
-            $absenceMinutes += $dayAbsence;
-            $nightMinutes += (int) round($this->nightHoursForLogs($date, $firstLog, $lastLog) * 60);
-
-            if ($worked > 0 || $dayMission['minutes'] > 0) {
+            if ((int) $metrics['worked_minutes'] > 0 || (int) $metrics['leave_minutes'] > 0 || (int) $metrics['mission_minutes'] > 0 || (int) $metrics['holiday_minutes'] > 0) {
                 $presentDays++;
             }
 
-            $daily[] = [
-                'date' => $dateKey,
-                'work_group_id' => $workGroup?->id,
-                'shift_id' => $shift?->id,
-                'planned_minutes' => $dayPlanned,
-                'worked_minutes' => $worked,
-                'leave_minutes' => $dayLeave['minutes'],
-                'mission_minutes' => $dayMission['minutes'],
-                'overtime_minutes' => $dayOvertime,
-                'absence_minutes' => $dayAbsence,
+            $nightMinutes += $this->nightMinutesForLogs($date, $dayLogs);
+
+            $daily[] = $metrics + [
+                'work_group_id' => $metrics['work_group_id'],
+                'shift_id' => $metrics['shift_id'],
+                'work_date' => $dateKey,
+                'worked_hours' => round(((int) $metrics['worked_minutes']) / 60, 2),
+                'break_hours' => round(((int) $metrics['break_minutes']) / 60, 2),
+                'delay_hours' => round(((int) $metrics['delay_minutes']) / 60, 2),
+                'early_leave_hours' => round(((int) $metrics['early_leave_minutes']) / 60, 2),
+                'leave_hours' => round(((int) $metrics['leave_minutes']) / 60, 2),
+                'mission_hours' => round(((int) $metrics['mission_minutes']) / 60, 2),
+                'absence_hours' => round(((int) $metrics['absence_minutes']) / 60, 2),
+                'overtime_hours' => round(((int) $metrics['overtime_minutes']) / 60, 2),
+                'holiday_hours' => round(((int) $metrics['holiday_minutes']) / 60, 2),
+                'net_payable_hours' => round(((int) $metrics['net_payable_minutes']) / 60, 2),
+                'payable_hours' => round(((int) $metrics['payable_minutes']) / 60, 2),
             ];
 
             $date->addDay();
@@ -197,30 +148,38 @@ class NewAttendanceEngineService
             ['employee_id' => $employee->id, 'year' => $period->year, 'month' => $period->month],
             [
                 'payroll_period_id' => $period->id,
+                'calendar_days' => $calendarDays,
+                'working_days' => $workingDays,
                 'required_days' => $monthRequiredTime['required_days'],
                 'required_hours' => $monthRequiredTime['required_hours'],
                 'required_minutes' => $monthRequiredTime['required_minutes'],
                 'worked_days' => $presentDays,
-                'worked_hours' => round($normalMinutes / 60, 2),
+                'worked_hours' => round($workedMinutes / 60, 2),
                 'planned_minutes' => $plannedMinutes,
-                'worked_minutes' => $normalMinutes,
+                'worked_minutes' => $workedMinutes,
+                'break_minutes' => $breakMinutes,
                 'overtime_minutes' => $overtimeMinutes,
+                'overtime_hours' => round($overtimeMinutes / 60, 2),
                 'holiday_minutes' => $holidayMinutes,
                 'delay_minutes' => $delayMinutes,
                 'early_leave_minutes' => $earlyLeaveMinutes,
                 'absence_minutes' => $absenceMinutes,
+                'absence_hours' => round($absenceMinutes / 60, 2),
                 'hourly_leave_minutes' => $leaveMinutes,
+                'leave_hours' => round($leaveMinutes / 60, 2),
                 'daily_leave_days' => $dailyLeaveDays,
                 'hourly_mission_minutes' => $missionMinutes,
+                'mission_hours' => round($missionMinutes / 60, 2),
                 'daily_mission_days' => $dailyMissionDays,
+                'net_payable_hours' => round($netPayableMinutes / 60, 2),
                 'status' => 'calculated',
                 'failure_reason' => null,
                 'meta' => [
                     'employee_salary_type' => $isHourly ? 'hourly' : 'monthly',
                     'decree_id' => $order?->id,
                     'calculation_rule' => $isHourly
-                        ? 'hourly_actual_work_only'
-                        : 'planned_shift_calendar_with_overtime_and_absence',
+                        ? 'shift_based_worked_minutes_with_leave_and_mission'
+                        : 'shift_based_worked_minutes_with_leave_and_mission',
                     'daily' => $daily,
                 ],
             ]
@@ -229,42 +188,155 @@ class NewAttendanceEngineService
         return MonthlyAttendance::updateOrCreate(
             ['payroll_period_id' => $period->id, 'employee_id' => $employee->id],
             [
-                'work_days' => $workDays,
+                'calendar_days' => $calendarDays,
+                'working_days' => $workingDays,
+                'work_days' => $workingDays,
                 'present_days' => $presentDays,
                 'required_hours' => round($plannedMinutes / 60, 2),
-                'normal_hours' => round($normalMinutes / 60, 2),
-                'overtime_hours' => round($overtimeMinutes / 60, 2),
+                'normal_hours' => round($workedMinutes / 60, 2),
+                'worked_hours' => round($workedMinutes / 60, 2),
+                'break_minutes' => $breakMinutes,
+                'delay_minutes' => $delayMinutes,
                 'delay_hours' => round($delayMinutes / 60, 2),
+                'early_leave_minutes' => $earlyLeaveMinutes,
                 'early_leave_hours' => round($earlyLeaveMinutes / 60, 2),
                 'absence_hours' => round($absenceMinutes / 60, 2),
                 'leave_hours' => round($leaveMinutes / 60, 2),
                 'mission_hours' => round($missionMinutes / 60, 2),
+                'overtime_hours' => round($overtimeMinutes / 60, 2),
                 'night_hours' => round($nightMinutes / 60, 2),
                 'holiday_hours' => round($holidayMinutes / 60, 2),
-                'payable_hours' => round(($normalMinutes + $overtimeMinutes + $missionMinutes + $holidayMinutes + $nightMinutes) / 60, 2),
+                'payable_hours' => round($payableMinutes / 60, 2),
+                'net_payable_hours' => round($netPayableMinutes / 60, 2),
                 'status' => 'processed',
                 'meta' => [
                     'attendance_summary_id' => $summary->id,
                     'employee_salary_type' => $isHourly ? 'hourly' : 'monthly',
                     'decree_id' => $order?->id,
-                    'calculation_rule' => $isHourly
-                        ? 'hourly_actual_work_only'
-                        : 'planned_shift_calendar_with_overtime_and_absence',
+                    'calculation_rule' => 'shift_based_worked_minutes_with_leave_and_mission',
                     'daily' => $daily,
                 ],
-            ]
+            ] + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => $absenceMinutes] : [])
         );
+    }
+
+    private function resolveEmployeeIds(PayrollPeriod $period, ?int $employeeId, bool $includeAllActive): Collection
+    {
+        if ($employeeId) {
+            return collect([$employeeId]);
+        }
+
+        if ($includeAllActive) {
+            return Employee::query()
+                ->where(function ($query): void {
+                    $query->where('is_active', true)->orWhere('status', 'active');
+                })
+                ->pluck('id');
+        }
+
+        return WorkLog::query()
+            ->whereBetween('work_date', [$period->starts_at, $period->ends_at])
+            ->pluck('employee_id')
+            ->merge(AttendanceRawLog::query()
+                ->whereBetween('logged_at', [$period->starts_at, $period->ends_at])
+                ->pluck('employee_id'))
+            ->merge(AttendanceLeave::query()
+                ->where('status', 'approved')
+                ->where(function ($query) use ($period): void {
+                    $query->where(function ($dated) use ($period): void {
+                        $dated->whereDate('start_date', '<=', $period->ends_at)
+                            ->whereDate('end_date', '>=', $period->starts_at);
+                    })->orWhereBetween('leave_date', [$period->starts_at, $period->ends_at]);
+                })
+                ->pluck('employee_id'))
+            ->merge(AttendanceMission::query()
+                ->where('status', 'approved')
+                ->where(function ($query) use ($period): void {
+                    $query->where(function ($dated) use ($period): void {
+                        $dated->whereDate('start_date', '<=', $period->ends_at)
+                            ->whereDate('end_date', '>=', $period->starts_at);
+                    })->orWhereBetween('mission_date', [$period->starts_at, $period->ends_at]);
+                })
+                ->pluck('employee_id'))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * @return array{
+     *   work_logs: array<int, Collection<string, Collection<int, WorkLog>>>,
+     *   raw_logs: array<int, Collection<string, Collection<int, AttendanceRawLog>>>,
+     *   leaves: array<int, Collection<int, AttendanceLeave>>,
+     *   missions: array<int, Collection<int, AttendanceMission>>
+     * }
+     */
+    private function loadPeriodData(PayrollPeriod $period, Collection $employeeIds): array
+    {
+        $workLogs = WorkLog::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('work_date', [$period->starts_at, $period->ends_at])
+            ->orderBy('work_date')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn (Collection $employeeLogs) => $employeeLogs->groupBy(fn (WorkLog $log) => $log->work_date?->toDateString() ?? (string) $log->work_date));
+
+        $rawLogs = AttendanceRawLog::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('logged_at', [$period->starts_at, $period->ends_at])
+            ->orderBy('logged_at')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn (Collection $employeeLogs) => $employeeLogs->groupBy(fn (AttendanceRawLog $log) => $log->logged_at->toDateString()));
+
+        $leaves = AttendanceLeave::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->where('status', 'approved')
+            ->where(function ($query) use ($period): void {
+                $query->where(function ($dated) use ($period): void {
+                    $dated->whereDate('start_date', '<=', $period->ends_at)
+                        ->whereDate('end_date', '>=', $period->starts_at);
+                })->orWhereBetween('leave_date', [$period->starts_at, $period->ends_at]);
+            })
+            ->get()
+            ->groupBy('employee_id');
+
+        $missions = AttendanceMission::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->where('status', 'approved')
+            ->where(function ($query) use ($period): void {
+                $query->where(function ($dated) use ($period): void {
+                    $dated->whereDate('start_date', '<=', $period->ends_at)
+                        ->whereDate('end_date', '>=', $period->starts_at);
+                })->orWhereBetween('mission_date', [$period->starts_at, $period->ends_at]);
+            })
+            ->get()
+            ->groupBy('employee_id');
+
+        return [
+            'work_logs' => $workLogs->all(),
+            'raw_logs' => $rawLogs->all(),
+            'leaves' => $leaves->all(),
+            'missions' => $missions->all(),
+        ];
     }
 
     private function approvedOrderFor(Employee $employee, PayrollPeriod $period): ?EmploymentOrder
     {
-        return $employee->employmentOrders()
+        $orders = $employee->relationLoaded('employmentOrders')
+            ? $employee->employmentOrders
+            : $employee->employmentOrders()->get();
+
+        return $orders
             ->where('status', 'approved')
-            ->whereDate('effective_date', '<=', $period->ends_at)
-            ->where(function ($query) use ($period): void {
-                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $period->starts_at);
+            ->filter(function (EmploymentOrder $order) use ($period): bool {
+                return $order->effective_date
+                    && $order->effective_date->lte($period->ends_at)
+                    && (! $order->end_date || $order->end_date->gte($period->starts_at));
             })
-            ->latest('effective_date')
+            ->sortByDesc('effective_date')
+            ->sortByDesc('id')
             ->first();
     }
 
@@ -279,117 +351,62 @@ class NewAttendanceEngineService
             || $employee->employment_type === 'hourly';
     }
 
-    private function activeWorkGroupFor(Employee $employee, Carbon $date): ?WorkGroup
+    private function workGroupForDate(Employee $employee, Carbon $date): ?WorkGroup
     {
-        $assignment = $employee->workGroupAssignments()
-            ->with(['workGroup.shift', 'workGroup.calendar'])
-            ->where(function ($query) use ($date): void {
-                $query->whereNull('start_date')->orWhereDate('start_date', '<=', $date->toDateString());
+        $assignments = $employee->workGroupAssignments ?? collect();
+
+        return $assignments
+            ->filter(function (WorkGroupEmployee $assignment) use ($date): bool {
+                return (! $assignment->start_date || $assignment->start_date->lte($date))
+                    && (! $assignment->end_date || $assignment->end_date->gte($date));
             })
-            ->where(function ($query) use ($date): void {
-                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $date->toDateString());
-            })
-            ->latest('start_date')
-            ->latest('id')
-            ->first();
-
-        return $assignment?->workGroup;
+            ->sortByDesc(fn (WorkGroupEmployee $assignment) => $assignment->start_date?->timestamp ?? 0)
+            ->sortByDesc('id')
+            ->first()
+            ?->workGroup;
     }
 
-    private function isWorkingDay(Carbon $date, ?WorkCalendar $calendar): bool
-    {
-        $jalaliDate = formatJalaliDateSafe($date, '');
-        $holidays = $calendar?->holidays ?: [];
-        if (in_array($date->toDateString(), $holidays, true) || in_array($jalaliDate, $holidays, true)) {
-            return false;
-        }
-
-        $dayOfWeek = (int) $date->dayOfWeek;
-        $weekends = $calendar?->weekend_days ?: [];
-        if (in_array($dayOfWeek, $weekends, true)) {
-            return false;
-        }
-
-        $workingDays = $calendar?->working_days ?: [];
-        if ($workingDays !== []) {
-            return in_array($dayOfWeek, $workingDays, true);
-        }
-
-        return $dayOfWeek !== Carbon::FRIDAY;
-    }
-
-    private function approvedMinutesForDate(Collection $requests, Carbon $date, int $dailyMinutes): array
-    {
-        $minutes = 0;
-        $days = 0.0;
-
-        foreach ($requests as $request) {
-            $start = Carbon::parse($request->start_date ?: $request->{$request instanceof AttendanceLeave ? 'leave_date' : 'mission_date'});
-            $end = Carbon::parse($request->end_date ?: $start);
-
-            if ($date->lt($start) || $date->gt($end)) {
-                continue;
-            }
-
-            if (($request->request_type ?? 'hourly') === 'daily') {
-                $minutes += $dailyMinutes;
-                $days += 1.0;
-                continue;
-            }
-
-            $minutes += (int) ($request->duration_minutes ?: round((float) $request->hours * 60));
-        }
-
-        return ['minutes' => min($minutes, $dailyMinutes), 'days' => $days];
-    }
-
-    private function rawLogWork(Carbon $date, Collection $logs, ?WorkShift $shift): array
+    private function nightMinutesForLogs(Carbon $date, Collection $logs): int
     {
         if ($logs->isEmpty()) {
-            return [0, 0, 0, null, null];
+            return 0;
         }
 
-        $first = $logs->first()->logged_at;
-        $last = $logs->last()->logged_at;
-        $worked = max(0, $last->diffInMinutes($first));
-        $startTime = $shift?->start_time ?: '08:00:00';
-        $endTime = $shift?->end_time ?: '17:00:00';
-        $lateTolerance = (int) ($shift?->late_tolerance_minutes ?: 0);
-        $earlyTolerance = (int) ($shift?->early_leave_tolerance_minutes ?: 0);
-        $scheduledStart = Carbon::parse($date->toDateString() . ' ' . $startTime);
-        $scheduledEnd = Carbon::parse($date->toDateString() . ' ' . $endTime);
-        $delay = max(0, $scheduledStart->diffInMinutes($first, false) - $lateTolerance);
-        $early = max(0, $last->diffInMinutes($scheduledEnd, false) - $earlyTolerance);
+        $first = $this->logMoment($date, $logs->first(), true);
+        $last = $this->logMoment($date, $logs->last(), false);
 
-        return [$worked, $delay, $early, null, null];
-    }
+        if (! $first || ! $last) {
+            return 0;
+        }
 
-    private function nightHours(Carbon $first, Carbon $last): float
-    {
-        $nightStart = Carbon::parse($first->toDateString() . ' 22:00:00');
-        $nightEnd = Carbon::parse($first->copy()->addDay()->toDateString() . ' 06:00:00');
+        $nightStart = Carbon::parse($date->toDateString() . ' 22:00:00');
+        $nightEnd = Carbon::parse($date->copy()->addDay()->toDateString() . ' 06:00:00');
         $start = $first->greaterThan($nightStart) ? $first : $nightStart;
         $end = $last->lessThan($nightEnd) ? $last : $nightEnd;
 
-        return $end->greaterThan($start) ? $end->diffInMinutes($start) / 60 : 0.0;
+        return $end->greaterThan($start) ? $end->diffInMinutes($start) : 0;
     }
 
-    private function nightHoursForLogs(Carbon $date, ?WorkLog $firstLog, ?WorkLog $lastLog): float
+    private function logMoment(Carbon $date, WorkLog|AttendanceRawLog $log, bool $start): ?Carbon
     {
-        $startTime = $firstLog?->check_in_time ?: $firstLog?->start_time;
-        $endTime = $lastLog?->check_out_time ?: $lastLog?->end_time;
+        $time = $start
+            ? ($log->check_in_time ?? $log->start_time ?? null)
+            : ($log->check_out_time ?? $log->end_time ?? null);
 
-        if (! $startTime || ! $endTime) {
-            return 0.0;
+        if (! $time && isset($log->logged_at)) {
+            return Carbon::parse($log->logged_at);
         }
 
-        $first = Carbon::parse($date->toDateString() . ' ' . $startTime);
-        $last = Carbon::parse($date->toDateString() . ' ' . $endTime);
-
-        if ($last->lte($first)) {
-            $last->addDay();
+        if (! $time) {
+            return null;
         }
 
-        return $this->nightHours($first, $last);
+        $moment = Carbon::parse($date->toDateString() . ' ' . $time);
+
+        if (! $start && $moment->lte(Carbon::parse($date->toDateString() . ' ' . ($log->check_in_time ?? $log->start_time ?? $time)))) {
+            $moment->addDay();
+        }
+
+        return $moment;
     }
 }
