@@ -38,6 +38,9 @@ class FiscalPeriodController extends Controller
         DB::transaction(function () use ($data) {
             $year = FiscalYear::create($data);
             $this->syncSinglePeriod($year);
+            if ($year->status === 'open') {
+                app(FiscalPeriodService::class)->activatePeriod($year->periods()->first());
+            }
         });
 
         return redirect()->route('fiscal-periods.index')
@@ -68,6 +71,12 @@ class FiscalPeriodController extends Controller
                 $this->syncSinglePeriodStatus($fiscalYear);
             } else {
                 $this->syncSinglePeriodTitle($fiscalYear);
+            }
+
+            if ($fiscalYear->status === 'open') {
+                app(FiscalPeriodService::class)->activatePeriod($fiscalYear->periods()->first());
+            } elseif ($fiscalYear->status === 'closed') {
+                $fiscalYear->periods()->update(['is_active' => false]);
             }
         });
 
@@ -102,6 +111,7 @@ class FiscalPeriodController extends Controller
         $service->close($fiscalPeriod, $request->user()->id);
         $fiscalPeriod->fiscalYear?->update([
             'status' => 'closed',
+            'is_active' => false,
             'closed_at' => now(),
         ]);
 
@@ -113,6 +123,7 @@ class FiscalPeriodController extends Controller
         $service->reopen($fiscalPeriod);
         $fiscalPeriod->fiscalYear?->update([
             'status' => 'open',
+            'is_active' => true,
             'closed_at' => null,
         ]);
 
@@ -181,6 +192,7 @@ class FiscalPeriodController extends Controller
             'start_date' => $fiscalYear->start_date,
             'end_date' => $fiscalYear->end_date,
             'status' => $fiscalYear->status,
+            'is_active' => $fiscalYear->status === 'open',
             'closed_at' => $fiscalYear->status === 'closed' ? now() : null,
         ]);
     }
@@ -189,6 +201,7 @@ class FiscalPeriodController extends Controller
     {
         $fiscalYear->periods()->update([
             'status' => $fiscalYear->status,
+            'is_active' => $fiscalYear->status === 'open',
             'closed_at' => $fiscalYear->status === 'closed' ? now() : null,
             'closed_by' => null,
         ]);

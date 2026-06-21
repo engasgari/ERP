@@ -16,6 +16,20 @@
             <table class="w-full border-collapse border border-gray-300">
                 <tbody>
                     <tr><th class="border border-gray-300 p-3">پروژه</th><td class="border border-gray-300 p-3">{{ $financialTransaction->project?->name ?: '-' }}</td></tr>
+                    <tr><th class="border border-gray-300 p-3">بانک</th><td class="border border-gray-300 p-3">{{ $financialTransaction->bankAccount ? $financialTransaction->bankAccount->bank_name . ' - ' . $financialTransaction->bankAccount->code : '-' }}</td></tr>
+                    <tr><th class="border border-gray-300 p-3">صندوق</th><td class="border border-gray-300 p-3">{{ $financialTransaction->cashbox ? $financialTransaction->cashbox->name . ' - ' . $financialTransaction->cashbox->code : '-' }}</td></tr>
+                    <tr>
+                        <th class="border border-gray-300 p-3">سند حسابداری</th>
+                        <td class="border border-gray-300 p-3">
+                            @if($financialTransaction->accountingDocument)
+                                <a href="{{ route('accounting-documents.show', $financialTransaction->accountingDocument) }}" class="text-blue-600 hover:underline">
+                                    {{ $financialTransaction->accountingDocument->number }}
+                                </a>
+                            @else
+                                -
+                            @endif
+                        </td>
+                    </tr>
                     <tr><th class="border border-gray-300 p-3">دسته بندی</th><td class="border border-gray-300 p-3">{{ $financialTransaction->category }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">مبلغ (ریال)</th><td class="border border-gray-300 p-3">{{ $financialTransaction->signed_amount }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">تاریخ</th><td class="border border-gray-300 p-3">{{ verta($financialTransaction->transaction_date)->format('Y/m/d') }}</td></tr>

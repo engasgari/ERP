@@ -47,6 +47,10 @@ class FinancialReportRequest extends FormRequest
             $filters['account_id'] = (int) $filters['account_id'];
         }
 
+        if (! empty($filters['bank_account_id'])) {
+            $filters['bank_account_id'] = (int) $filters['bank_account_id'];
+        }
+
         if (! empty($filters['cost_center'])) {
             $filters['cost_center'] = trim((string) $filters['cost_center']);
         }
@@ -65,6 +69,7 @@ class FinancialReportRequest extends FormRequest
             'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'party_id' => ['nullable', 'integer', 'exists:parties,id'],
             'account_id' => ['nullable', 'integer', 'exists:chart_accounts,id'],
+            'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
             'cost_center' => ['nullable', 'string', 'max:255'],
             'search' => ['nullable', 'string', 'max:255'],
             'sort' => ['nullable', 'string', 'max:100'],

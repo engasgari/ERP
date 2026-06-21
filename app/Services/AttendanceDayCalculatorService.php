@@ -73,7 +73,11 @@ class AttendanceDayCalculatorService
         $holidayMinutes = $isWorkingDay ? 0 : $workedMinutes;
         $absenceMinutes = max(0, $plannedMinutes - $workedMinutes - $requestCoverageMinutes);
         $overtimeMinutes = $isWorkingDay ? max(0, $workedMinutes - $plannedMinutes) : $workedMinutes;
-        $netPayableMinutes = max(0, min($plannedMinutes, $workedMinutes + $requestCoverageMinutes) - $delayMinutes - $earlyMinutes);
+        $attendanceDeductionMinutes = min(
+            $plannedMinutes,
+            max($absenceMinutes, $delayMinutes + $earlyMinutes)
+        );
+        $netPayableMinutes = max(0, $plannedMinutes - $attendanceDeductionMinutes);
         $payableMinutes = $netPayableMinutes + $overtimeMinutes;
 
         return [
@@ -88,6 +92,7 @@ class AttendanceDayCalculatorService
             'leave_minutes' => $leaveMetrics['minutes'],
             'mission_minutes' => $missionMetrics['minutes'],
             'absence_minutes' => $absenceMinutes,
+            'attendance_deduction_minutes' => $attendanceDeductionMinutes,
             'overtime_minutes' => $overtimeMinutes,
             'holiday_minutes' => $holidayMinutes,
             'net_payable_minutes' => $netPayableMinutes,
@@ -460,6 +465,11 @@ class AttendanceDayCalculatorService
             return 0;
         }
 
+        $lastLog = $this->lastLogMoment($date, $logs);
+        if (! $lastLog || $lastLog->lte(Carbon::parse($date->toDateString() . ' 13:00:00'))) {
+            return 0;
+        }
+
         return min((int) $config['break_minutes'], $plannedMinutes);
     }
 
@@ -495,5 +505,16 @@ class AttendanceDayCalculatorService
         $moment = Carbon::parse($date->toDateString() . ' ' . $time);
 
         return $moment;
+    }
+
+    private function lastLogMoment(Carbon $date, Collection $logs): ?Carbon
+    {
+        $lastLog = $logs->last();
+
+        if (! $lastLog instanceof WorkLog && ! $lastLog instanceof AttendanceRawLog) {
+            return null;
+        }
+
+        return $this->logDateTime($date, $lastLog, false) ?? $this->logDateTime($date, $lastLog, true);
     }
 }

@@ -19,20 +19,13 @@
 
 @if(session('success') || session('error'))
     <div class="erp-flash-overlay" data-erp-flash>
-        <div class="erp-flash-card {{ session('error') ? 'is-error' : 'is-success' }}">
-            <button type="button" class="erp-flash-close" data-erp-flash-close>×</button>
-            <div class="erp-flash-icon">{{ session('error') ? '!' : '✓' }}</div>
-            <div>
-                <div class="erp-flash-title">{{ session('error') ? 'خطا' : 'انجام شد' }}</div>
-                <div class="erp-flash-message">{{ session('error') ?: session('success') }}</div>
-                @if(session('error') && session('error_details'))
-                    <ul class="erp-flash-details">
-                        @foreach((array) session('error_details') as $detail)
-                            <li>{{ $detail }}</li>
-                        @endforeach
-                    </ul>
-                @endif
-            </div>
+        <div class="mx-auto max-w-2xl px-3 py-4 sm:px-5 lg:px-6">
+            <x-erp.ui.alert
+                :tone="session('error') ? 'danger' : 'success'"
+                :title="session('error') ? 'خطا' : 'انجام شد'"
+                :message="session('error') ?: session('success')"
+                :details="session('error') ? session('error_details') : []"
+            />
         </div>
     </div>
 @endif

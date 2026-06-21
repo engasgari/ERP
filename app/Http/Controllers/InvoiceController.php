@@ -24,7 +24,7 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Invoice::with('party', 'lines.item')->latest();
+        $query = Invoice::with(['party', 'lines.item', 'accountingDocument', 'settledBy'])->latest();
 
         foreach (['direction', 'document_type', 'status'] as $filter) {
             if ($request->filled($filter)) {
@@ -66,7 +66,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines']);
+        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy']);
 
         return view('invoices.show', [
             'invoice' => $invoice,
@@ -76,7 +76,7 @@ class InvoiceController extends Controller
 
     public function print(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines']);
+        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
 
         return view('invoices.print', [
             'invoice' => $invoice,
@@ -86,7 +86,7 @@ class InvoiceController extends Controller
 
     public function downloadPdf(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines']);
+        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
 
         $pdf = Pdf::loadView('invoices.print', [
             'invoice' => $invoice,
@@ -241,11 +241,28 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.show', $invoice)->with('success', 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
     }
 
+    public function settle(Request $request, Invoice $invoice)
+    {
+        abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور قابل تسویه نیست.');
+        abort_if($invoice->status !== 'confirmed', 422, 'فقط فاکتور تایید شده را می‌توان تسویه کرد.');
+
+        if ($invoice->settled_at) {
+            return back()->with('success', 'این فاکتور قبلاً تسویه شده است.');
+        }
+
+        $invoice->update([
+            'settled_at' => now(),
+            'settled_by' => $request->user()?->id,
+        ]);
+
+        return back()->with('success', 'فاکتور با موفقیت تسویه شد.');
+    }
+
     public function convert(Invoice $invoice, NumberingService $numbering)
     {
         abort_if($invoice->document_type !== 'proforma', 422);
 
-        $new = $invoice->replicate(['number', 'document_type', 'status', 'accounting_document_id', 'confirmed_at']);
+        $new = $invoice->replicate(['number', 'document_type', 'status', 'accounting_document_id', 'confirmed_at', 'settled_at', 'settled_by']);
         $new->number = $numbering->next($invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice');
         $new->document_type = 'invoice';
         $new->status = 'draft';

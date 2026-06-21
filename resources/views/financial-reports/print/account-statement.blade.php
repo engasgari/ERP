@@ -42,15 +42,15 @@
         <tbody>
         @forelse($summary['lines'] as $line)
             <tr>
-                <td>{{ gregorianToJalaliDate($line->document?->document_date) ?: '-' }}</td>
-                <td>{{ $line->document?->number ?: '-' }}</td>
-                <td>{{ $line->account?->code }} - {{ $line->account?->title }}</td>
-                <td>{{ $line->party?->name ?: '-' }}</td>
-                <td>{{ $line->project?->name ?: '-' }}</td>
-                <td>{{ $line->description ?: $line->document?->description ?: '-' }}</td>
-                <td class="text-left" dir="ltr">{{ (float) $line->debit ? number_format((float) $line->debit) : '-' }}</td>
-                <td class="text-left" dir="ltr">{{ (float) $line->credit ? number_format((float) $line->credit) : '-' }}</td>
-                <td class="text-left" dir="ltr">{{ number_format((float) $line->running_balance) }}</td>
+                <td>{{ gregorianToJalaliDate(data_get($line, 'document.document_date')) ?: '-' }}</td>
+                <td>{{ data_get($line, 'document.number', '-') }}</td>
+                <td>{{ data_get($line, 'account.code') }} - {{ data_get($line, 'account.title') }}</td>
+                <td>{{ data_get($line, 'party.name', '-') }}</td>
+                <td>{{ data_get($line, 'project.name', '-') }}</td>
+                <td>{{ data_get($line, 'description') ?: data_get($line, 'document.description', '-') }}</td>
+                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'debit') ? number_format((float) data_get($line, 'debit')) : '-' }}</td>
+                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'credit') ? number_format((float) data_get($line, 'credit')) : '-' }}</td>
+                <td class="text-left" dir="ltr">{{ number_format((float) data_get($line, 'running_balance')) }}</td>
             </tr>
         @empty
             <tr>

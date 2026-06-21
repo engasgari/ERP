@@ -13,6 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'permission' => \App\Http\Middleware\EnsureUserHasPermission::class,
+            'fiscal.period' => \App\Http\Middleware\EnsureFiscalPeriodDatesAreValid::class,
+        ]);
+        $middleware->web(append: [
+            \App\Http\Middleware\EnsureFiscalPeriodDatesAreValid::class,
+        ]);
+        $middleware->api(append: [
+            \App\Http\Middleware\EnsureFiscalPeriodDatesAreValid::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

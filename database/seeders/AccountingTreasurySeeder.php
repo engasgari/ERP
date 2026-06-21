@@ -89,9 +89,19 @@ class AccountingTreasurySeeder extends Seeder
             ['code' => '5104', 'title' => 'جذب سربار تولید', 'level' => 'subsidiary', 'nature' => 'debit', 'parent' => '51'],
             ['code' => '52', 'title' => 'هزینه‌های عملیاتی', 'level' => 'ledger', 'nature' => 'debit', 'parent' => '5'],
             ['code' => '5201', 'title' => 'هزینه عمومی', 'level' => 'subsidiary', 'nature' => 'debit', 'parent' => '52'],
+            ['code' => '520101', 'title' => 'اجاره', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520102', 'title' => 'ناهار پرسنل', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520103', 'title' => 'تنخواه', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520104', 'title' => 'پذیرایی', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520105', 'title' => 'خرید لوازم', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520106', 'title' => 'تعمیرات', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520107', 'title' => 'حمل و نقل', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
+            ['code' => '520108', 'title' => 'سایر هزینه های روزمره', 'level' => 'detail', 'nature' => 'debit', 'parent' => '5201'],
             ['code' => '5202', 'title' => 'هزینه حقوق و دستمزد', 'level' => 'subsidiary', 'nature' => 'debit', 'parent' => '52'],
             ['code' => '5203', 'title' => 'هزینه اداری', 'level' => 'subsidiary', 'nature' => 'debit', 'parent' => '52'],
             ['code' => '5204', 'title' => 'هزینه حمل و نقل', 'level' => 'subsidiary', 'nature' => 'debit', 'parent' => '52'],
+            ['code' => '410201', 'title' => 'درآمد متفرقه', 'level' => 'detail', 'nature' => 'credit', 'parent' => '4102'],
+            ['code' => '410202', 'title' => 'سایر درآمدهای غیر فاکتوری', 'level' => 'detail', 'nature' => 'credit', 'parent' => '4102'],
         ];
 
         foreach ($accounts as $account) {
@@ -148,7 +158,7 @@ class AccountingTreasurySeeder extends Seeder
 
     private function treasury(): void
     {
-        BankAccount::updateOrCreate(
+        $bank = BankAccount::withTrashed()->updateOrCreate(
             ['code' => 'BANK-001'],
             [
                 'bank_name' => 'بانک اصلی',
@@ -158,8 +168,9 @@ class AccountingTreasurySeeder extends Seeder
                 'is_active' => true,
             ]
         );
+        $bank->restore();
 
-        Cashbox::updateOrCreate(
+        $cashbox = Cashbox::withTrashed()->updateOrCreate(
             ['code' => 'CASH-001'],
             [
                 'name' => 'صندوق اصلی',
@@ -169,5 +180,6 @@ class AccountingTreasurySeeder extends Seeder
                 'is_active' => true,
             ]
         );
+        $cashbox->restore();
     }
 }

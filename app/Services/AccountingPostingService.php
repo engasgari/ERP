@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AccountingAudit;
 use App\Models\AccountingDocument;
 use App\Models\ChartAccount;
+use App\Models\FinancialTransaction;
 use App\Models\InventoryDocument;
 use App\Models\Invoice;
 use App\Models\PayrollAccountingSetting;
@@ -241,19 +242,23 @@ class AccountingPostingService
         $amount = (float) $transaction->amount;
         $bankOrCashTo = $transaction->to_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $bankOrCashFrom = $transaction->from_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
+        $toBankAccountId = $transaction->to_treasury_type === \App\Models\BankAccount::class ? (int) $transaction->to_treasury_id : null;
+        $toCashboxId = $transaction->to_treasury_type === \App\Models\Cashbox::class ? (int) $transaction->to_treasury_id : null;
+        $fromBankAccountId = $transaction->from_treasury_type === \App\Models\BankAccount::class ? (int) $transaction->from_treasury_id : null;
+        $fromCashboxId = $transaction->from_treasury_type === \App\Models\Cashbox::class ? (int) $transaction->from_treasury_id : null;
 
         $lines = match ($transaction->type) {
             'deposit', 'cash_receipt', 'bank_receipt' => [
-                $this->line($bankOrCashTo, $amount, 0, 'دریافت خزانه'),
+                $this->line($bankOrCashTo, $amount, 0, 'دریافت خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId),
                 $this->line($transaction->party_id ? '1101' : '4102', 0, $amount, 'طرف حساب دریافت', partyId: $transaction->party_id),
             ],
             'withdrawal', 'cash_payment', 'bank_payment' => [
                 $this->line($transaction->party_id ? '2101' : '5201', $amount, 0, 'طرف حساب پرداخت', partyId: $transaction->party_id),
-                $this->line($bankOrCashFrom, 0, $amount, 'پرداخت خزانه'),
+                $this->line($bankOrCashFrom, 0, $amount, 'پرداخت خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId),
             ],
             default => [
-                $this->line($bankOrCashTo, $amount, 0, 'انتقال ورودی خزانه'),
-                $this->line($bankOrCashFrom, 0, $amount, 'انتقال خروجی خزانه'),
+                $this->line($bankOrCashTo, $amount, 0, 'انتقال ورودی خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId),
+                $this->line($bankOrCashFrom, 0, $amount, 'انتقال خروجی خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId),
             ],
         };
 
@@ -265,6 +270,75 @@ class AccountingPostingService
             lines: $lines,
             userId: $userId ?? $transaction->created_by
         );
+    }
+
+    public function fromFinancialTransaction(FinancialTransaction $transaction, ?int $userId = null): AccountingDocument
+    {
+        $transaction->loadMissing(['bankAccount', 'cashbox', 'chartAccount', 'detailAccount', 'accountingDocument']);
+
+        if ($transaction->accounting_document_id && $transaction->accountingDocument) {
+            return $transaction->accountingDocument;
+        }
+
+        $amount = (float) $transaction->amount;
+        $treasuryCode = $transaction->bankAccount ? '1202' : '1201';
+        $offsetCode = $this->financialTransactionAccountCode($transaction->type, $transaction->category);
+        $offsetDescription = trim((string) ($transaction->detailAccount?->title ?: $transaction->category ?: $transaction->chartAccount?->title));
+        $documentDescription = $this->financialTransactionDocumentDescription($transaction->type, $offsetDescription);
+        $projectId = $transaction->project_id ? (int) $transaction->project_id : null;
+
+        $lines = $transaction->type === 'income'
+            ? [
+                $this->line(
+                    $treasuryCode,
+                    $amount,
+                    0,
+                    $documentDescription,
+                    bankAccountId: $transaction->bank_account_id,
+                    cashboxId: $transaction->cashbox_id
+                ),
+                $this->line(
+                    $offsetCode,
+                    0,
+                    $amount,
+                    $documentDescription,
+                    projectId: $projectId,
+                    accountId: $transaction->chart_account_id ?: null,
+                    detailAccountId: $transaction->detail_account_id ?: null
+                ),
+            ]
+            : [
+                $this->line(
+                    $offsetCode,
+                    $amount,
+                    0,
+                    $documentDescription,
+                    projectId: $projectId,
+                    accountId: $transaction->chart_account_id ?: null,
+                    detailAccountId: $transaction->detail_account_id ?: null
+                ),
+                $this->line(
+                    $treasuryCode,
+                    0,
+                    $amount,
+                    $documentDescription,
+                    bankAccountId: $transaction->bank_account_id,
+                    cashboxId: $transaction->cashbox_id
+                ),
+            ];
+
+        $document = $this->automatic(
+            source: $transaction,
+            type: 'manual',
+            date: $transaction->transaction_date->toDateString(),
+            description: $documentDescription,
+            lines: $lines,
+            userId: $userId ?? $transaction->created_by
+        );
+
+        $transaction->update(['accounting_document_id' => $document->id]);
+
+        return $document;
     }
 
     public function fromSalary(Salary $salary, ?int $userId = null): AccountingDocument
@@ -394,24 +468,66 @@ class AccountingPostingService
         });
     }
 
-    public function line(string $accountCode, float $debit, float $credit, ?string $description = null, ?int $partyId = null, ?int $projectId = null): array
+    public function line(
+        string $accountCode,
+        float $debit,
+        float $credit,
+        ?string $description = null,
+        ?int $partyId = null,
+        ?int $projectId = null,
+        ?int $bankAccountId = null,
+        ?int $cashboxId = null,
+        ?int $accountId = null,
+        ?int $detailAccountId = null
+    ): array
     {
-        $account = ChartAccount::where('code', $accountCode)->first()
-            ?? throw new RuntimeException("حساب با کد {$accountCode} پیدا نشد.");
+        $account = $accountId
+            ? ChartAccount::find($accountId)
+            : ChartAccount::where('code', $accountCode)->first();
+
+        if (! $account) {
+            throw new RuntimeException("حساب با کد {$accountCode} پیدا نشد.");
+        }
 
         return [
             'chart_account_id' => $account->id,
+            'detail_account_id' => $detailAccountId,
             'party_id' => $partyId,
             'project_id' => $projectId,
             'description' => $description,
             'debit' => $debit,
             'credit' => $credit,
+            'bank_account_id' => $bankAccountId,
+            'cashbox_id' => $cashboxId,
         ];
     }
 
     private function payrollAccountCode(string $key, string $fallback): string
     {
         return PayrollAccountingSetting::where('key', $key)->where('is_active', true)->value('account_code') ?: $fallback;
+    }
+
+    private function financialTransactionAccountCode(string $type, ?string $category): string
+    {
+        if ($type === 'income') {
+            return '4102';
+        }
+
+        $category = trim((string) $category);
+
+        return match ($category) {
+            'حقوق و دستمزد' => '5202',
+            'حمل و نقل' => '5204',
+            'اجاره', 'پذیرایی', 'خرید لوازم', 'تعمیرات', 'ناهار پرسنل', 'تنخواه', 'سایر هزینه‌ها' => '5201',
+            default => '5201',
+        };
+    }
+
+    private function financialTransactionDocumentDescription(string $type, string $title): string
+    {
+        $kind = $type === 'income' ? 'سند درآمد مالی' : 'سند هزینه مالی';
+
+        return trim($kind . ' - ' . $title);
     }
 
     private function replaceLines(AccountingDocument $document, array $lines): void

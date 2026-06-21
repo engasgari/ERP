@@ -30,6 +30,7 @@ class NewPayrollEngineService
         private readonly NewAttendanceEngineService $attendanceEngine,
         private readonly AccountingPostingService $accountingPosting,
         private readonly ProjectCostingService $projectCosting,
+        private readonly EmploymentContractResolver $contractResolver,
     ) {
     }
 
@@ -61,6 +62,12 @@ class NewPayrollEngineService
         $employee = $attendance->employee;
         $order = $this->approvedOrderFor($employee, $period);
         $attendanceSummaryId = $attendance->meta['attendance_summary_id'] ?? null;
+        $contractType = $this->contractTypeFor($employee, $order);
+
+        if (in_array($contractType, ['hourly', 'project'], true)) {
+            return $this->calculateWorkBasedEmployee($period, $attendance, $order, $attendanceSummaryId, $contractType);
+        }
+
         $failureReason = $this->payrollFailureReason($employee, $period, $attendance, $order, $attendanceSummaryId);
 
         if ($failureReason !== null) {
@@ -225,7 +232,7 @@ class NewPayrollEngineService
             ['code' => 'food_allowance', 'title' => 'بن کارگری', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->food_allowance ?: $this->itemAmount('food_allowance'))],
             ['code' => 'child_allowance', 'title' => 'حق اولاد', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->child_allowance ?: 0)],
             ['code' => 'transportation_allowance', 'title' => 'ایاب و ذهاب', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->transportation_allowance ?: 0)],
-            ['code' => 'attendance_deduction', 'title' => 'کسر کارکرد', 'type' => 'deduction', 'hours' => (float) $attendance->absence_hours + (float) $attendance->delay_hours + (float) $attendance->early_leave_hours, 'rate' => $hourlyRate, 'amount' => ((float) $attendance->absence_hours + (float) $attendance->delay_hours + (float) $attendance->early_leave_hours) * $hourlyRate],
+            ['code' => 'attendance_deduction', 'title' => 'کسر کارکرد', 'type' => 'deduction', 'hours' => $this->attendanceDeductionHours($attendance), 'rate' => $hourlyRate, 'amount' => $this->attendanceDeductionHours($attendance) * $hourlyRate],
         ])->filter(fn ($line) => (float) $line['amount'] > 0)->values();
 
         collect([
@@ -347,6 +354,115 @@ class NewPayrollEngineService
                 'salary_payable_credit' => $netPayable,
                 'insurance_payable_credit' => $insuranceEmployee + $insuranceEmployer,
                 'tax_payable_credit' => $tax,
+                'status' => $gross > 0 ? 'generated' : 'skipped',
+                'lines' => [],
+            ]
+        );
+
+        return $calculation->refresh();
+    }
+
+    private function calculateWorkBasedEmployee(
+        PayrollPeriod $period,
+        MonthlyAttendance $attendance,
+        ?EmploymentOrder $order,
+        mixed $attendanceSummaryId,
+        string $contractType,
+    ): PayrollCalculation {
+        $employee = $attendance->employee;
+        $hourlyRate = $this->hourlyRate($employee, $order, $period);
+        $workedHours = (float) (
+            $attendance->net_payable_hours
+            ?? $attendance->payable_hours
+            ?? $attendance->worked_hours
+            ?? $attendance->normal_hours
+            ?? 0
+        );
+        $gross = round($workedHours * $hourlyRate, 2);
+
+        $calculation = PayrollCalculation::updateOrCreate(
+            ['payroll_period_id' => $period->id, 'employee_id' => $employee->id],
+            [
+                'personnel_decree_id' => $order?->id,
+                'monthly_attendance_id' => $attendance->id,
+                'attendance_summary_id' => $attendanceSummaryId,
+                'gross_salary' => $gross,
+                'total_benefits' => 0,
+                'insurance_employee' => 0,
+                'insurance_employer' => 0,
+                'tax_amount' => 0,
+                'total_deductions' => 0,
+                'net_payable' => $gross,
+                'status' => 'calculated',
+                'failure_reason' => null,
+                'calculated_at' => now(),
+            ]
+        );
+
+        $calculation->lines()->delete();
+        $baseSalaryItem = PayrollItem::where('code', 'base_salary')->first();
+        $calculation->lines()->create([
+            'payroll_item_id' => $baseSalaryItem?->id,
+            'code' => 'base_salary',
+            'title' => 'حقوق پایه',
+            'type' => 'earning',
+            'hours' => $workedHours,
+            'rate' => $hourlyRate,
+            'amount' => $gross,
+        ]);
+
+        InsuranceRecord::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $period->id,
+                'insurance_days' => 0,
+                'insurance_wage' => $gross,
+                'employee_share' => 0,
+                'employer_share' => 0,
+                'unemployment_share' => 0,
+            ]
+        );
+
+        TaxRecord::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $period->id,
+                'taxable_income' => $gross,
+                'exemption_amount' => 0,
+                'tax_amount' => 0,
+                'brackets' => [],
+            ]
+        );
+
+        Payslip::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $period->id,
+                'number' => 'PS-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
+                'issued_at' => now(),
+                'status' => 'issued',
+                'snapshot' => [
+                    'employee' => $employee->full_name,
+                    'period' => $period->persian_title,
+                    'net_payable' => $gross,
+                ],
+            ]
+        );
+
+        PayrollAccountingEntry::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $period->id,
+                'entry_number' => 'PA-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
+                'salary_expense_debit' => $gross,
+                'insurance_expense_debit' => 0,
+                'salary_payable_credit' => $gross,
+                'insurance_payable_credit' => 0,
+                'tax_payable_credit' => 0,
                 'status' => $gross > 0 ? 'generated' : 'skipped',
                 'lines' => [],
             ]
@@ -544,6 +660,11 @@ class NewPayrollEngineService
                 ])->values()->all(),
             ]);
         });
+    }
+
+    private function contractTypeFor(Employee $employee, ?EmploymentOrder $order = null): string
+    {
+        return $this->contractResolver->resolve($employee, $order);
     }
 
     private function syncProjectCostSnapshots(PayrollPeriod $period): void
@@ -744,6 +865,18 @@ class NewPayrollEngineService
         return PayrollAccountingSetting::where('key', $key)
             ->where('is_active', true)
             ->value('account_code') ?: $fallback;
+    }
+
+    private function attendanceDeductionHours(MonthlyAttendance $attendance): float
+    {
+        $plannedHours = max(0, (float) ($attendance->required_hours ?? 0));
+        $latenessHours = max(
+            0,
+            (float) ($attendance->delay_hours ?? 0) + (float) ($attendance->early_leave_hours ?? 0)
+        );
+        $absenceHours = max(0, (float) ($attendance->absence_hours ?? 0));
+
+        return round(min($plannedHours > 0 ? $plannedHours : max($latenessHours, $absenceHours), max($latenessHours, $absenceHours)), 2);
     }
 
     /**

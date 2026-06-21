@@ -68,11 +68,7 @@ class PayrollCalculationService
                     $overtimeSalary = $overtimeHours * $overtimeRate;
                     $missionHours = (float) ($attendance?->mission_hours ?? 0);
                     $missionSalary = $missionHours * $hourlyRate;
-                    $attendanceDeduction = (
-                        (float) ($attendance?->delay_hours ?? 0)
-                        + (float) ($attendance?->early_leave_hours ?? 0)
-                        + (float) ($attendance?->absence_hours ?? 0)
-                    ) * $hourlyRate;
+                    $attendanceDeduction = $this->attendanceDeductionHours($attendance) * $hourlyRate;
 
                     [$earningLines, $deductionLines] = $this->buildLines($employee, $order, $activeItems, $baseSalary + $overtimeSalary + $missionSalary, $baseSalary, $overtimeSalary, $missionSalary, $attendanceDeduction);
                     $benefits = collect($earningLines)->whereNotIn('code', ['base_salary', 'overtime', 'mission'])->sum('amount');
@@ -309,6 +305,28 @@ class PayrollCalculationService
         }
 
         return [$earnings, $deductions];
+    }
+
+    private function attendanceDeductionHours(?MonthlyAttendance $attendance): float
+    {
+        if (! $attendance) {
+            return 0.0;
+        }
+
+        $plannedHours = max(0, (float) ($attendance->required_hours ?? 0));
+        $latenessHours = max(
+            0,
+            (float) ($attendance->delay_hours ?? 0) + (float) ($attendance->early_leave_hours ?? 0)
+        );
+        $absenceHours = max(0, (float) ($attendance->absence_hours ?? 0));
+
+        $deductionHours = max($latenessHours, $absenceHours);
+
+        if ($plannedHours > 0) {
+            $deductionHours = min($plannedHours, $deductionHours);
+        }
+
+        return round($deductionHours, 2);
     }
 
     private function amountForItem(PayrollItem $item, float $taxBase, ?EmploymentOrder $order): float

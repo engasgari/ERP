@@ -16,11 +16,13 @@ class DatabaseSeeder extends Seeder
     {
         
 
-        User::factory()->create([
-            'name' => 'Admin',
-            'email' => 'admin@aale.ir',
-            'password' => Hash::make('password')
-        ]);
+        User::updateOrCreate(
+            ['email' => 'admin@aale.ir'],
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('password'),
+            ]
+        );
 
         $this->call(AccessControlSeeder::class);
         $this->call(BusinessCoreSeeder::class);

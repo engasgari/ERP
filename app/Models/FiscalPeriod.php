@@ -15,6 +15,7 @@ class FiscalPeriod extends Model
         'start_date',
         'end_date',
         'status',
+        'is_active',
         'closed_at',
         'closed_by',
     ];
@@ -22,6 +23,7 @@ class FiscalPeriod extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'is_active' => 'boolean',
         'closed_at' => 'datetime',
     ];
 

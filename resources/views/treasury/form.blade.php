@@ -20,7 +20,10 @@
         <h2 class="font-semibold text-xl">{{ $isEdit ? 'ویرایش تراکنش خزانه' : 'ثبت تراکنش خزانه' }}</h2>
     </x-slot>
 
-    <form method="post" action="{{ $isEdit ? route('treasury.update', $transaction) : route('treasury.store') }}" class="bg-white rounded-lg shadow-md p-6 space-y-4">
+    <form method="post" action="{{ $isEdit ? route('treasury.update', $transaction) : route('treasury.store') }}" class="bg-white rounded-lg shadow-md p-6 space-y-4" x-data="{
+        fromType: @js(old('from_treasury_type', $transaction?->from_treasury_type ?: '')),
+        toType: @js(old('to_treasury_type', $transaction?->to_treasury_type ?: '')),
+    }">
         @csrf
         @if($isEdit)
             @method('PUT')
@@ -51,26 +54,59 @@
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
-            <label>از حساب خزانه
-                <select name="from_treasury_type" class="w-full">
-                    <option value="">انتخاب نشده</option>
-                    <option value="{{ App\Models\BankAccount::class }}" @selected(old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\BankAccount::class)>بانک</option>
-                    <option value="{{ App\Models\Cashbox::class }}" @selected(old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\Cashbox::class)>صندوق</option>
-                </select>
-            </label>
-            <label>شناسه حساب مبدا
-                <input name="from_treasury_id" value="{{ old('from_treasury_id', $transaction?->from_treasury_id) }}" class="w-full">
-            </label>
-            <label>به حساب خزانه
-                <select name="to_treasury_type" class="w-full">
-                    <option value="">انتخاب نشده</option>
-                    <option value="{{ App\Models\BankAccount::class }}" @selected(old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\BankAccount::class)>بانک</option>
-                    <option value="{{ App\Models\Cashbox::class }}" @selected(old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\Cashbox::class)>صندوق</option>
-                </select>
-            </label>
-            <label>شناسه حساب مقصد
-                <input name="to_treasury_id" value="{{ old('to_treasury_id', $transaction?->to_treasury_id) }}" class="w-full">
-            </label>
+            <div class="space-y-3 rounded-xl border border-slate-200 p-4">
+                <div class="text-sm font-bold text-slate-700">حساب خزانه مبدا</div>
+                <label>نوع حساب
+                    <select name="from_treasury_type" class="w-full" x-model="fromType">
+                        <option value="">انتخاب نشده</option>
+                        <option value="{{ App\Models\BankAccount::class }}">بانک</option>
+                        <option value="{{ App\Models\Cashbox::class }}">صندوق</option>
+                    </select>
+                </label>
+                <label x-show="fromType === @js(App\Models\BankAccount::class)" x-cloak>حساب بانکی
+                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== @js(App\Models\BankAccount::class)">
+                        <option value="">انتخاب بانک</option>
+                        @foreach($banks as $bank)
+                            <option value="{{ $bank->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $bank->id && old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\BankAccount::class)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label x-show="fromType === @js(App\Models\Cashbox::class)" x-cloak>صندوق
+                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== @js(App\Models\Cashbox::class)">
+                        <option value="">انتخاب صندوق</option>
+                        @foreach($cashboxes as $cashbox)
+                            <option value="{{ $cashbox->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $cashbox->id && old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\Cashbox::class)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            </div>
+
+            <div class="space-y-3 rounded-xl border border-slate-200 p-4">
+                <div class="text-sm font-bold text-slate-700">حساب خزانه مقصد</div>
+                <label>نوع حساب
+                    <select name="to_treasury_type" class="w-full" x-model="toType">
+                        <option value="">انتخاب نشده</option>
+                        <option value="{{ App\Models\BankAccount::class }}">بانک</option>
+                        <option value="{{ App\Models\Cashbox::class }}">صندوق</option>
+                    </select>
+                </label>
+                <label x-show="toType === @js(App\Models\BankAccount::class)" x-cloak>حساب بانکی
+                    <select name="to_treasury_id" class="w-full" :disabled="toType !== @js(App\Models\BankAccount::class)">
+                        <option value="">انتخاب بانک</option>
+                        @foreach($banks as $bank)
+                            <option value="{{ $bank->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $bank->id && old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\BankAccount::class)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label x-show="toType === @js(App\Models\Cashbox::class)" x-cloak>صندوق
+                    <select name="to_treasury_id" class="w-full" :disabled="toType !== @js(App\Models\Cashbox::class)">
+                        <option value="">انتخاب صندوق</option>
+                        @foreach($cashboxes as $cashbox)
+                            <option value="{{ $cashbox->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $cashbox->id && old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\Cashbox::class)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+            </div>
         </div>
 
         <label>شخص/شرکت

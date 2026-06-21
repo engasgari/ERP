@@ -10,6 +10,7 @@ use App\Models\InventoryDocument;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class FiscalPeriodService
@@ -20,17 +21,92 @@ class FiscalPeriodService
 
     public function periodForDate(CarbonInterface|string $date): ?FiscalPeriod
     {
-        $date = is_string($date) ? $date : $date->toDateString();
+        $date = $this->normalizeDate($date);
 
-        return FiscalPeriod::whereDate('start_date', '<=', $date)
+        return FiscalPeriod::with('fiscalYear')
+            ->whereDate('start_date', '<=', $date)
             ->whereDate('end_date', '>=', $date)
             ->orderByDesc('id')
             ->first();
     }
 
+    public function getActiveFiscalPeriod(): ?FiscalPeriod
+    {
+        $today = now()->toDateString();
+
+        $current = FiscalPeriod::with('fiscalYear')
+            ->where('status', 'open')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->latest('id')
+            ->first();
+
+        if ($current) {
+            return $current;
+        }
+
+        $active = FiscalPeriod::with('fiscalYear')
+            ->where('is_active', true)
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->latest('id')
+            ->first();
+
+        if ($active) {
+            return $active;
+        }
+
+        return FiscalPeriod::with('fiscalYear')
+            ->where('status', 'open')
+            ->latest('id')
+            ->first();
+    }
+
+    public function isDateAllowed(CarbonInterface|string $date): bool
+    {
+        $period = $this->getActiveFiscalPeriod();
+        if (! $period) {
+            return false;
+        }
+
+        $date = $this->normalizeDate($date);
+
+        return $date >= $period->start_date->toDateString() && $date <= $period->end_date->toDateString();
+    }
+
+    public function ensureDateIsAllowed(CarbonInterface|string $date): void
+    {
+        if (! $this->isDateAllowed($date)) {
+            throw ValidationException::withMessages([
+                'date' => 'تاریخ انتخاب‌شده خارج از بازه مالی فعال است.',
+            ]);
+        }
+    }
+
+    public function ensurePeriodIsOpen(?FiscalPeriod $period = null): void
+    {
+        $period ??= $this->getActiveFiscalPeriod();
+
+        if (! $period || $period->status !== 'open') {
+            throw ValidationException::withMessages([
+                'date' => 'بازه مالی بسته است و امکان ثبت یا تغییر عملیات وجود ندارد.',
+            ]);
+        }
+    }
+
+    public function activatePeriod(FiscalPeriod $period): FiscalPeriod
+    {
+        DB::transaction(function () use ($period): void {
+            FiscalPeriod::query()->update(['is_active' => false]);
+            $period->update(['is_active' => true]);
+        });
+
+        return $period->refresh();
+    }
+
     public function fiscalYearForDate(CarbonInterface|string $date): ?FiscalYear
     {
-        $date = is_string($date) ? $date : $date->toDateString();
+        $date = $this->normalizeDate($date);
 
         return FiscalYear::whereDate('start_date', '<=', $date)
             ->whereDate('end_date', '>=', $date)
@@ -40,16 +116,31 @@ class FiscalPeriodService
 
     public function assertOpen(CarbonInterface|string $date): void
     {
+        $date = $this->normalizeDate($date);
+        $this->ensureDateIsAllowed($date);
         $period = $this->periodForDate($date);
 
         if ($period && $period->status === 'closed') {
-            throw new RuntimeException('دوره مالی انتخاب‌شده بسته است.');
+            throw ValidationException::withMessages([
+                'date' => 'بازه مالی بسته است و امکان ثبت یا تغییر عملیات وجود ندارد.',
+            ]);
         }
 
         $year = $period?->fiscalYear ?: $this->fiscalYearForDate($date);
         if ($year && $year->status === 'closed') {
-            throw new RuntimeException('سال مالی انتخاب‌شده بسته است.');
+            throw ValidationException::withMessages([
+                'date' => 'بازه مالی بسته است و امکان ثبت یا تغییر عملیات وجود ندارد.',
+            ]);
         }
+    }
+
+    private function normalizeDate(CarbonInterface|string $date): string
+    {
+        if ($date instanceof CarbonInterface) {
+            return $date->toDateString();
+        }
+
+        return jalaliToGregorianDate($date) ?: $date;
     }
 
     public function close(FiscalPeriod $period, ?int $userId = null): FiscalPeriod
@@ -68,6 +159,7 @@ class FiscalPeriodService
 
             $year->periods()->update([
                 'status' => 'closed',
+                'is_active' => false,
                 'closed_at' => now(),
                 'closed_by' => $userId,
             ]);
@@ -91,6 +183,7 @@ class FiscalPeriodService
 
             $year->periods()->update([
                 'status' => 'open',
+                'is_active' => true,
                 'closed_at' => null,
                 'closed_by' => null,
             ]);
@@ -99,6 +192,10 @@ class FiscalPeriodService
                 'status' => 'open',
                 'closed_at' => null,
             ]);
+
+            if ($firstPeriod = $year->periods()->orderBy('period_number')->first()) {
+                $this->activatePeriod($firstPeriod);
+            }
 
             return $period->refresh();
         });

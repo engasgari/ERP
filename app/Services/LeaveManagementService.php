@@ -10,10 +10,15 @@ use Illuminate\Support\Facades\DB;
 
 class LeaveManagementService
 {
+    public function __construct(private readonly FiscalPeriodService $periods)
+    {
+    }
+
     public function request(array $data, ?int $userId = null): AttendanceLeave
     {
         return DB::transaction(function () use ($data, $userId): AttendanceLeave {
             $payload = $this->normalizePayload($data);
+            $this->periods->ensureDateIsAllowed($payload['leave_date'] ?? $payload['start_date'] ?? null);
 
             return AttendanceLeave::create($payload + [
                 'requested_by' => $userId,
@@ -25,6 +30,7 @@ class LeaveManagementService
     public function approve(AttendanceLeave $leave, int $userId): AttendanceLeave
     {
         return DB::transaction(function () use ($leave, $userId): AttendanceLeave {
+            $this->periods->ensureDateIsAllowed($leave->leave_date ?? $leave->start_date ?? null);
             $leave->update([
                 'status' => 'approved',
                 'approved_by' => $userId,
@@ -43,6 +49,8 @@ class LeaveManagementService
 
     public function reject(AttendanceLeave $leave, int $userId, ?string $reason = null): AttendanceLeave
     {
+        $this->periods->ensureDateIsAllowed($leave->leave_date ?? $leave->start_date ?? null);
+
         $leave->update([
             'status' => 'rejected',
             'approved_by' => $userId,

@@ -4,6 +4,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\AccountingDocument;
+use App\Models\ChartAccount;
 
 class FinancialTransaction extends Model
 {
@@ -11,6 +13,11 @@ class FinancialTransaction extends Model
 
     protected $fillable = [
         'project_id',
+        'bank_account_id',
+        'cashbox_id',
+        'chart_account_id',
+        'detail_account_id',
+        'accounting_document_id',
         'type',
         'category',
         'amount',
@@ -29,6 +36,31 @@ class FinancialTransaction extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
+    }
+
+    public function chartAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartAccount::class);
+    }
+
+    public function detailAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartAccount::class, 'detail_account_id');
+    }
+
+    public function accountingDocument(): BelongsTo
+    {
+        return $this->belongsTo(AccountingDocument::class);
     }
 
     // عنوان نوع تراکنش
@@ -60,5 +92,33 @@ class FinancialTransaction extends Model
     {
         $sign = $this->type == 'income' ? '+' : '-';
         return $sign . number_format($this->amount) . ' ریال';
+    }
+
+    public function getSourceLabelAttribute(): string
+    {
+        if ($this->bankAccount) {
+            return 'بانک: ' . $this->bankAccount->bank_name . ' - ' . $this->bankAccount->code;
+        }
+
+        if ($this->cashbox) {
+            return 'صندوق: ' . $this->cashbox->name . ' - ' . $this->cashbox->code;
+        }
+
+        return '-';
+    }
+
+    public function getCodingLabelAttribute(): string
+    {
+        $parts = [];
+
+        if ($this->chartAccount) {
+            $parts[] = $this->chartAccount->code . ' - ' . $this->chartAccount->title;
+        }
+
+        if ($this->detailAccount) {
+            $parts[] = $this->detailAccount->code . ' - ' . $this->detailAccount->title;
+        }
+
+        return $parts ? implode(' / ', $parts) : '-';
     }
 }

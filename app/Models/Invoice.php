@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use App\Models\User;
 
 class Invoice extends Model
 {
@@ -29,6 +30,8 @@ class Invoice extends Model
         'accounting_document_id',
         'created_by',
         'confirmed_at',
+        'settled_at',
+        'settled_by',
     ];
 
     protected $casts = [
@@ -39,6 +42,7 @@ class Invoice extends Model
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'confirmed_at' => 'datetime',
+        'settled_at' => 'datetime',
     ];
 
     public function party(): BelongsTo
@@ -66,6 +70,11 @@ class Invoice extends Model
         return $this->belongsTo(AccountingDocument::class);
     }
 
+    public function settledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'settled_by');
+    }
+
     public function inventoryDocuments(): MorphMany
     {
         return $this->morphMany(InventoryDocument::class, 'source');
@@ -91,5 +100,15 @@ class Invoice extends Model
     public function scopeForProject($query, ?int $projectId)
     {
         return $projectId ? $query->where('project_id', $projectId) : $query;
+    }
+
+    public function getSettlementStatusLabelAttribute(): string
+    {
+        return $this->settled_at ? 'تسویه شده' : ($this->status === 'confirmed' ? 'باز' : ($this->status === 'draft' ? 'موقت' : $this->status));
+    }
+
+    public function getIsSettledAttribute(): bool
+    {
+        return (bool) $this->settled_at;
     }
 }

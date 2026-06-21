@@ -12,7 +12,10 @@ use RuntimeException;
 
 class InventoryPostingService
 {
-    public function __construct(private NumberingService $numbering)
+    public function __construct(
+        private NumberingService $numbering,
+        private FiscalPeriodService $periods
+    )
     {
     }
 
@@ -118,6 +121,8 @@ class InventoryPostingService
     private function createDocument(string $type, int $warehouseId, object $source, string $description, Collection $lines, string $date, ?int $userId = null): InventoryDocument
     {
         return DB::transaction(function () use ($type, $warehouseId, $source, $description, $lines, $date, $userId) {
+            $this->periods->ensureDateIsAllowed($date);
+
             $document = InventoryDocument::create([
                 'number' => $this->numbering->next($this->numberingKey($type), $this->numberingPrefix($type)),
                 'type' => $type,

@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\WithinActiveFiscalPeriod;
+use App\Services\FiscalPeriodService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreAccountingDocumentRequest extends FormRequest
@@ -31,7 +33,7 @@ class StoreAccountingDocumentRequest extends FormRequest
     {
         return [
             'number' => ['nullable', 'string', 'max:255'],
-            'document_date' => ['required', 'date'],
+            'document_date' => ['required', 'date', new WithinActiveFiscalPeriod(app(FiscalPeriodService::class))],
             'description' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'status' => ['required', 'in:draft,posted'],

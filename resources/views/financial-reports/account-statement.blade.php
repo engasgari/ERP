@@ -52,21 +52,21 @@
                 <tbody>
                 @forelse($summary['lines'] as $line)
                     <tr>
-                        <td>{{ gregorianToJalaliDate($line->document?->document_date) ?: '-' }}</td>
+                        <td>{{ gregorianToJalaliDate(data_get($line, 'document.document_date')) ?: '-' }}</td>
                         <td>
-                            @if($line->document)
-                                <a class="erp-modal-trigger" href="{{ route('accounting-documents.show', $line->document) }}">{{ $line->document->number }}</a>
+                            @if(data_get($line, 'document'))
+                                <a class="erp-modal-trigger" href="{{ route('accounting-documents.show', data_get($line, 'document')) }}">{{ data_get($line, 'document.number') }}</a>
                             @else
                                 -
                             @endif
                         </td>
-                        <td>{{ $line->account?->code }} - {{ $line->account?->title }}</td>
-                        <td>{{ $line->party?->name ?: '-' }}</td>
-                        <td>{{ $line->project?->name ?: '-' }}</td>
-                        <td>{{ $line->description ?: $line->document?->description ?: '-' }}</td>
-                        <td>{{ (float) $line->debit ? number_format((float) $line->debit) : '-' }}</td>
-                        <td>{{ (float) $line->credit ? number_format((float) $line->credit) : '-' }}</td>
-                        <td>{{ number_format((float) $line->running_balance) }}</td>
+                        <td>{{ data_get($line, 'account.code') }} - {{ data_get($line, 'account.title') }}</td>
+                        <td>{{ data_get($line, 'party.name', '-') }}</td>
+                        <td>{{ data_get($line, 'project.name', '-') }}</td>
+                        <td>{{ data_get($line, 'description') ?: data_get($line, 'document.description', '-') }}</td>
+                        <td>{{ (float) data_get($line, 'debit') ? number_format((float) data_get($line, 'debit')) : '-' }}</td>
+                        <td>{{ (float) data_get($line, 'credit') ? number_format((float) data_get($line, 'credit')) : '-' }}</td>
+                        <td>{{ number_format((float) data_get($line, 'running_balance')) }}</td>
                     </tr>
                 @empty
                     <tr>

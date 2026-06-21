@@ -8,10 +8,15 @@ use Illuminate\Support\Facades\DB;
 
 class MissionManagementService
 {
+    public function __construct(private readonly FiscalPeriodService $periods)
+    {
+    }
+
     public function request(array $data, ?int $userId = null): AttendanceMission
     {
         return DB::transaction(function () use ($data, $userId): AttendanceMission {
             $payload = $this->normalizePayload($data);
+            $this->periods->ensureDateIsAllowed($payload['mission_date'] ?? $payload['start_date'] ?? null);
 
             return AttendanceMission::create($payload + [
                 'requested_by' => $userId,
@@ -22,6 +27,8 @@ class MissionManagementService
 
     public function approve(AttendanceMission $mission, int $userId): AttendanceMission
     {
+        $this->periods->ensureDateIsAllowed($mission->mission_date ?? $mission->start_date ?? null);
+
         $mission->update([
             'status' => 'approved',
             'approved_by' => $userId,
@@ -34,6 +41,8 @@ class MissionManagementService
 
     public function reject(AttendanceMission $mission, int $userId, ?string $reason = null): AttendanceMission
     {
+        $this->periods->ensureDateIsAllowed($mission->mission_date ?? $mission->start_date ?? null);
+
         $mission->update([
             'status' => 'rejected',
             'approved_by' => $userId,

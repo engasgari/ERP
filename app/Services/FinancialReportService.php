@@ -8,6 +8,7 @@ use App\Models\AccountingDocumentLine;
 use App\Models\BankAccount;
 use App\Models\Cashbox;
 use App\Models\ChartAccount;
+use App\Models\FinancialTransaction;
 use App\Models\CostCenter;
 use App\Models\FiscalYear;
 use App\Models\Invoice;
@@ -63,7 +64,7 @@ class FinancialReportService
                 'description' => 'دفتر نقدی، بانک، مغایرت‌گیری و جریان نقد دوره‌ای',
                 'reports' => [
                     ['key' => 'cash-book', 'title' => 'دفتر صندوق', 'description' => 'گردش صندوق‌های نقدی'],
-                    ['key' => 'bank-book', 'title' => 'دفتر بانک', 'description' => 'گردش حساب‌های بانکی'],
+                    ['key' => 'bank-statement', 'title' => 'صورتحساب بانک', 'description' => 'موجودی و گردش حساب‌های بانکی'],
                     ['key' => 'bank-reconciliation', 'title' => 'گزارش مغایرت بانکی', 'description' => 'تطبیق دفتر بانک با تراکنش‌های ثبت‌شده'],
                     ['key' => 'cash-flow-by-period', 'title' => 'جریان نقد بر اساس دوره', 'description' => 'جریان نقد به‌تفکیک ماه/دوره'],
                 ],
@@ -126,6 +127,7 @@ class FinancialReportService
             'overdue-invoices' => $this->overdueInvoicesReport($filters, $context),
             'cash-book' => $this->cashBookReport($filters, $context),
             'bank-book' => $this->bankBookReport($filters, $context),
+            'bank-statement' => $this->bankBookReport($filters, $context),
             'bank-reconciliation' => $this->bankReconciliationReport($filters, $context),
             'cash-flow-by-period' => $this->cashFlowByPeriodReport($filters, $context),
             'sales-tax' => $this->salesTaxReport($filters, $context),
@@ -193,6 +195,62 @@ class FinancialReportService
         $report = $this->report($side === 'supplier' ? 'accounts-payable-aging' : 'accounts-receivable-aging');
 
         return collect($report['sections'][0]['rows'] ?? []);
+    }
+
+    public function bankTransactions(BankAccount $bankAccount, array $filters = []): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        $baseQuery = $this->postedLineQuery($filters)
+            ->where('bank_account_id', $bankAccount->id)
+            ->orderBy('accounting_documents.document_date')
+            ->orderBy('accounting_document_lines.id');
+
+        if (! empty($filters['date_from'])) {
+            $openingFilters = $filters;
+            $openingFilters['date_to'] = \Carbon\Carbon::parse($openingFilters['date_from'])->subDay()->toDateString();
+            unset($openingFilters['date_from']);
+
+            $openingLines = $this->postedLineQuery($openingFilters)
+                ->where('bank_account_id', $bankAccount->id)
+                ->orderBy('accounting_documents.document_date')
+                ->orderBy('accounting_document_lines.id')
+                ->get();
+        } else {
+            $openingLines = collect();
+        }
+
+        $startingBalance = (float) $bankAccount->opening_balance + (float) $openingLines->sum(fn ($line) => (float) $line->debit - (float) $line->credit);
+        $periodDebit = (float) $baseQuery->sum('debit');
+        $periodCredit = (float) $baseQuery->sum('credit');
+        $rows = $baseQuery->get()->map(function ($line) use (&$startingBalance) {
+            $startingBalance += (float) $line->debit - (float) $line->credit;
+            $row = $this->lineRow($line);
+            $row['running_balance'] = $startingBalance;
+
+            return $row;
+        })->values();
+
+        return $this->reportPayload(
+            key: 'bank-transactions',
+            title: 'تراکنش‌های بانکی',
+            subtitle: $bankAccount->code . ' - ' . $bankAccount->bank_name,
+            filters: $filters,
+            summary: [
+                'opening_balance' => (float) $bankAccount->opening_balance + (float) $openingLines->sum(fn ($line) => (float) $line->debit - (float) $line->credit),
+                'period_debit' => $periodDebit,
+                'period_credit' => $periodCredit,
+                'closing_balance' => $startingBalance,
+                'line_count' => $rows->count(),
+            ],
+            sections: [
+                [
+                    'title' => 'گردش حساب بانکی',
+                    'headers' => ['تاریخ', 'شماره سند', 'حساب', 'طرف حساب', 'پروژه', 'شرح', 'بدهکار', 'بستانکار', 'مانده جاری'],
+                    'rows' => $rows,
+                    'columns' => ['date', 'document_number', 'account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
+                ],
+            ],
+        );
     }
 
     public function reportDefinitions(string $key): ?array
@@ -593,6 +651,7 @@ class FinancialReportService
     {
         $rows = $this->invoiceRows($filters)
             ->where('status', 'confirmed')
+            ->whereNull('settled_at')
             ->map(fn ($invoice) => $this->invoiceRow($invoice))
             ->values();
 
@@ -619,6 +678,7 @@ class FinancialReportService
     {
         $rows = $this->invoiceRows($filters)
             ->where('status', 'confirmed')
+            ->whereNull('settled_at')
             ->filter(fn ($invoice) => $invoice->invoice_date && now()->greaterThan($invoice->invoice_date->copy()->addDays(30)))
             ->map(fn ($invoice) => $this->invoiceRow($invoice))
             ->values();
@@ -657,7 +717,11 @@ class FinancialReportService
 
     private function bankReconciliationReport(array $filters, FinancialReportContext $context): array
     {
-        $rows = BankAccount::query()->with('account')->get()->map(function (BankAccount $bankAccount) use ($filters) {
+        $rows = BankAccount::query()
+            ->with('account')
+            ->when(! empty($filters['bank_account_id']), fn ($query) => $query->whereKey($filters['bank_account_id']))
+            ->get()
+            ->map(function (BankAccount $bankAccount) use ($filters) {
             $query = $this->postedLines($filters)->where('bank_account_id', $bankAccount->id);
             $journalDebit = (float) $query->sum('debit');
             $journalCredit = (float) $query->sum('credit');
@@ -673,7 +737,7 @@ class FinancialReportService
                 'statement_balance' => $statementBalance,
                 'variance' => null,
             ];
-        })->values();
+            })->values();
 
         return $this->reportPayload(
             key: $context->reportKey,
@@ -1145,15 +1209,26 @@ class FinancialReportService
 
     private function cashOrBankReport(string $field, string $title, string $subtitle, array $filters, FinancialReportContext $context): array
     {
-        $rows = $this->postedLines($filters)->filter(fn ($line) => filled(data_get($line, $field)))->groupBy($field)->map(function (Collection $group, $key) use ($field) {
+        $rows = $this->postedLines($filters)->filter(fn ($line) => filled(data_get($line, $field)))->groupBy($field)->map(function (Collection $group, $key) use ($field, $filters) {
             $entity = $field === 'cashbox_id' ? Cashbox::find($key) : BankAccount::find($key);
+            $reportKey = $field === 'bank_account_id' ? 'bank-statement' : 'cash-book';
+            $detailUrl = route('financial-reports.show', array_merge([
+                'report' => $reportKey,
+                'bank_account_id' => $field === 'bank_account_id' ? (int) $key : null,
+                'cashbox_id' => $field === 'cashbox_id' ? (int) $key : null,
+            ], $filters));
+
             return [
+                'id' => (int) $key,
                 'code' => $entity?->code ?: (string) $key,
                 'name' => $entity?->name ?? $entity?->bank_name ?? '-',
                 'opening' => (float) ($entity?->opening_balance ?? 0),
                 'debit' => (float) $group->sum('debit'),
                 'credit' => (float) $group->sum('credit'),
                 'closing' => (float) ($entity?->opening_balance ?? 0) + (float) $group->sum('debit') - (float) $group->sum('credit'),
+                'bank_account_id' => $field === 'bank_account_id' ? (int) $key : null,
+                'cashbox_id' => $field === 'cashbox_id' ? (int) $key : null,
+                'detail_url' => $detailUrl,
             ];
         })->values();
 
@@ -1256,7 +1331,7 @@ class FinancialReportService
             'customer-statement', 'supplier-statement' => ['code', 'name', 'debit', 'credit', 'balance', 'balance_type'],
             'outstanding-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
             'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'days_overdue', 'outstanding_balance'],
-            'cash-book', 'bank-book' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+            'cash-book', 'bank-book', 'bank-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
             'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
             'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
             'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],
@@ -1282,7 +1357,7 @@ class FinancialReportService
             }
         }
 
-        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'per_page'] as $key) {
+        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'bank_account_id', 'per_page'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $filters[$key] = (int) $filters[$key];
             }
@@ -1405,7 +1480,7 @@ class FinancialReportService
 
     private function invoiceRow(Invoice $invoice): array
     {
-        $outstanding = (float) $invoice->total_amount;
+        $outstanding = $invoice->settled_at ? 0 : (float) $invoice->total_amount;
 
         return [
             'id' => $invoice->id,
@@ -1417,7 +1492,7 @@ class FinancialReportService
             'total_amount' => (float) $invoice->total_amount,
             'tax_amount' => (float) $invoice->tax_amount,
             'outstanding_balance' => $outstanding,
-            'status' => $invoice->status,
+            'status' => $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? 'باز' : ($invoice->status === 'draft' ? 'موقت' : $invoice->status)),
         ];
     }
 

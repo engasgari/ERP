@@ -59,6 +59,14 @@
                             @endforeach
                         </select>
                     </label>
+                    <label class="text-sm font-bold text-slate-700">بانک
+                        <select name="bank_account_id" class="mt-1 w-full rounded-lg border-slate-300">
+                            <option value="">همه</option>
+                            @foreach($banks ?? [] as $bank)
+                                <option value="{{ $bank->id }}" @selected(request('bank_account_id') == $bank->id)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
                     <label class="text-sm font-bold text-slate-700">طرف حساب
                         <select name="party_id" class="mt-1 w-full rounded-lg border-slate-300">
                             <option value="">همه</option>
@@ -140,7 +148,7 @@
                         'customer-statement', 'supplier-statement' => ['code', 'name', 'debit', 'credit', 'balance', 'balance_type'],
                         'outstanding-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
                         'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'days_overdue', 'outstanding_balance'],
-                        'cash-book', 'bank-book' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+                        'cash-book', 'bank-book', 'bank-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
                         'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
                         'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
                         'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],
@@ -172,7 +180,8 @@
 
                 <x-erp.ui.data-table :headers="$section['headers'] ?? []" :colspan="count($section['headers'] ?? []) + ($hasDrilldown ? 1 : 0)" :empty-message="'رکوردی برای نمایش وجود ندارد.'">
                     @forelse($items as $row)
-                        <tr>
+                        @php $rowUrl = data_get($row, 'detail_url'); @endphp
+                        <tr @if($rowUrl) class="cursor-pointer hover:bg-slate-50" x-on:click="window.location = @js($rowUrl)" @endif>
                             @foreach($columns as $key)
                                 <td>
                                     @php $cell = data_get($row, $key); @endphp

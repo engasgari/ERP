@@ -150,6 +150,10 @@ class FinancialReportRepository
             $query->where('accounting_document_lines.chart_account_id', $filters['account_id']);
         }
 
+        if (! empty($filters['bank_account_id'])) {
+            $query->where('accounting_document_lines.bank_account_id', $filters['bank_account_id']);
+        }
+
         if (! empty($filters['project_id'])) {
             $query->where('accounting_document_lines.project_id', $filters['project_id']);
         }

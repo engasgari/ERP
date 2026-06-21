@@ -12,6 +12,7 @@ use App\Http\Controllers\ManagementReportController;
 use App\Http\Controllers\AccessRoleController;
 use App\Http\Controllers\AccessUserController;
 use App\Http\Controllers\AccountingDocumentController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\ChartAccountController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinancialReportController;
@@ -53,6 +54,11 @@ Route::middleware('auth')->group(function () {
     Route::get('items/import/template', [ItemController::class, 'downloadTemplate'])->middleware('permission:base-info.view')->name('items.import.template');
     Route::resource('items', ItemController::class)->except(['show'])->middleware('permission:base-info.view');
     Route::resource('chart-accounts', ChartAccountController::class)->except(['show'])->middleware('permission:accounting.view');
+    Route::get('bank-accounts', [BankAccountController::class, 'index'])->middleware('permission:financial.manage')->name('bank-accounts.index');
+    Route::get('bank-accounts/{bankAccount}/statement', [BankAccountController::class, 'statement'])
+        ->whereNumber('bankAccount')
+        ->middleware('permission:financial.manage')
+        ->name('bank-accounts.statement');
     Route::get('company-settings', [CompanySettingController::class, 'edit'])->middleware('permission:settings.manage')->name('company-settings.edit');
     Route::put('company-settings', [CompanySettingController::class, 'update'])->middleware('permission:settings.manage')->name('company-settings.update');
     Route::post('invoices/preview', [InvoiceController::class, 'preview'])->middleware('permission:commerce.view')->name('invoices.preview');
@@ -61,6 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::get('invoices/{invoice}/excel', [InvoiceController::class, 'downloadExcel'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.excel');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])->whereNumber('invoice')->middleware('permission:commerce.view');
     Route::post('invoices/{invoice}/confirm', [InvoiceController::class, 'confirm'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.confirm');
+    Route::post('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.settle');
     Route::post('invoices/{invoice}/convert', [InvoiceController::class, 'convert'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.convert');
     Route::get('accounting-documents', [AccountingDocumentController::class, 'index'])->middleware('permission:accounting.view')->name('accounting-documents.index');
     Route::get('accounting-documents/create', [AccountingDocumentController::class, 'create'])->middleware('permission:accounting.documents.create')->name('accounting-documents.create');
@@ -187,6 +194,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('employees', EmployeeController::class)->only(['index', 'show'])->middleware('permission:employees.view');
     Route::resource('work-logs', WorkLogController::class)->except(['index', 'show'])->middleware('permission:worklogs.manage');
     Route::resource('financial-transactions', FinancialTransactionController::class)->except(['index', 'show'])->middleware('permission:financial.manage');
+    Route::get('/financial-transactions/summary', [FinancialTransactionController::class, 'summary'])
+        ->middleware('permission:financial.view')
+        ->name('financial-transactions.summary');
 
 // ط¹آ¯ط·آ²ط·آ§ط·آ±ط·آ´أ¢â‚¬إ’ط¸â€،ط·آ§ط؛إ’ ط¸â€¦ط·آ§ط¸â€‍ط؛إ’
     Route::get('/financial-transactions/project/{project}',

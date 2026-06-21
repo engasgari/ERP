@@ -12,18 +12,18 @@
         $taxTotal = (float) $invoice->tax_amount;
         $finalTotal = (float) $invoice->total_amount;
         $emptyRows = max(0, 8 - $invoice->lines->count());
-        $statusLabel = $invoice->status === 'confirmed' ? 'تایید نهایی' : 'ثبت موقت';
+        $statusLabel = $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? 'تایید نهایی' : 'ثبت موقت');
     @endphp
 
     <x-slot name="header">
         <h2 class="font-semibold text-xl">پیش نمایش و چاپ فاکتور</h2>
     </x-slot>
 
-    <div class="invoice-print-actions">
-        <a href="{{ route('invoices.index') }}">بازگشت به فهرست</a>
-        <a href="{{ route('invoices.edit', $invoice) }}">ویرایش فاکتور</a>
-        <a href="{{ route('invoices.print', $invoice) }}" target="_blank" data-no-spa>چاپ نهایی</a>
-        <a href="{{ route('invoices.pdf', $invoice) }}" data-no-spa>PDF</a>
+        <div class="invoice-print-actions">
+            <a href="{{ route('invoices.index') }}">بازگشت به فهرست</a>
+            <a href="{{ route('invoices.edit', $invoice) }}">ویرایش فاکتور</a>
+            <a href="{{ route('invoices.print', $invoice) }}" target="_blank" data-no-spa>چاپ نهایی</a>
+            <a href="{{ route('invoices.pdf', $invoice) }}" data-no-spa>PDF</a>
         <a href="{{ route('invoices.excel', $invoice) }}" data-no-spa>Excel</a>
         <form method="POST" action="{{ route('invoices.destroy', $invoice) }}" onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')">
             @csrf
@@ -41,6 +41,11 @@
                 @csrf
                 <button type="submit" class="primary">{{ $invoice->direction === 'purchase' ? 'تایید نهایی و ثبت رسید انبار' : 'تایید نهایی و ثبت حواله انبار' }}</button>
             </form>
+        @elseif($invoice->status === 'confirmed' && ! $invoice->settled_at)
+            <form method="POST" action="{{ route('invoices.settle', $invoice) }}">
+                @csrf
+                <button type="submit" class="primary">تسویه فاکتور</button>
+            </form>
         @endif
     </div>
 
@@ -49,7 +54,7 @@
     @enderror
 
     <section class="tax-invoice-sheet">
-        <div class="tax-invoice-watermark">{{ $invoice->status === 'confirmed' ? '' : 'ثبت موقت' }}</div>
+        <div class="tax-invoice-watermark">{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? '' : 'ثبت موقت') }}</div>
 
         <header class="tax-invoice-header">
             <div class="tax-invoice-title">
@@ -200,7 +205,21 @@
         </table>
 
         <div class="tax-invoice-bottom">
-            <table class="tax-extra-table">
+        <table class="tax-extra-table">
+                <tr>
+                    <th>وضعیت فاکتور</th>
+                    <td colspan="3">{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? 'باز' : 'موقت') }}</td>
+                </tr>
+                @if($invoice->settled_at)
+                    <tr>
+                        <th>تاریخ تسویه</th>
+                        <td colspan="3">{{ gregorianToJalaliDate($invoice->settled_at) }}</td>
+                    </tr>
+                    <tr>
+                        <th>تسویه کننده</th>
+                        <td colspan="3">{{ $invoice->settledBy?->name ?: '-' }}</td>
+                    </tr>
+                @endif
                 <tr>
                     <th>توضیحات</th>
                     <td colspan="3">{{ $invoice->description ?: '-' }}</td>

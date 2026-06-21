@@ -20,7 +20,10 @@ use Illuminate\Support\Facades\Schema;
 
 class NewAttendanceEngineService
 {
-    public function __construct(private readonly AttendanceDayCalculatorService $dayCalculator)
+    public function __construct(
+        private readonly AttendanceDayCalculatorService $dayCalculator,
+        private readonly EmploymentContractResolver $contractResolver,
+    )
     {
     }
 
@@ -56,8 +59,12 @@ class NewAttendanceEngineService
 
         $requiredTime = app(RequiredWorkingTimeService::class);
         $order = $this->approvedOrderFor($employee, $period);
-        $isHourly = $this->isHourlyEmployee($employee, $order);
-        $monthRequiredTime = $requiredTime->month($employee, $period, $isHourly);
+        $contractType = $this->contractTypeFor($employee, $order);
+        $monthRequiredTime = $requiredTime->month($employee, $period, $contractType === 'hourly');
+
+        if ($contractType !== 'monthly') {
+            return $this->processWorkBasedEmployee($period, $employee, $periodData, $order, $monthRequiredTime, $contractType);
+        }
 
         $calendarDays = $period->starts_at->daysInMonth;
         $workingDays = 0;
@@ -175,11 +182,9 @@ class NewAttendanceEngineService
                 'status' => 'calculated',
                 'failure_reason' => null,
                 'meta' => [
-                    'employee_salary_type' => $isHourly ? 'hourly' : 'monthly',
+                    'employee_salary_type' => $contractType,
                     'decree_id' => $order?->id,
-                    'calculation_rule' => $isHourly
-                        ? 'shift_based_worked_minutes_with_leave_and_mission'
-                        : 'shift_based_worked_minutes_with_leave_and_mission',
+                    'calculation_rule' => 'shift_based_worked_minutes_with_leave_and_mission',
                     'daily' => $daily,
                 ],
             ]
@@ -211,12 +216,162 @@ class NewAttendanceEngineService
                 'status' => 'processed',
                 'meta' => [
                     'attendance_summary_id' => $summary->id,
-                    'employee_salary_type' => $isHourly ? 'hourly' : 'monthly',
+                    'employee_salary_type' => $contractType,
                     'decree_id' => $order?->id,
                     'calculation_rule' => 'shift_based_worked_minutes_with_leave_and_mission',
                     'daily' => $daily,
                 ],
             ] + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => $absenceMinutes] : [])
+        );
+    }
+
+    private function processWorkBasedEmployee(
+        PayrollPeriod $period,
+        Employee $employee,
+        array $periodData,
+        ?EmploymentOrder $order,
+        array $monthRequiredTime,
+        string $contractType,
+    ): MonthlyAttendance {
+        $calendarDays = $period->starts_at->daysInMonth;
+        $workingDays = 0;
+        $workedMinutes = 0;
+        $daily = [];
+
+        $employeeWorkLogs = $periodData['work_logs'][$employee->id] ?? collect();
+        $employeeRawLogs = $periodData['raw_logs'][$employee->id] ?? collect();
+
+        $date = $period->starts_at->copy();
+        while ($date->lte($period->ends_at)) {
+            $dateKey = $date->toDateString();
+            $dayWorkLogs = $employeeWorkLogs[$dateKey] ?? collect();
+            $dayRawLogs = $employeeRawLogs[$dateKey] ?? collect();
+            $dayLogs = $dayWorkLogs->isNotEmpty() ? $dayWorkLogs : $dayRawLogs;
+
+            $dayWorkedMinutes = (int) round($dayLogs->sum(fn (WorkLog|AttendanceRawLog $log) => (float) ($log->hours ?? 0) * 60));
+
+            if ($dayWorkedMinutes > 0) {
+                $workingDays++;
+            }
+
+            $workedMinutes += $dayWorkedMinutes;
+
+            $daily[] = [
+                'date' => $dateKey,
+                'is_working_day' => $dayWorkedMinutes > 0,
+                'calendar_day' => $date->day,
+                'planned_minutes' => 0,
+                'worked_minutes' => $dayWorkedMinutes,
+                'break_minutes' => 0,
+                'delay_minutes' => 0,
+                'early_leave_minutes' => 0,
+                'leave_minutes' => 0,
+                'mission_minutes' => 0,
+                'absence_minutes' => 0,
+                'overtime_minutes' => 0,
+                'holiday_minutes' => 0,
+                'net_payable_minutes' => $dayWorkedMinutes,
+                'payable_minutes' => $dayWorkedMinutes,
+                'leave_days' => 0,
+                'mission_days' => 0,
+                'work_group_id' => null,
+                'shift_id' => null,
+                'shift_code' => null,
+                'shift_start_time' => null,
+                'shift_end_time' => null,
+                'overtime_multiplier' => 1.4,
+                'late_tolerance_minutes' => 0,
+                'early_leave_tolerance_minutes' => 0,
+                'break_window' => ['start' => null, 'end' => null],
+                'first_log_at' => $dayLogs->first()?->check_in_time ? $date->toDateString() . ' ' . $dayLogs->first()->check_in_time : null,
+                'last_log_at' => $dayLogs->last()?->check_out_time ? $date->toDateString() . ' ' . $dayLogs->last()->check_out_time : null,
+                'worked_hours' => round($dayWorkedMinutes / 60, 2),
+                'break_hours' => 0,
+                'delay_hours' => 0,
+                'early_leave_hours' => 0,
+                'leave_hours' => 0,
+                'mission_hours' => 0,
+                'absence_hours' => 0,
+                'overtime_hours' => 0,
+                'holiday_hours' => 0,
+                'net_payable_hours' => round($dayWorkedMinutes / 60, 2),
+                'payable_hours' => round($dayWorkedMinutes / 60, 2),
+            ];
+
+            $date->addDay();
+        }
+
+        $summary = AttendanceSummary::updateOrCreate(
+            ['employee_id' => $employee->id, 'year' => $period->year, 'month' => $period->month],
+            [
+                'payroll_period_id' => $period->id,
+                'calendar_days' => $calendarDays,
+                'working_days' => $workingDays,
+                'required_days' => $monthRequiredTime['required_days'],
+                'required_hours' => $monthRequiredTime['required_hours'],
+                'required_minutes' => $monthRequiredTime['required_minutes'],
+                'worked_days' => $workingDays,
+                'worked_hours' => round($workedMinutes / 60, 2),
+                'planned_minutes' => 0,
+                'worked_minutes' => $workedMinutes,
+                'break_minutes' => 0,
+                'overtime_minutes' => 0,
+                'overtime_hours' => 0,
+                'holiday_minutes' => 0,
+                'delay_minutes' => 0,
+                'early_leave_minutes' => 0,
+                'absence_minutes' => 0,
+                'absence_hours' => 0,
+                'hourly_leave_minutes' => 0,
+                'leave_hours' => 0,
+                'daily_leave_days' => 0,
+                'hourly_mission_minutes' => 0,
+                'mission_hours' => 0,
+                'daily_mission_days' => 0,
+                'net_payable_hours' => round($workedMinutes / 60, 2),
+                'status' => 'calculated',
+                'failure_reason' => null,
+                'meta' => [
+                    'employee_salary_type' => $contractType,
+                    'decree_id' => $order?->id,
+                    'calculation_rule' => 'work_log_only_by_contract_type',
+                    'daily' => $daily,
+                ],
+            ]
+        );
+
+        return MonthlyAttendance::updateOrCreate(
+            ['payroll_period_id' => $period->id, 'employee_id' => $employee->id],
+            [
+                'calendar_days' => $calendarDays,
+                'working_days' => $workingDays,
+                'work_days' => $workingDays,
+                'present_days' => $workingDays,
+                'required_hours' => $monthRequiredTime['required_hours'],
+                'worked_hours' => round($workedMinutes / 60, 2),
+                'normal_hours' => round($workedMinutes / 60, 2),
+                'break_minutes' => 0,
+                'delay_minutes' => 0,
+                'delay_hours' => 0,
+                'early_leave_minutes' => 0,
+                'early_leave_hours' => 0,
+                'absence_hours' => 0,
+                'leave_hours' => 0,
+                'mission_hours' => 0,
+                'overtime_hours' => 0,
+                'night_hours' => 0,
+                'holiday_hours' => 0,
+                'payable_hours' => round($workedMinutes / 60, 2),
+                'net_payable_hours' => round($workedMinutes / 60, 2),
+                'status' => 'processed',
+                'meta' => [
+                    'attendance_summary_id' => $summary->id,
+                    'employee_salary_type' => $contractType,
+                    'decree_id' => $order?->id,
+                    'calculation_rule' => 'work_log_only_by_contract_type',
+                    'daily' => $daily,
+                ],
+            ] + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => 0] : [])
         );
     }
 
@@ -340,15 +495,24 @@ class NewAttendanceEngineService
             ->first();
     }
 
+    private function contractTypeFor(Employee $employee, ?EmploymentOrder $order = null): string
+    {
+        return $this->contractResolver->resolve($employee, $order);
+    }
+
     private function isHourlyEmployee(Employee $employee, ?EmploymentOrder $order = null): bool
     {
-        if ($order) {
-            return in_array($order->employment_type, ['hourly', 'hourly_contract'], true)
-                || ((float) ($order->hourly_rate ?? 0) > 0 && (float) ($order->base_salary ?? 0) <= 0);
-        }
+        return $this->contractTypeFor($employee, $order) === 'hourly';
+    }
 
-        return $employee->salary_type === 'hourly'
-            || $employee->employment_type === 'hourly';
+    private function isProjectBasedEmployee(Employee $employee, ?EmploymentOrder $order = null): bool
+    {
+        return $this->contractTypeFor($employee, $order) === 'project';
+    }
+
+    private function isWorkBasedEmployee(Employee $employee, ?EmploymentOrder $order = null): bool
+    {
+        return in_array($this->contractTypeFor($employee, $order), ['hourly', 'project'], true);
     }
 
     private function workGroupForDate(Employee $employee, Carbon $date): ?WorkGroup

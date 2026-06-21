@@ -14,6 +14,7 @@ class EmploymentOrderService
     public function __construct(
         private readonly EmployeeHistoryService $history,
         private readonly ContractGenerationService $contracts,
+        private readonly FiscalPeriodService $periods,
     ) {
     }
 
@@ -21,6 +22,7 @@ class EmploymentOrderService
     {
         return DB::transaction(function () use ($order, $userId) {
             $order->loadMissing('employee');
+            $this->periods->ensureDateIsAllowed($order->effective_date);
             $employee = $order->employee;
 
             $oldValues = $employee->only([
@@ -87,6 +89,7 @@ class EmploymentOrderService
     {
         return DB::transaction(function () use ($order, $userId) {
             $order->loadMissing('employee');
+            $this->periods->ensureDateIsAllowed($order->effective_date);
             $employee = $order->employee;
 
             $history = $employee->history()
@@ -154,6 +157,10 @@ class EmploymentOrderService
 
     private function salaryTypeFor(?string $employmentType): string
     {
-        return $employmentType === 'hourly_contract' ? 'hourly' : 'monthly';
+        return match ($employmentType) {
+            'hourly', 'hourly_contract' => 'hourly',
+            'project', 'project_contract', 'project_based', 'project_based_contract' => 'project',
+            default => 'monthly',
+        };
     }
 }
