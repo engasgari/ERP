@@ -82,7 +82,7 @@
                                 <select name="year">
                                     <option value="">همه سال‌ها</option>
                                     @for($y = verta()->year; $y >= 1400; $y--)
-                                        <option value="{{ $y }}" @selected(request('year') == $y)>{{ $y }}</option>
+                                        <option value="{{ $y }}" @selected(request('year') == $y)>{{ toPersianDigits($y) }}</option>
                                     @endfor
                                 </select>
                             </label>
@@ -142,7 +142,7 @@
                                     </td>
                                     <td class="py-3 px-4">
                                         <div class="font-semibold">{{ getPersianMonthName($salary->month) }}</div>
-                                        <div class="text-sm text-gray-500">{{ $salary->year }}</div>
+                                        <div class="text-sm text-gray-500">{{ toPersianDigits($salary->year) }}</div>
                                     </td>
                                     <td class="py-3 px-4">
                                         <div>{{ number_format($salary->total_hours, 1) }} ساعت</div>

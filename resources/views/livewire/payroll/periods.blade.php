@@ -20,7 +20,11 @@
             <form wire:submit="createPeriod" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:min-w-[640px]">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">سال</span>
-                    <input type="number" wire:model.live="year" min="1400" max="1500" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                    <select wire:model.live="year" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                        @for($y = verta()->year; $y >= 1400; $y--)
+                            <option value="{{ $y }}">{{ toPersianDigits($y) }}</option>
+                        @endfor
+                    </select>
                 </label>
 
                 <label class="block">
@@ -335,3 +339,4 @@
         </div>
     </div>
 </div>
+

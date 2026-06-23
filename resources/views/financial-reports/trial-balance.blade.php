@@ -6,7 +6,7 @@
             <tbody>
             @forelse($rows as $row)
                 <tr>
-                    <td>{{ $row['account']?->code }} - {{ $row['account']?->title }}</td>
+                    <td>{{ chartAccountDisplayLabel($row['account']) }}</td>
                     <td>{{ number_format($row['debit']) }}</td>
                     <td>{{ number_format($row['credit']) }}</td>
                     <td>{{ number_format($row['debit_balance']) }}</td>

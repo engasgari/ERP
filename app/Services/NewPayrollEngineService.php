@@ -93,6 +93,7 @@ class NewPayrollEngineService
 
         $hourlyRate = $this->hourlyRate($employee, $order, $period);
         $isHourly = $this->isHourlyEmployee($employee, $order);
+        $insuranceEnabled = $this->insuranceEnabled($order);
         $overtimeRate = $hourlyRate * 1.4;
         $nightRate = $hourlyRate * 0.35;
         $holidayRate = $hourlyRate * 1.4;
@@ -254,11 +255,13 @@ class NewPayrollEngineService
         }
 
         $gross = (float) $lines->where('type', 'earning')->sum('amount');
-        $insuranceEmployee = round($gross * ($this->itemRate('employee_insurance') / 100), 2);
-        $insuranceEmployer = round($gross * (($this->itemRate('employer_insurance') + $this->itemRate('unemployment_insurance')) / 100), 2);
+        $insuranceEmployee = $insuranceEnabled ? round($gross * ($this->itemRate('employee_insurance') / 100), 2) : 0.0;
+        $insuranceEmployer = $insuranceEnabled ? round($gross * (($this->itemRate('employer_insurance') + $this->itemRate('unemployment_insurance')) / 100), 2) : 0.0;
         $tax = $this->taxAmount($gross);
 
-        $lines->push(['code' => 'insurance', 'title' => 'بیمه سهم کارمند', 'type' => 'deduction', 'hours' => 0, 'rate' => 7, 'amount' => $insuranceEmployee]);
+        if ($insuranceEnabled && $insuranceEmployee > 0) {
+            $lines->push(['code' => 'insurance', 'title' => 'بیمه سهم کارمند', 'type' => 'deduction', 'hours' => 0, 'rate' => 7, 'amount' => $insuranceEmployee]);
+        }
         $lines->push(['code' => 'tax', 'title' => 'مالیات حقوق', 'type' => 'deduction', 'hours' => 0, 'rate' => 0, 'amount' => $tax]);
 
         $totalDeductions = (float) $lines->where('type', 'deduction')->sum('amount');
@@ -307,11 +310,11 @@ class NewPayrollEngineService
             [
                 'employee_id' => $employee->id,
                 'payroll_period_id' => $period->id,
-                'insurance_days' => min(30, (int) $attendance->present_days + (int) floor((float) $attendance->leave_hours / 8)),
-                'insurance_wage' => $gross,
+                'insurance_days' => $insuranceEnabled ? min(30, (int) $attendance->present_days + (int) floor((float) $attendance->leave_hours / 8)) : 0,
+                'insurance_wage' => $insuranceEnabled ? $gross : 0,
                 'employee_share' => $insuranceEmployee,
-                'employer_share' => round($gross * ($this->itemRate('employer_insurance') / 100), 2),
-                'unemployment_share' => round($gross * ($this->itemRate('unemployment_insurance') / 100), 2),
+                'employer_share' => $insuranceEnabled ? round($gross * ($this->itemRate('employer_insurance') / 100), 2) : 0,
+                'unemployment_share' => $insuranceEnabled ? round($gross * ($this->itemRate('unemployment_insurance') / 100), 2) : 0,
             ]
         );
 
@@ -853,6 +856,13 @@ class NewPayrollEngineService
     private function itemRate(string $code): float
     {
         return (float) PayrollItem::where('code', $code)->value('default_rate');
+    }
+
+    private function insuranceEnabled(?EmploymentOrder $order): bool
+    {
+        $status = strtolower((string) ($order?->insurance_status ?: 'insured'));
+
+        return ! in_array($status, ['not_insured', 'exempt'], true);
     }
 
     private function taxAmount(float $gross): float

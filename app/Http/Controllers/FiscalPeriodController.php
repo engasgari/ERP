@@ -109,23 +109,13 @@ class FiscalPeriodController extends Controller
     public function close(Request $request, FiscalPeriod $fiscalPeriod, FiscalPeriodService $service)
     {
         $service->close($fiscalPeriod, $request->user()->id);
-        $fiscalPeriod->fiscalYear?->update([
-            'status' => 'closed',
-            'is_active' => false,
-            'closed_at' => now(),
-        ]);
 
         return back()->with('success', 'دوره مالی بسته شد.');
     }
 
-    public function reopen(FiscalPeriod $fiscalPeriod, FiscalPeriodService $service)
+    public function reopen(Request $request, FiscalPeriod $fiscalPeriod, FiscalPeriodService $service)
     {
-        $service->reopen($fiscalPeriod);
-        $fiscalPeriod->fiscalYear?->update([
-            'status' => 'open',
-            'is_active' => true,
-            'closed_at' => null,
-        ]);
+        $service->reopen($fiscalPeriod, $request->user()?->id);
 
         return back()->with('success', 'دوره مالی دوباره باز شد.');
     }

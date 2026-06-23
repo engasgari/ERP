@@ -4,6 +4,9 @@
             <div>
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">صورتحساب تراکنش‌های بانکی</h2>
                 <p class="mt-1 text-sm text-slate-500">{{ $bankAccount->code }} - {{ $bankAccount->bank_name }}</p>
+                <p class="mt-1 text-xs text-slate-400">
+                    تفصیل: {{ $bankAccount->detailAccount?->code ? $bankAccount->detailAccount->code . ' - ' . $bankAccount->detailAccount->title : 'برای این بانک هنوز تفصیل ثبت نشده است' }}
+                </p>
             </div>
             <a href="{{ route('bank-accounts.index') }}" class="inline-flex items-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
                 بازگشت به تعریف بانک
@@ -46,7 +49,7 @@
                     <select name="account_id" class="mt-1 w-full rounded-lg border-slate-300">
                         <option value="">همه</option>
                         @foreach($accounts ?? [] as $account)
-                            <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ $account->code }} - {{ $account->title }}</option>
+                            <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -89,6 +92,7 @@
                         <th class="px-3 py-3 font-bold">تاریخ</th>
                         <th class="px-3 py-3 font-bold">شماره سند</th>
                         <th class="px-3 py-3 font-bold">حساب</th>
+                        <th class="px-3 py-3 font-bold">تفصیل</th>
                         <th class="px-3 py-3 font-bold">طرف حساب</th>
                         <th class="px-3 py-3 font-bold">پروژه</th>
                         <th class="px-3 py-3 font-bold">شرح</th>
@@ -103,6 +107,7 @@
                             <td class="px-3 py-2">{{ $row['date'] ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $row['document_number'] ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $row['account'] ?? '-' }}</td>
+                            <td class="px-3 py-2">{{ $row['detail_account'] ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $row['party'] ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $row['project'] ?? '-' }}</td>
                             <td class="px-3 py-2">{{ $row['description'] ?? '-' }}</td>
@@ -112,7 +117,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="py-8 text-center text-slate-500">تراکنشی برای این بانک در بازه انتخاب‌شده یافت نشد.</td>
+                            <td colspan="10" class="py-8 text-center text-slate-500">تراکنشی برای این بانک در بازه انتخاب‌شده یافت نشد.</td>
                         </tr>
                     @endforelse
                     </tbody>
@@ -121,3 +126,4 @@
         </section>
     </div>
 </x-app-layout>
+

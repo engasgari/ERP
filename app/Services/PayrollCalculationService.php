@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\AttendanceCalculation;
 use App\Models\EmploymentOrder;
 use App\Models\AccountingDocument;
 use App\Models\EmployeeTransaction;
@@ -60,6 +61,7 @@ class PayrollCalculationService
                     $attendance = $attendanceRows->get($employee->id);
                     $order = $this->approvedOrderFor($employee, $period);
                     $isHourly = $this->isHourlyEmployee($employee, $order);
+                    $insuranceEnabled = $this->insuranceEnabled($order);
 
                     $hourlyRate = (float) ($attendance?->hourly_rate ?: $order?->hourly_rate ?: $employee->hourly_rate);
                     $baseSalary = $this->baseSalaryFor($employee, $order, $attendance, $isHourly);
@@ -70,7 +72,7 @@ class PayrollCalculationService
                     $missionSalary = $missionHours * $hourlyRate;
                     $attendanceDeduction = $this->attendanceDeductionHours($attendance) * $hourlyRate;
 
-                    [$earningLines, $deductionLines] = $this->buildLines($employee, $order, $activeItems, $baseSalary + $overtimeSalary + $missionSalary, $baseSalary, $overtimeSalary, $missionSalary, $attendanceDeduction);
+                    [$earningLines, $deductionLines] = $this->buildLines($employee, $order, $activeItems, $baseSalary + $overtimeSalary + $missionSalary, $baseSalary, $overtimeSalary, $missionSalary, $attendanceDeduction, $insuranceEnabled);
                     $benefits = collect($earningLines)->whereNotIn('code', ['base_salary', 'overtime', 'mission'])->sum('amount');
                     $grossSalary = $baseSalary + $overtimeSalary + $missionSalary + $benefits;
                     $insuranceAmount = collect($deductionLines)->where('code', 'employee_insurance')->sum('amount');
@@ -255,7 +257,7 @@ class PayrollCalculationService
             || $order?->employment_type === 'hourly_contract';
     }
 
-    private function buildLines(Employee $employee, ?EmploymentOrder $order, Collection $items, float $taxBase, float $baseSalary, float $overtimeSalary, float $missionSalary, float $attendanceDeduction): array
+    private function buildLines(Employee $employee, ?EmploymentOrder $order, Collection $items, float $taxBase, float $baseSalary, float $overtimeSalary, float $missionSalary, float $attendanceDeduction, bool $insuranceEnabled): array
     {
         $earnings = [
             ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'amount' => $baseSalary],
@@ -267,7 +269,7 @@ class PayrollCalculationService
             : [];
 
         foreach ($items as $item) {
-            $amount = $this->amountForItem($item, $taxBase, $order);
+            $amount = $this->amountForItem($item, $taxBase, $order, $insuranceEnabled);
 
             if ($amount <= 0) {
                 continue;
@@ -307,7 +309,7 @@ class PayrollCalculationService
         return [$earnings, $deductions];
     }
 
-    private function attendanceDeductionHours(?MonthlyAttendance $attendance): float
+    private function attendanceDeductionHours(AttendanceCalculation|MonthlyAttendance|null $attendance): float
     {
         if (! $attendance) {
             return 0.0;
@@ -329,8 +331,12 @@ class PayrollCalculationService
         return round($deductionHours, 2);
     }
 
-    private function amountForItem(PayrollItem $item, float $taxBase, ?EmploymentOrder $order): float
+    private function amountForItem(PayrollItem $item, float $taxBase, ?EmploymentOrder $order, bool $insuranceEnabled): float
     {
+        if (! $insuranceEnabled && in_array($item->code, ['employee_insurance', 'employer_insurance', 'unemployment_insurance'], true)) {
+            return 0.0;
+        }
+
         $orderMap = [
             'housing_allowance' => (float) ($order?->housing_allowance ?? 0),
             'food_allowance' => (float) ($order?->food_allowance ?? 0),
@@ -351,5 +357,12 @@ class PayrollCalculationService
         }
 
         return (float) $item->default_amount;
+    }
+
+    private function insuranceEnabled(?EmploymentOrder $order): bool
+    {
+        $status = strtolower((string) ($order?->insurance_status ?: 'insured'));
+
+        return ! in_array($status, ['not_insured', 'exempt'], true);
     }
 }

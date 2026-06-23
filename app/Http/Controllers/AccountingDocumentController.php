@@ -9,6 +9,7 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Repositories\AccountingDocumentRepository;
 use App\Services\AccountingPostingService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
 class AccountingDocumentController extends Controller
@@ -45,8 +46,25 @@ class AccountingDocumentController extends Controller
     public function show(AccountingDocument $accountingDocument)
     {
         return view('accounting-documents.show', [
-            'document' => $accountingDocument->load(['lines.account', 'lines.party', 'lines.project', 'audits']),
+            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount', 'audits']),
         ]);
+    }
+
+    public function print(AccountingDocument $accountingDocument)
+    {
+        return view('accounting-documents.print', [
+            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount']),
+        ]);
+    }
+
+    public function pdf(AccountingDocument $accountingDocument)
+    {
+        $pdf = Pdf::loadView('accounting-documents.print', [
+            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount']),
+            'forPdf' => true,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('accounting-document-' . $accountingDocument->number . '.pdf');
     }
 
     public function edit(AccountingDocument $accountingDocument)
@@ -55,7 +73,7 @@ class AccountingDocumentController extends Controller
             return $redirect;
         }
 
-        return view('accounting-documents.form', $this->formData($accountingDocument->load('lines')));
+        return view('accounting-documents.form', $this->formData($accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project'])));
     }
 
     public function update(StoreAccountingDocumentRequest $request, AccountingDocument $accountingDocument)

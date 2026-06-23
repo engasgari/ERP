@@ -48,7 +48,7 @@
                                 <select id="year" name="year" required
                                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                     @for($y = $currentYear; $y >= 1400; $y--)
-                                        <option value="{{ $y }}" {{ $currentYear == $y ? 'selected' : '' }}>{{ $y }}</option>
+                                        <option value="{{ $y }}" {{ $currentYear == $y ? 'selected' : '' }}>{{ toPersianDigits($y) }}</option>
                                     @endfor
                                 </select>
                             </div>

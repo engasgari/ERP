@@ -8,7 +8,7 @@
                 <tr>
                     <td>{{ gregorianToJalaliDate($row->document->document_date) }}</td>
                     <td>{{ $row->document->number }}</td>
-                    <td>{{ $row->account?->code }} - {{ $row->account?->title }}</td>
+                    <td>{{ chartAccountDisplayLabel($row->account) }}</td>
                     <td>{{ $row->party?->name ?: '-' }}</td>
                     <td>{{ $row->description }}</td>
                     <td>{{ number_format($row->debit) }}</td>

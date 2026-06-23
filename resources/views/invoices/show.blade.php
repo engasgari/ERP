@@ -46,6 +46,11 @@
                 @csrf
                 <button type="submit" class="primary">تسویه فاکتور</button>
             </form>
+        @elseif($invoice->settled_at)
+            <form method="POST" action="{{ route('invoices.unsettle', $invoice) }}">
+                @csrf
+                <button type="submit" class="primary">خروج از تسویه</button>
+            </form>
         @endif
     </div>
 
@@ -69,6 +74,10 @@
                 <div>
                     <span>تاریخ</span>
                     <strong>{{ gregorianToJalaliDate($invoice->invoice_date) }}</strong>
+                </div>
+                <div>
+                    <span>پروژه</span>
+                    <strong>{{ $invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-' }}</strong>
                 </div>
                 <div>
                     <span>وضعیت</span>
@@ -377,7 +386,7 @@
 
         .tax-meta-box {
             display: grid;
-            grid-template-rows: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(4, minmax(0, 1fr));
             width: 100%;
             min-width: 0;
             max-width: 100%;

@@ -14,6 +14,15 @@ class AccountingDocument extends Model
 {
     use SoftDeletes;
 
+    public const TYPE_MANUAL = 'manual';
+    public const TYPE_SALE_INVOICE = 'sale_invoice';
+    public const TYPE_PURCHASE_INVOICE = 'purchase_invoice';
+    public const TYPE_PAYMENT = 'payment';
+    public const TYPE_RECEIPT = 'receipt';
+    public const TYPE_INVENTORY = 'inventory';
+    public const TYPE_CLOSING = 'closing';
+    public const TYPE_OPENING = 'opening';
+
     protected $fillable = [
         'fiscal_year_id',
         'fiscal_period_id',

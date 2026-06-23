@@ -42,6 +42,66 @@
             </div>
 
             <section>
+                <h3 class="mb-3 text-base font-black text-slate-800">فاکتورهای فروش پروژه</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300 text-sm">
+                        <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border border-gray-300 p-2">شماره</th>
+                            <th class="border border-gray-300 p-2">طرف حساب</th>
+                            <th class="border border-gray-300 p-2">تاریخ</th>
+                            <th class="border border-gray-300 p-2">مبلغ</th>
+                            <th class="border border-gray-300 p-2">وضعیت</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($saleInvoices as $invoice)
+                            <tr>
+                                <td class="border border-gray-300 p-2">{{ $invoice->number }}</td>
+                                <td class="border border-gray-300 p-2">{{ $invoice->party?->name ?: '-' }}</td>
+                                <td class="border border-gray-300 p-2">{{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
+                                <td class="border border-gray-300 p-2">{{ number_format((float) $invoice->total_amount) }}</td>
+                                <td class="border border-gray-300 p-2">{{ $invoice->settlement_status_label }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="border border-gray-300 p-5 text-center text-slate-500">فاکتور فروش متصل به این پروژه ثبت نشده است.</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
+                <h3 class="mb-3 text-base font-black text-slate-800">فاکتورهای خرید پروژه</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-gray-300 text-sm">
+                        <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border border-gray-300 p-2">شماره</th>
+                            <th class="border border-gray-300 p-2">طرف حساب</th>
+                            <th class="border border-gray-300 p-2">تاریخ</th>
+                            <th class="border border-gray-300 p-2">مبلغ</th>
+                            <th class="border border-gray-300 p-2">وضعیت</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($purchaseInvoices as $invoice)
+                            <tr>
+                                <td class="border border-gray-300 p-2">{{ $invoice->number }}</td>
+                                <td class="border border-gray-300 p-2">{{ $invoice->party?->name ?: '-' }}</td>
+                                <td class="border border-gray-300 p-2">{{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
+                                <td class="border border-gray-300 p-2">{{ number_format((float) $invoice->total_amount) }}</td>
+                                <td class="border border-gray-300 p-2">{{ $invoice->settlement_status_label }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="border border-gray-300 p-5 text-center text-slate-500">فاکتور خرید متصل به این پروژه ثبت نشده است.</td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section>
                 <h3 class="mb-3 text-base font-black text-slate-800">سفارش‌های تولید مرتبط</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse border border-gray-300 text-sm">

@@ -79,6 +79,15 @@
                     </span>
                 </label>
                 <label>
+                    پروژه
+                    <select name="project_id">
+                        <option value="">بدون پروژه</option>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}" @selected(old('project_id', $invoice?->project_id) == $project->id)>{{ $project->code }} - {{ $project->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label>
                     {{ $warehouseLabel }}
                     <select name="warehouse_id">
                         <option value="">انتخاب {{ $warehouseLabel }}</option>
@@ -207,11 +216,11 @@
             </td>
             <td><input class="line-description"></td>
             <td><input class="line-unit" readonly tabindex="-1"></td>
-            <td><input class="line-quantity" type="number" step="0.001" min="0.001" dir="ltr"></td>
-            <td><input class="line-price" type="number" step="0.01" min="0" dir="ltr"></td>
-            <td><input class="line-discount" type="number" step="0.01" min="0" dir="ltr" value="0"></td>
-            <td><input class="line-tax-rate" type="number" step="0.01" min="0" dir="ltr" value="10"></td>
-            <td><input class="line-total" readonly tabindex="-1" dir="ltr"></td>
+            <td><input class="line-quantity" type="text" inputmode="decimal" autocomplete="off" dir="ltr" data-erp-number="0"></td>
+            <td><input class="line-price" type="text" inputmode="decimal" autocomplete="off" dir="ltr" data-erp-number="0"></td>
+            <td><input class="line-discount" type="text" inputmode="decimal" autocomplete="off" dir="ltr" value="0" data-erp-number="0"></td>
+            <td><input class="line-tax-rate" type="text" inputmode="decimal" autocomplete="off" dir="ltr" value="10" data-erp-number="0"></td>
+            <td><input class="line-total" readonly tabindex="-1" dir="ltr" data-erp-number="0"></td>
             <td><button type="button" class="line-remove">×</button></td>
         </tr>
     </template>
@@ -239,6 +248,15 @@
         .invoice-entry-table th:nth-child(5), .invoice-entry-table td:nth-child(5) { width: 7rem; }
         .invoice-entry-table th:nth-child(6), .invoice-entry-table td:nth-child(6), .invoice-entry-table th:nth-child(7), .invoice-entry-table td:nth-child(7), .invoice-entry-table th:nth-child(9), .invoice-entry-table td:nth-child(9) { width: 9rem; }
         .line-unit, .line-total { background: #f8fafc; font-weight: 800; }
+        .line-quantity, .line-price, .line-discount, .line-tax-rate {
+            color: #475569;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            text-align: left;
+        }
+        .line-quantity::placeholder, .line-price::placeholder, .line-discount::placeholder, .line-tax-rate::placeholder {
+            color: #94a3b8;
+        }
         .line-remove { display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: .3rem; background: #fef2f2; color: #b91c1c; font-weight: 900; }
         .invoice-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin-top: 1rem; }
         .invoice-summary div { border: 1px solid #e2e8f0; border-radius: .4rem; background: #f8fafc; padding: .7rem; }
@@ -341,11 +359,75 @@
         });
 
         function toNumber(value) {
-            return Number(value || 0) || 0;
+            const digitMap = {
+                '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+                '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+            };
+            const normalized = String(value ?? '')
+                .replace(/[,\s٬]/g, '')
+                .replace(/[٫]/g, '.')
+                .replace(/[۰-۹٠-٩]/g, (digit) => digitMap[digit] ?? digit);
+
+            return Number(normalized || 0) || 0;
         }
 
         function money(value) {
             return Math.round(value).toLocaleString('fa-IR');
+        }
+
+        function formatNumericDisplay(value, maxFractionDigits = 2) {
+            const number = toNumber(value);
+
+            if (!Number.isFinite(number)) {
+                return '';
+            }
+
+            return new Intl.NumberFormat('fa-IR', {
+                maximumFractionDigits: maxFractionDigits,
+            }).format(number);
+        }
+
+        function normalizeEditableNumber(value) {
+            const digitMap = {
+                '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+                '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+            };
+
+            return String(value ?? '')
+                .replace(/[,\s٬]/g, '')
+                .replace(/[٫]/g, '.')
+                .replace(/[۰-۹٠-٩]/g, (digit) => digitMap[digit] ?? digit);
+        }
+
+        function setFormattedValue(input) {
+            if (!input || input.readOnly) {
+                return;
+            }
+
+            input.value = input.value === '' ? '' : formatNumericDisplay(input.value);
+        }
+
+        function setRawValue(input) {
+            if (!input || input.readOnly) {
+                return;
+            }
+
+            input.value = normalizeEditableNumber(input.value);
+        }
+
+        function selectLineInputValue(input) {
+            if (!input || input.readOnly) {
+                return;
+            }
+
+            window.requestAnimationFrame(() => {
+                input.select?.();
+                input.setSelectionRange?.(0, String(input.value ?? '').length);
+            });
         }
 
         function renameRows() {
@@ -370,6 +452,7 @@
             row.querySelector('.line-price').value = values.unit_price || '';
             row.querySelector('.line-discount').value = values.discount_amount ?? 0;
             row.querySelector('.line-tax-rate').value = values.tax_rate ?? 10;
+            row.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach(setFormattedValue);
             linesBody.appendChild(row);
             renameRows();
             recalculateInvoice();
@@ -425,6 +508,25 @@
         }
 
         linesBody.addEventListener('input', recalculateInvoice);
+        linesBody.addEventListener('focusin', (event) => {
+            if (event.target.classList.contains('line-quantity') || event.target.classList.contains('line-price') || event.target.classList.contains('line-discount') || event.target.classList.contains('line-tax-rate')) {
+                setRawValue(event.target);
+                selectLineInputValue(event.target);
+            }
+        });
+        linesBody.addEventListener('mousedown', (event) => {
+            if (event.target.classList.contains('line-quantity') || event.target.classList.contains('line-price') || event.target.classList.contains('line-discount') || event.target.classList.contains('line-tax-rate')) {
+                event.preventDefault();
+                event.target.focus({ preventScroll: true });
+                setRawValue(event.target);
+                selectLineInputValue(event.target);
+            }
+        });
+        linesBody.addEventListener('focusout', (event) => {
+            if (event.target.classList.contains('line-quantity') || event.target.classList.contains('line-price') || event.target.classList.contains('line-discount') || event.target.classList.contains('line-tax-rate')) {
+                setFormattedValue(event.target);
+            }
+        });
         linesBody.addEventListener('change', (event) => {
             if (event.target.classList.contains('line-item')) {
                 const row = event.target.closest('.invoice-line');
@@ -433,6 +535,7 @@
                 if (!row.querySelector('.line-quantity').value && event.target.value) {
                     row.querySelector('.line-quantity').value = 1;
                 }
+                row.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach(setFormattedValue);
                 maybeAddNextRow();
                 recalculateInvoice();
             }
@@ -459,3 +562,4 @@
     })();
     </script>
 </x-app-layout>
+

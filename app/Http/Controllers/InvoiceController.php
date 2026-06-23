@@ -9,6 +9,7 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Party;
 use App\Models\PartyType;
+use App\Models\Project;
 use App\Models\Warehouse;
 use App\Services\AccountingDocumentService;
 use App\Services\InventoryPostingService;
@@ -24,7 +25,7 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Invoice::with(['party', 'lines.item', 'accountingDocument', 'settledBy'])->latest();
+        $query = Invoice::with(['party', 'project', 'lines.item', 'accountingDocument', 'settledBy'])->latest();
 
         foreach (['direction', 'document_type', 'status'] as $filter) {
             if ($request->filled($filter)) {
@@ -66,7 +67,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy']);
+        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy']);
 
         return view('invoices.show', [
             'invoice' => $invoice,
@@ -76,7 +77,7 @@ class InvoiceController extends Controller
 
     public function print(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
+        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
 
         return view('invoices.print', [
             'invoice' => $invoice,
@@ -86,7 +87,7 @@ class InvoiceController extends Controller
 
     public function downloadPdf(Invoice $invoice)
     {
-        $invoice->load(['party.types', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
+        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
 
         $pdf = Pdf::loadView('invoices.print', [
             'invoice' => $invoice,
@@ -99,7 +100,7 @@ class InvoiceController extends Controller
 
     public function downloadExcel(Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
-        $invoice->load(['party', 'lines.item.unit']);
+        $invoice->load(['party', 'project', 'lines.item.unit']);
         $path = $excel->build($invoice, CompanySetting::first());
 
         return response()->download($path, 'invoice-' . $invoice->number . '.xlsx')->deleteFileAfterSend(true);
@@ -124,6 +125,7 @@ class InvoiceController extends Controller
                 'number' => $payload['data']['number'] ?: $numbering->next($key),
                 'invoice_date' => $payload['data']['invoice_date'],
                 'party_id' => $payload['data']['party_id'],
+                'project_id' => $payload['data']['project_id'] ?? null,
                 'warehouse_id' => $payload['data']['warehouse_id'] ?? null,
                 'status' => 'draft',
                 'subtotal' => $payload['subtotal'],
@@ -163,6 +165,7 @@ class InvoiceController extends Controller
                     'number' => $payload['data']['number'] ?: $invoice->number,
                     'invoice_date' => $payload['data']['invoice_date'],
                     'party_id' => $payload['data']['party_id'],
+                    'project_id' => $payload['data']['project_id'] ?? null,
                     'warehouse_id' => $payload['data']['warehouse_id'] ?? null,
                     'status' => 'draft',
                     'subtotal' => $payload['subtotal'],
@@ -173,6 +176,8 @@ class InvoiceController extends Controller
                     'description' => $payload['data']['description'] ?? null,
                     'accounting_document_id' => null,
                     'confirmed_at' => null,
+                    'settled_at' => null,
+                    'settled_by' => null,
                 ]);
 
                 $this->syncLines($invoice, $payload['lines']);
@@ -213,6 +218,7 @@ class InvoiceController extends Controller
             'number' => $payload['data']['number'] ?: 'پیش‌نمایش',
             'invoice_date' => $payload['data']['invoice_date'],
             'party' => Party::findOrFail($payload['data']['party_id']),
+            'project' => $payload['data']['project_id'] ? Project::find($payload['data']['project_id']) : null,
             'lines' => $lines,
             'status' => 'draft',
             'discount_amount' => $payload['discount_amount'],
@@ -256,6 +262,20 @@ class InvoiceController extends Controller
         ]);
 
         return back()->with('success', 'فاکتور با موفقیت تسویه شد.');
+    }
+
+    public function unsettle(Request $request, Invoice $invoice)
+    {
+        abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور قابل خروج از تسویه نیست.');
+        abort_if(! $invoice->settled_at, 422, 'این فاکتور هنوز تسویه نشده است.');
+
+        $invoice->update([
+            'status' => 'confirmed',
+            'settled_at' => null,
+            'settled_by' => null,
+        ]);
+
+        return back()->with('success', 'فاکتور از حالت تسویه خارج شد و به وضعیت تایید شده برگشت.');
     }
 
     public function convert(Invoice $invoice, NumberingService $numbering)
@@ -309,6 +329,7 @@ class InvoiceController extends Controller
             'direction' => $direction,
             'documentType' => $documentType,
             'parties' => $parties,
+            'projects' => Project::query()->orderBy('name')->get(),
             'items' => Item::with('unit')->where('is_active', true)->orderBy('name')->get(),
             'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
             'partyTypeId' => PartyType::where('name', $partyType)->value('id'),
@@ -317,7 +338,18 @@ class InvoiceController extends Controller
 
     private function validatedPayload(Request $request, ?Invoice $invoice = null, bool $allowDuplicateNumber = false): array
     {
-        $request->merge(['invoice_date' => $this->normalizeInvoiceDate($request->input('invoice_date'))]);
+        $request->merge([
+            'invoice_date' => $this->normalizeInvoiceDate($request->input('invoice_date')),
+            'lines' => collect($request->input('lines', []))->map(function ($line) {
+                return [
+                    ...$line,
+                    'quantity' => $this->normalizeNumericInput($line['quantity'] ?? null),
+                    'unit_price' => $this->normalizeNumericInput($line['unit_price'] ?? null),
+                    'discount_amount' => $this->normalizeNumericInput($line['discount_amount'] ?? null),
+                    'tax_rate' => $this->normalizeNumericInput($line['tax_rate'] ?? null),
+                ];
+            })->all(),
+        ]);
 
         $numberRule = 'nullable|string|max:255';
         if (!$allowDuplicateNumber) {
@@ -330,6 +362,7 @@ class InvoiceController extends Controller
             'number' => $numberRule,
             'invoice_date' => 'required|date',
             'party_id' => 'required|exists:parties,id',
+            'project_id' => 'nullable|exists:projects,id',
             'warehouse_id' => 'nullable|exists:warehouses,id',
             'description' => 'nullable|string',
             'lines' => 'required|array',
@@ -464,12 +497,13 @@ class InvoiceController extends Controller
 
     private function normalizeInvoiceDate(?string $value): ?string
     {
-        $value = trim((string) normalizePersianDigits($value));
+        $value = $this->normalizeNumericInput($value);
 
         if ($value === '') {
             return null;
         }
 
+        $value = str_replace('-', '/', (string) $value);
         $year = (int) substr(str_replace('/', '-', $value), 0, 4);
 
         if ($year >= 1700) {
@@ -477,5 +511,46 @@ class InvoiceController extends Controller
         }
 
         return jalaliToGregorianDate($value);
+    }
+
+    private function normalizeNumericInput(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $value = strtr($value, [
+            '۰' => '0',
+            '۱' => '1',
+            '۲' => '2',
+            '۳' => '3',
+            '۴' => '4',
+            '۵' => '5',
+            '۶' => '6',
+            '۷' => '7',
+            '۸' => '8',
+            '۹' => '9',
+            '٠' => '0',
+            '١' => '1',
+            '٢' => '2',
+            '٣' => '3',
+            '٤' => '4',
+            '٥' => '5',
+            '٦' => '6',
+            '٧' => '7',
+            '٨' => '8',
+            '٩' => '9',
+            ',' => '',
+            '٬' => '',
+            ' ' => '',
+        ]);
+
+        return str_replace('٫', '.', $value);
     }
 }

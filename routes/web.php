@@ -9,6 +9,7 @@ use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WorkLogController;
 use App\Http\Controllers\FinancialTransactionController;
 use App\Http\Controllers\ManagementReportController;
+use App\Http\Controllers\ReportCenterController;
 use App\Http\Controllers\AccessRoleController;
 use App\Http\Controllers\AccessUserController;
 use App\Http\Controllers\AccountingDocumentController;
@@ -68,11 +69,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('invoices', InvoiceController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])->whereNumber('invoice')->middleware('permission:commerce.view');
     Route::post('invoices/{invoice}/confirm', [InvoiceController::class, 'confirm'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.confirm');
     Route::post('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.settle');
+    Route::post('invoices/{invoice}/unsettle', [InvoiceController::class, 'unsettle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.unsettle');
     Route::post('invoices/{invoice}/convert', [InvoiceController::class, 'convert'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.convert');
     Route::get('accounting-documents', [AccountingDocumentController::class, 'index'])->middleware('permission:accounting.view')->name('accounting-documents.index');
     Route::get('accounting-documents/create', [AccountingDocumentController::class, 'create'])->middleware('permission:accounting.documents.create')->name('accounting-documents.create');
     Route::post('accounting-documents', [AccountingDocumentController::class, 'store'])->middleware('permission:accounting.documents.create')->name('accounting-documents.store');
     Route::get('accounting-documents/{accountingDocument}', [AccountingDocumentController::class, 'show'])->middleware('permission:accounting.view')->name('accounting-documents.show');
+    Route::get('accounting-documents/{accountingDocument}/print', [AccountingDocumentController::class, 'print'])->middleware('permission:accounting.view')->name('accounting-documents.print');
+    Route::get('accounting-documents/{accountingDocument}/pdf', [AccountingDocumentController::class, 'pdf'])->middleware('permission:accounting.view')->name('accounting-documents.pdf');
     Route::get('accounting-documents/{accountingDocument}/edit', [AccountingDocumentController::class, 'edit'])->middleware('permission:accounting.documents.edit')->name('accounting-documents.edit');
     Route::put('accounting-documents/{accountingDocument}', [AccountingDocumentController::class, 'update'])->middleware('permission:accounting.documents.edit')->name('accounting-documents.update');
     Route::delete('accounting-documents/{accountingDocument}', [AccountingDocumentController::class, 'destroy'])->middleware('permission:accounting.documents.delete')->name('accounting-documents.destroy');
@@ -120,7 +124,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('roles', AccessRoleController::class)->except(['show']);
     });
 
-    Route::get('/management-reports', [ManagementReportController::class, 'index'])
+    Route::get('/management-reports', [ReportCenterController::class, 'index'])
         ->middleware('permission:reports.view')
         ->name('management-reports.index');
 

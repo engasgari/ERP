@@ -74,6 +74,48 @@
         </tbody>
     </table>
 
+    <table style="margin-bottom: 14px;">
+        <thead>
+        <tr>
+            <th>فاکتورهای فروش پروژه</th>
+            <th>مبلغ</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse($saleInvoices as $invoice)
+            <tr>
+                <td>{{ $invoice->number }} - {{ $invoice->party?->name ?: '-' }} - {{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
+                <td class="text-left" dir="ltr">{{ number_format((float) $invoice->total_amount) }}</td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="2" style="text-align: center;">فاکتور فروش متصل به این پروژه ثبت نشده است.</td>
+            </tr>
+        @endforelse
+        </tbody>
+    </table>
+
+    <table style="margin-bottom: 14px;">
+        <thead>
+        <tr>
+            <th>فاکتورهای خرید پروژه</th>
+            <th>مبلغ</th>
+        </tr>
+        </thead>
+        <tbody>
+        @forelse($purchaseInvoices as $invoice)
+            <tr>
+                <td>{{ $invoice->number }} - {{ $invoice->party?->name ?: '-' }} - {{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
+                <td class="text-left" dir="ltr">{{ number_format((float) $invoice->total_amount) }}</td>
+            </tr>
+        @empty
+            <tr>
+                <td colspan="2" style="text-align: center;">فاکتور خرید متصل به این پروژه ثبت نشده است.</td>
+            </tr>
+        @endforelse
+        </tbody>
+    </table>
+
     <table>
         <thead>
         <tr>

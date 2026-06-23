@@ -49,6 +49,7 @@ class InvoiceExcelTemplateService
 
         $this->setText($dom, 'E3', gregorianToJalaliDate($invoice->invoice_date));
         $this->setText($dom, 'BE3', $invoice->number);
+        $this->setText($dom, 'K5', 'پروژه: ' . ($invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-'));
 
         $this->setText($dom, 'K7', $company?->company_name ?? config('app.name', 'ERP'));
         $this->setText($dom, 'AH7', $company?->economic_code ?: '-');

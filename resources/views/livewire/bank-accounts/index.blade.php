@@ -24,7 +24,7 @@
             <label class="erp-filter-field col-12 col-md-6 col-lg-2">کارت<input wire:model="form.card_number" dir="ltr"></label>
             <label class="erp-filter-field col-12 col-md-4 col-lg-2">ارز<input wire:model="form.currency" dir="ltr"></label>
             <label class="erp-filter-field col-12 col-md-4 col-lg-2">مانده افتتاحیه<input type="number" step="0.01" wire:model="form.opening_balance" dir="ltr"></label>
-            <label class="erp-filter-field col-12 col-md-6 col-lg-3">حساب کل<select wire:model="form.chart_account_id"><option value="">بدون حساب</option>@foreach($accounts as $account)<option value="{{ $account->id }}">{{ $account->code }} - {{ $account->title }}</option>@endforeach</select></label>
+            <label class="erp-filter-field col-12 col-md-6 col-lg-3">حساب کل<select wire:model="form.chart_account_id"><option value="">بدون حساب</option>@foreach($accounts as $account)<option value="{{ $account->id }}">{{ chartAccountDisplayLabel($account) }}</option>@endforeach</select></label>
             <label class="erp-filter-field col-12 col-md-4 col-lg-2">وضعیت<select wire:model="form.is_active"><option value="1">فعال</option><option value="0">غیرفعال</option></select></label>
             <div class="col-12 col-lg-3 d-grid d-sm-flex gap-2">
                 <button class="erp-action-btn erp-action-edit">ذخیره</button>
@@ -64,6 +64,7 @@
                     <th>شبا</th>
                     <th>مانده افتتاحیه</th>
                     <th>حساب کل</th>
+                    <th>تفصیل</th>
                     <th>وضعیت</th>
                     <th>عملیات</th>
                 </tr>
@@ -82,7 +83,8 @@
                     <td class="text-nowrap">{{ $bank->account_number ?: '-' }}</td>
                     <td class="text-nowrap">{{ $bank->iban ?: '-' }}</td>
                     <td class="text-nowrap">{{ number_format((float) $bank->opening_balance) }}</td>
-                    <td>{{ $bank->account?->code ? $bank->account->code . ' - ' . $bank->account->title : '-' }}</td>
+                    <td>{{ chartAccountDisplayLabel($bank->account) }}</td>
+                    <td>{{ chartAccountDisplayLabel($bank->detailAccount) }}</td>
                     <td>
                         <x-erp.ui.status-badge :label="$bank->is_active ? 'فعال' : 'غیرفعال'" :tone="$bank->is_active ? 'success' : 'neutral'" />
                     </td>
@@ -95,7 +97,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="text-center py-6 text-slate-500">رکوردی ثبت نشده است.</td>
+                    <td colspan="10" class="text-center py-6 text-slate-500">رکوردی ثبت نشده است.</td>
                 </tr>
             @endforelse
             </tbody>

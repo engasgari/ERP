@@ -13,7 +13,7 @@
                         <td>
                             <select name="settings[{{ $setting->id }}][chart_account_id]" class="w-full">
                                 @foreach($accounts as $account)
-                                    <option value="{{ $account->id }}" @selected($setting->chart_account_id == $account->id)>{{ $account->code }} - {{ $account->title }}</option>
+                                    <option value="{{ $account->id }}" @selected($setting->chart_account_id == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
                                 @endforeach
                             </select>
                         </td>

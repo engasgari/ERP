@@ -25,7 +25,11 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">سال *</label>
-                        <input type="number" name="year" value="{{ old('year', $salary->year) }}" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                        <select name="year" required class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            @for($year = (int) now()->year + 1; $year >= 1400; $year--)
+                                <option value="{{ $year }}" @selected(old('year', $salary->year) == $year)>{{ toPersianDigits($year) }}</option>
+                            @endfor
+                        </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">ماه *</label>
@@ -104,3 +108,4 @@
         </div>
     </div>
 </x-app-layout>
+

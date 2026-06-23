@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>فیش حقوقی - {{ $salary->employee->full_name }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    @vite(['resources/css/app.css'])
+    <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
     <style>
         @media print {
             .no-print {
@@ -17,12 +18,8 @@
                 page-break-after: always;
             }
         }
-        @font-face {
-            font-family: 'Vazir';
-            src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2');
-        }
         body {
-            font-family: 'Vazir', 'Tanha', 'Segoe UI', Tahoma, sans-serif;
+            font-family: 'Vazirmatn', 'Tahoma', 'Segoe UI', sans-serif;
         }
     </style>
 </head>
@@ -45,13 +42,13 @@
             <h1 class="text-2xl font-bold text-gray-800">فیش حقوقی</h1>
             <div class="grid grid-cols-3 gap-4 mt-4 text-sm">
                 <div class="text-left">
-                    <strong>کد فیش:</strong> SL{{ $salary->id }}{{ $salary->year }}{{ $salary->month }}
+                    <strong>کد فیش:</strong> SL{{ toPersianDigits($salary->id) }}{{ toPersianDigits($salary->year) }}{{ toPersianDigits($salary->month) }}
                 </div>
                 <div class="text-center">
                     <strong>تاریخ چاپ:</strong> {{ verta()->format('Y/m/d') }}
                 </div>
                 <div class="text-right">
-                    <strong>دوره:</strong> {{ getPersianMonthName($salary->month) }} {{ $salary->year }}
+                    <strong>دوره:</strong> {{ getPersianMonthName($salary->month) }} {{ toPersianDigits($salary->year) }}
                 </div>
             </div>
         </div>

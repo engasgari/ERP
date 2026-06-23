@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>خطای داخلی سرور</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+    <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
     <style>
         body { margin: 0; font-family: Vazirmatn, sans-serif; background: #fff1f2; color: #7f1d1d; min-height: 100vh; display: grid; place-items: center; }
         .card { width: min(640px, calc(100vw - 2rem)); border: 1px solid #fecdd3; border-radius: 20px; background: #fff; padding: 2rem; box-shadow: 0 20px 60px rgba(185, 28, 28, .08); }

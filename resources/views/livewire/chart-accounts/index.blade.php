@@ -54,7 +54,7 @@
                 <tr wire:key="account-{{ $account->id }}" class="cursor-pointer hover:bg-slate-50" onclick="window.location='{{ route('financial-reports.account-statement', $account) }}'">
                     <td>{{ $account->code }}</td>
                     <td>
-                        <span class="font-bold text-blue-700">{{ $account->title }}</span>
+                        <span class="font-bold text-blue-700">{{ chartAccountDisplayLabel($account) }}</span>
                     </td>
                     <td>{{ $levelLabels[$account->level] ?? $account->level }}</td>
                     <td>{{ $natureLabels[$account->nature] ?? $account->nature }}</td>
@@ -90,7 +90,7 @@
             </x-slot>
             <div class="erp-modal-grid">
                 <div class="erp-modal-field">کد<div class="erp-modal-value">{{ $showingAccount->code }}</div></div>
-                <div class="erp-modal-field">عنوان<div class="erp-modal-value">{{ $showingAccount->title }}</div></div>
+                <div class="erp-modal-field">عنوان<div class="erp-modal-value">{{ chartAccountDisplayLabel($showingAccount) }}</div></div>
                 <div class="erp-modal-field">سطح<div class="erp-modal-value">{{ $levelLabels[$showingAccount->level] ?? $showingAccount->level }}</div></div>
                 <div class="erp-modal-field">ماهیت<div class="erp-modal-value">{{ $natureLabels[$showingAccount->nature] ?? $showingAccount->nature }}</div></div>
                 <div class="erp-modal-field">والد<div class="erp-modal-value">{{ $showingAccount->parent_title ?: '-' }}</div></div>

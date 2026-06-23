@@ -23,21 +23,21 @@
 
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
                 <div class="bg-green-50 rounded-lg p-3">
-                    <div class="text-xs text-gray-500">درآمد ثبت شده</div>
-                    <div class="mt-1 font-bold text-green-700">{{ number_format($summary['income']) }} تومان</div>
+                    <div class="text-xs text-gray-500">مانده افتتاحیه</div>
+                    <div class="mt-1 font-bold text-green-700">{{ number_format($summary['opening']) }} تومان</div>
                 </div>
                 <div class="bg-red-50 rounded-lg p-3">
-                    <div class="text-xs text-gray-500">هزینه‌های مالی</div>
-                    <div class="mt-1 font-bold text-red-700">{{ number_format($summary['financial_expense']) }} تومان</div>
+                    <div class="text-xs text-gray-500">گردش دوره</div>
+                    <div class="mt-1 font-bold text-red-700">{{ number_format($summary['period']) }} تومان</div>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-3">
-                    <div class="text-xs text-gray-500">حقوق و دستمزد</div>
-                    <div class="mt-1 font-bold text-gray-700">{{ number_format($summary['salary_expense']) }} تومان</div>
+                    <div class="text-xs text-gray-500">مانده نهایی</div>
+                    <div class="mt-1 font-bold text-gray-700">{{ number_format($summary['closing']) }} تومان</div>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-3">
-                    <div class="text-xs text-gray-500">سود/زیان مدیریتی</div>
-                    <div class="mt-1 font-bold {{ $summary['net_profit'] >= 0 ? 'text-green-700' : 'text-red-700' }}">
-                        {{ number_format($summary['net_profit']) }} تومان
+                    <div class="text-xs text-gray-500">وضعیت تراز</div>
+                    <div class="mt-1 font-bold {{ $summary['is_balanced'] ? 'text-green-700' : 'text-red-700' }}">
+                        {{ $summary['is_balanced'] ? 'متعادل' : 'نامتعادل' }}
                     </div>
                 </div>
             </div>
@@ -53,8 +53,12 @@
                     <tr>
                         <th class="border border-gray-300 p-2">کد حساب</th>
                         <th class="border border-gray-300 p-2">شرح حساب</th>
-                        <th class="border border-gray-300 p-2">بدهکار</th>
-                        <th class="border border-gray-300 p-2">بستانکار</th>
+                        <th class="border border-gray-300 p-2">مانده افتتاحیه بدهکار</th>
+                        <th class="border border-gray-300 p-2">مانده افتتاحیه بستانکار</th>
+                        <th class="border border-gray-300 p-2">گردش بدهکار</th>
+                        <th class="border border-gray-300 p-2">گردش بستانکار</th>
+                        <th class="border border-gray-300 p-2">مانده نهایی بدهکار</th>
+                        <th class="border border-gray-300 p-2">مانده نهایی بستانکار</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -62,16 +66,16 @@
                         <tr>
                             <td class="border border-gray-300 p-2 text-gray-500">{{ $row['code'] }}</td>
                             <td class="border border-gray-300 p-2 font-medium">{{ $row['title'] }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">
-                                {{ $row['debit'] ? number_format($row['debit']) : '-' }}
-                            </td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">
-                                {{ $row['credit'] ? number_format($row['credit']) : '-' }}
-                            </td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['opening_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['opening_credit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['period_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['period_credit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['closing_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['closing_credit'] ?? 0)) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="border border-gray-300 p-4 text-center text-gray-500">
+                            <td colspan="8" class="border border-gray-300 p-4 text-center text-gray-500">
                                 هنوز داده مالی برای گزارش وجود ندارد.
                             </td>
                         </tr>
@@ -80,15 +84,19 @@
                     <tfoot>
                     <tr class="font-bold">
                         <td class="border border-gray-300 p-2" colspan="2">جمع کل</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['debit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['opening_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['opening_credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['period_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['period_credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['closing_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['closing_credit']) }}</td>
                     </tr>
                     </tfoot>
                 </table>
             </div>
 
             <div class="mt-4 text-xs leading-6 text-gray-500">
-                این تراز آزمایشی از ثبت‌های عملیاتی فعلی ساخته شده است: درآمدها و هزینه‌های مالی، حقوق محاسبه شده، پرداخت‌های حقوق، ورود و خروج انبار.
+                این تراز آزمایشی از سندهای حسابداری ثبت‌شده ساخته شده است و باید با دفاتر کل و دفتر روزنامه همخوانی داشته باشد.
             </div>
         </div>
     </div>

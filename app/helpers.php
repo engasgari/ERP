@@ -54,6 +54,28 @@ if (!function_exists('getPersianMonthRange')) {
     }
 }
 
+if (!function_exists('chartAccountDisplayLabel')) {
+    function chartAccountDisplayLabel($account): string
+    {
+        if (! $account) {
+            return '-';
+        }
+
+        $code = data_get($account, 'code');
+        $title = data_get($account, 'title') ?: data_get($account, 'name') ?: data_get($account, 'bank_name');
+
+        if (! $code && ! $title) {
+            return '-';
+        }
+
+        if ($code && $title) {
+            return trim($code . ' - ' . $title);
+        }
+
+        return (string) ($code ?: $title);
+    }
+}
+
 if (!function_exists('convertToPersian')) {
     function convertToPersian($carbonDate): Verta
     {
@@ -96,6 +118,24 @@ if (!function_exists('normalizePersianDigits')) {
             '٧' => '7',
             '٨' => '8',
             '٩' => '9',
+        ]);
+    }
+}
+
+if (!function_exists('toPersianDigits')) {
+    function toPersianDigits($value): string
+    {
+        return strtr((string) $value, [
+            '0' => '۰',
+            '1' => '۱',
+            '2' => '۲',
+            '3' => '۳',
+            '4' => '۴',
+            '5' => '۵',
+            '6' => '۶',
+            '7' => '۷',
+            '8' => '۸',
+            '9' => '۹',
         ]);
     }
 }

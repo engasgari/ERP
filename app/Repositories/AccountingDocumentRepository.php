@@ -10,7 +10,7 @@ class AccountingDocumentRepository
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         return AccountingDocument::query()
-            ->with(['lines.account', 'creator'])
+            ->with(['lines.account', 'lines.detailAccount', 'lines.bankAccount', 'creator'])
             ->when($filters['search'] ?? null, function ($query, $search) {
                 $search = trim((string) $search);
                 $query->where(function ($query) use ($search) {

@@ -7,6 +7,7 @@ use App\Models\AccountingDocumentLine;
 use App\Models\BankAccount;
 use App\Models\ChartAccount;
 use App\Models\TreasuryTransaction;
+use App\Services\BankAccountCodingService;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -63,7 +64,7 @@ class Index extends Component
 
     public function edit(int $id): void
     {
-        $bank = BankAccount::findOrFail($id);
+        $bank = BankAccount::with(['account', 'detailAccount'])->findOrFail($id);
         $this->editingId = $bank->id;
         $this->form = $bank->only(['code', 'bank_name', 'branch', 'account_number', 'iban', 'card_number', 'currency', 'opening_balance', 'chart_account_id', 'is_active']);
         $this->form['chart_account_id'] = $this->form['chart_account_id'] ?: '';
@@ -93,7 +94,8 @@ class Index extends Component
         $data['opening_balance'] = (float) $data['opening_balance'];
         $data['is_active'] = (string) $data['is_active'] === '1' || $data['is_active'] === true;
 
-        BankAccount::updateOrCreate(['id' => $this->editingId], $data);
+        $bank = BankAccount::updateOrCreate(['id' => $this->editingId], $data);
+        app(BankAccountCodingService::class)->syncDetailAccount($bank);
 
         session()->flash('success', 'حساب بانکی ذخیره شد.');
         $this->cancel();
@@ -128,7 +130,7 @@ class Index extends Component
     public function render()
     {
         $banks = BankAccount::query()
-            ->with('account')
+            ->with(['account', 'detailAccount'])
             ->when($this->search !== '', function (Builder $query) {
                 $search = trim($this->search);
                 $query->where(function (Builder $builder) use ($search): void {

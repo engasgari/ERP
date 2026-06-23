@@ -15,7 +15,7 @@
                 <select name="account_id" class="w-full">
                     <option value="">همه حساب‌ها</option>
                     @foreach($accounts as $account)
-                        <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ $account->code }} - {{ $account->title }}</option>
+                        <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
                     @endforeach
                 </select>
             </label>
@@ -179,3 +179,4 @@
         })();
     </script>
 </x-app-layout>
+

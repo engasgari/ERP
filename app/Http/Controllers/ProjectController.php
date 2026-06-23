@@ -2,18 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AccountingDocumentLine;
-use App\Models\FinancialTransaction;
-use App\Models\InventoryDocument;
-use App\Models\Invoice;
 use App\Models\Party;
-use App\Models\ProductionOrder;
 use App\Models\Project;
-use App\Models\ProjectCostSnapshot;
-use App\Models\TreasuryTransaction;
 use App\Models\User;
-use App\Models\WorkLog;
 use App\Services\NumberingService;
+use App\Services\ProjectDeletionService;
 use Illuminate\Http\Request;
 
 class ProjectController extends Controller
@@ -51,8 +44,8 @@ class ProjectController extends Controller
         $projects = $query->latest()->paginate(12)->withQueryString();
 
         $dateErrors = [
-            'start_date' => $request->filled('start_date') && !jalaliToGregorianDate($request->start_date) ? 'تاریخ شروع معتبر نیست.' : null,
-            'end_date' => $request->filled('end_date') && !jalaliToGregorianDate($request->end_date) ? 'تاریخ پایان معتبر نیست.' : null,
+            'start_date' => $request->filled('start_date') && ! jalaliToGregorianDate($request->start_date) ? 'تاریخ شروع معتبر نیست.' : null,
+            'end_date' => $request->filled('end_date') && ! jalaliToGregorianDate($request->end_date) ? 'تاریخ پایان معتبر نیست.' : null,
         ];
 
         return view('projects.index', compact('projects', 'dateErrors'));
@@ -108,51 +101,12 @@ class ProjectController extends Controller
             ->with('success', 'پروژه با موفقیت ویرایش شد.');
     }
 
-    public function destroy(Project $project)
+    public function destroy(Project $project, ProjectDeletionService $deletion)
     {
-        $related = [
-            'تراکنش مالی' => FinancialTransaction::where('project_id', $project->id)->count(),
-            'کارکرد' => WorkLog::where('project_id', $project->id)->count(),
-            'فاکتور' => Invoice::where('project_id', $project->id)->count(),
-            'سند انبار' => InventoryDocument::where('project_id', $project->id)->count(),
-            'سفارش تولید' => ProductionOrder::where('project_id', $project->id)->count(),
-            'ردیف سند حسابداری' => AccountingDocumentLine::where('project_id', $project->id)->count(),
-            'تراکنش خزانه' => TreasuryTransaction::where('project_id', $project->id)->count(),
-            'اسنپ‌شات بهای تمام‌شده' => ProjectCostSnapshot::where('project_id', $project->id)->count(),
-        ];
-
-        $details = collect($related)
-            ->filter(fn ($count) => $count > 0)
-            ->map(fn ($count, $title) => "{$title}: {$count}")
-            ->values()
-            ->all();
-
-        $invoiceNumbers = Invoice::where('project_id', $project->id)->limit(5)->pluck('number')->filter()->implode('، ');
-        $inventoryNumbers = InventoryDocument::where('project_id', $project->id)->limit(5)->pluck('number')->filter()->implode('، ');
-        $productionNumbers = ProductionOrder::where('project_id', $project->id)->limit(5)->pluck('number')->filter()->implode('، ');
-
-        if ($invoiceNumbers) {
-            $details[] = 'نمونه فاکتورها: ' . $invoiceNumbers;
-        }
-
-        if ($inventoryNumbers) {
-            $details[] = 'نمونه اسناد انبار: ' . $inventoryNumbers;
-        }
-
-        if ($productionNumbers) {
-            $details[] = 'نمونه سفارش‌های تولید: ' . $productionNumbers;
-        }
-
-        if (! empty($details)) {
-            return redirect()->route('projects.index')
-                ->with('error', 'این پروژه سند یا گردش مرتبط دارد و قابل حذف نیست.')
-                ->with('error_details', $details);
-        }
-
-        $project->delete();
+        $deletion->delete($project);
 
         return redirect()->route('projects.index')
-            ->with('success', 'پروژه با موفقیت حذف شد.');
+            ->with('success', 'پروژه و سندهای وابسته با موفقیت حذف شدند.');
     }
 
     private function validated(Request $request, ?Project $project = null): array

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>چاپ فاکتور {{ $invoice->number }}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+    <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
     <style>
         @page {
             size: A4 landscape;
@@ -328,6 +328,10 @@
             <div class="meta-row">
                 <span>شماره فاکتور:</span>
                 <strong>{{ $invoice->number }}</strong>
+            </div>
+            <div class="meta-row">
+                <span>پروژه:</span>
+                <strong>{{ $invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-' }}</strong>
             </div>
         </div>
     </div>

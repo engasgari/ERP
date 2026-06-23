@@ -35,16 +35,179 @@ function enableErpDropdowns() {
     document.addEventListener('click', handleErpDropdownClick);
 }
 
+function isErpDateField(input) {
+    if (!input) {
+        return false;
+    }
+
+    if (input.dataset.jalaliReady === '1' || input.dataset.jalaliDatepicker === '1' || input.hasAttribute('data-jalali-datepicker')) {
+        return true;
+    }
+
+    const name = (input.getAttribute('name') || '').toLowerCase();
+    const id = (input.id || '').toLowerCase();
+    const haystack = `${name} ${id}`;
+
+    return /(^|[\[\]_.-])(date|date_from|date_to|start_date|end_date|document_date|transaction_date|invoice_date|work_date|effective_date|planned_start_date|planned_end_date|actual_start_date|actual_end_date|leave_date|mission_date|payment_date|hire_date|termination_date|issued_at|expires_at|start_date_fa|end_date_fa|from_date|to_date|period_date|due_date|delivery_date)(?=$|[\[\]_.-])/i.test(haystack);
+}
+
+function jalaliDatePlaceholderFor(input) {
+    const name = (input?.getAttribute('name') || '').toLowerCase();
+    if (name.includes('from') || name.includes('start')) {
+        return '1403/01/01';
+    }
+    if (name.includes('to') || name.includes('end')) {
+        return '1403/12/29';
+    }
+    return '1403/03/17';
+}
+
+function normalizeErpDateField(input) {
+    input.dataset.jalaliReady = '1';
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('placeholder', input.getAttribute('placeholder') || jalaliDatePlaceholderFor(input));
+    input.dir = 'ltr';
+    input.classList.add('erp-jalali-date-input');
+}
+
+function isErpMoneyField(input) {
+    if (!input || input.disabled || input.dataset.erpMoneyReady === '1') {
+        return false;
+    }
+
+    if (input.dataset.erpMoney === '0' || input.dataset.erpNumber === '0') {
+        return false;
+    }
+
+    if (input.dataset.erpMoney === '1') {
+        return true;
+    }
+
+    if (input.dataset.erpNumber === '1') {
+        return true;
+    }
+
+    if (input.type === 'hidden' || input.type === 'file' || input.type === 'password' || input.type === 'checkbox' || input.type === 'radio' || input.type === 'submit' || input.type === 'button') {
+        return false;
+    }
+
+    const name = (input.getAttribute('name') || '').toLowerCase();
+    const id = (input.id || '').toLowerCase();
+    const haystack = `${name} ${id}`;
+
+    if (isErpDateField(input)) {
+        return false;
+    }
+
+    if (/(code|phone|mobile|tel|fax|national_id|economic_code|postal_code|iban|serial|tracking|reference|token|password|username|email|account|card|passport|employee_code|invoice_number|document_number)/i.test(haystack)) {
+        return false;
+    }
+
+    return input.type === 'number'
+        || input.inputMode === 'decimal'
+        || input.inputMode === 'numeric'
+        || input.dataset.erpMoney === '1'
+        || /(^|[\[\]_.-])(amount|price|salary|cost|fee|tax|discount|balance|payment|paid|debit|credit|subtotal|total|unit_cost|hourly_rate|overtime_rate|overtime_salary|bonus|deduction|advance_payment|sale_price|purchase_price|net_salary|grand_total|quantity|qty|count|rate|ratio|percent|percentage|age|score|points)(?=$|[\[\]_.-])/i.test(haystack);
+}
+
+function normalizeErpMoneyValue(value) {
+    const raw = normalizeDigits(String(value ?? '')).replace(/[,\s٬]/g, '').replace(/[٫]/g, '.').replace(/[^\d.-]/g, '');
+    if (!raw) {
+        return '';
+    }
+
+    const negative = raw.startsWith('-');
+    const unsigned = raw.replace(/-/g, '');
+    const [integerPart = '', ...fractionParts] = unsigned.split('.');
+    const fractionPart = fractionParts.join('');
+
+    const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '') || '0';
+    const formattedInteger = normalizedInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    return toPersianNumber(`${negative ? '-' : ''}${formattedInteger}${fractionPart ? `.${fractionPart}` : ''}`);
+}
+
+function erpMoneyRawValue(value) {
+    const raw = normalizeDigits(String(value ?? '')).replace(/[,\s٬]/g, '').replace(/[٫]/g, '.').replace(/[^\d.-]/g, '');
+    if (!raw) {
+        return '';
+    }
+
+    const negative = raw.startsWith('-');
+    const unsigned = raw.replace(/-/g, '');
+    const [integerPart = '', ...fractionParts] = unsigned.split('.');
+    const fractionPart = fractionParts.join('');
+    const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '') || '0';
+
+    return `${negative ? '-' : ''}${normalizedInteger}${fractionPart ? `.${fractionPart}` : ''}`;
+}
+
+function enableErpMoneyInputs() {
+    document.querySelectorAll('input').forEach((input) => {
+        if (!isErpMoneyField(input)) {
+            return;
+        }
+
+        input.dataset.erpMoneyReady = '1';
+        input.autocomplete = 'off';
+        input.setAttribute('inputmode', input.step && input.step !== '1' ? 'decimal' : 'numeric');
+        input.dir = 'ltr';
+        input.classList.add('text-left', 'tabular-nums');
+
+        if (input.type === 'number') {
+            input.type = 'text';
+        }
+
+        const formatCurrentValue = () => {
+            input.value = input.value === '' ? '' : normalizeErpMoneyValue(input.value);
+        };
+
+        const sanitizeCurrentValue = () => {
+            input.value = erpMoneyRawValue(input.value);
+        };
+
+        input.addEventListener('focus', () => {
+            input.value = erpMoneyRawValue(input.value);
+            window.requestAnimationFrame(() => {
+                input.select?.();
+                input.setSelectionRange?.(0, String(input.value ?? '').length);
+            });
+        });
+
+        input.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            input.focus({ preventScroll: true });
+            window.requestAnimationFrame(() => {
+                input.select?.();
+                input.setSelectionRange?.(0, String(input.value ?? '').length);
+            });
+        });
+
+        input.addEventListener('input', sanitizeCurrentValue);
+        input.addEventListener('blur', formatCurrentValue);
+
+        const form = input.closest('form');
+        if (form && form.dataset.erpMoneySubmitReady !== '1') {
+            form.dataset.erpMoneySubmitReady = '1';
+            form.addEventListener('submit', () => {
+                form.querySelectorAll('input[data-erp-money-ready="1"]').forEach((moneyInput) => {
+                    moneyInput.value = erpMoneyRawValue(moneyInput.value);
+                });
+            }, true);
+        }
+
+        formatCurrentValue();
+    });
+}
+
 function enableJalaliDatepickers() {
-    document.querySelectorAll('input[data-jalali-datepicker], input[type="text"][name$="_date"], input[type="text"][name="date_from"], input[type="text"][name="date_to"], input[type="text"][name="start_date"], input[type="text"][name="end_date"], input[type="text"][name="allocated_date"], input[type="text"][name="effective_date"]').forEach((input) => {
+    document.querySelectorAll('input[data-jalali-datepicker], input[type="text"][name*="date"], input[type="text"][id*="date"]').forEach((input) => {
         if (input.type === 'hidden' || input.dataset.jalaliReady === '1') {
             return;
         }
 
-        input.dataset.jalaliReady = '1';
-        input.setAttribute('autocomplete', 'off');
-        input.setAttribute('inputmode', 'numeric');
-        input.dir = 'ltr';
+        normalizeErpDateField(input);
 
         input.addEventListener('input', () => {
             input.value = formatJalaliDateInput(input.value);
@@ -203,7 +366,7 @@ function showJalaliPicker(input) {
 function handleJalaliOutsideClick(event) {
     const picker = document.querySelector('.erp-jalali-picker');
 
-    if (!picker || event.target.closest('.erp-jalali-picker') || event.target.closest('input[data-jalali-datepicker], input[type="text"][name$="_date"], input[type="text"][name="date_from"], input[type="text"][name="date_to"], input[type="text"][name="start_date"], input[type="text"][name="end_date"], input[type="text"][name="allocated_date"], input[type="text"][name="effective_date"]')) {
+    if (!picker || event.target.closest('.erp-jalali-picker') || event.target.closest('input[data-jalali-datepicker], input[type="text"][name*="date"], input[type="text"][id*="date"]')) {
         return;
     }
 
@@ -509,6 +672,7 @@ function handleErpSpaClick(event) {
 document.addEventListener('DOMContentLoaded', hydrateErpTables);
 document.addEventListener('DOMContentLoaded', enableErpSpaLinks);
 document.addEventListener('DOMContentLoaded', enableErpDropdowns);
+document.addEventListener('DOMContentLoaded', enableErpMoneyInputs);
 document.addEventListener('DOMContentLoaded', enableJalaliDatepickers);
 document.addEventListener('DOMContentLoaded', enableErpDeleteConfirms);
 document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
@@ -516,6 +680,7 @@ document.addEventListener('livewire:navigated', () => {
     hydrateErpTables();
     enableErpSpaLinks();
     enableErpDropdowns();
+    enableErpMoneyInputs();
     enableJalaliDatepickers();
     enableErpDeleteConfirms();
     enableErpFlashMessages();
@@ -523,6 +688,7 @@ document.addEventListener('livewire:navigated', () => {
 document.addEventListener('livewire:update', hydrateErpTables);
 document.addEventListener('livewire:morphed', () => {
     hydrateErpTables();
+    enableErpMoneyInputs();
     enableJalaliDatepickers();
     enableErpDeleteConfirms();
     enableErpFlashMessages();
@@ -536,6 +702,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     new MutationObserver(scheduleErpHydration).observe(shell, {
+        childList: true,
+        subtree: true,
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const shell = document.querySelector('.erp-shell');
+
+    if (!shell || !window.MutationObserver) {
+        return;
+    }
+
+    new MutationObserver(() => {
+        enableErpMoneyInputs();
+    }).observe(shell, {
         childList: true,
         subtree: true,
     });

@@ -51,6 +51,7 @@
                         <th>نوع</th>
                         <th>تاریخ</th>
                         <th>طرف حساب</th>
+                        <th>پروژه</th>
                         <th>مبلغ (ریال)</th>
                         <th>وضعیت</th>
                         <th>عملیات</th>
@@ -63,6 +64,7 @@
                             <td>{{ $invoice->direction === 'sale' ? 'فروش' : 'خرید' }} / {{ $invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور' }}</td>
                             <td>{{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
                             <td><button type="button" class="erp-modal-trigger" data-erp-modal-open="invoice-show-{{ $invoice->id }}">{{ $invoice->party?->name ?: 'طرف حساب حذف شده' }}</button></td>
+                            <td>{{ $invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-' }}</td>
                             <td>{{ number_format($invoice->total_amount) }}</td>
                             <td>{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'draft' ? 'موقت' : ($invoice->status === 'confirmed' ? 'تایید شده' : $invoice->status)) }}</td>
                             <td>
@@ -76,6 +78,8 @@
                                         <form method="POST" action="{{ route('invoices.confirm', $invoice) }}">@csrf<button class="erp-action-btn erp-action-edit">تایید و سند</button></form>
                                     @elseif($invoice->status === 'confirmed' && ! $invoice->settled_at)
                                         <form method="POST" action="{{ route('invoices.settle', $invoice) }}">@csrf<button class="erp-action-btn erp-action-detail">تسویه</button></form>
+                                    @elseif($invoice->settled_at)
+                                        <form method="POST" action="{{ route('invoices.unsettle', $invoice) }}">@csrf<button class="erp-action-btn erp-action-detail">خروج از تسویه</button></form>
                                     @endif
                                     <form method="POST" action="{{ route('invoices.destroy', $invoice) }}" onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')">
                                         @csrf
@@ -86,7 +90,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center text-gray-500 py-6">فاکتوری یافت نشد.</td></tr>
+                        <tr><td colspan="8" class="text-center text-gray-500 py-6">فاکتوری یافت نشد.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -104,6 +108,7 @@
                         <div class="erp-modal-field">نوع<div class="erp-modal-value">{{ $invoice->direction === 'sale' ? 'فروش' : 'خرید' }} / {{ $invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور' }}</div></div>
                         <div class="erp-modal-field">تاریخ<div class="erp-modal-value">{{ gregorianToJalaliDate($invoice->invoice_date) }}</div></div>
                         <div class="erp-modal-field">طرف حساب<div class="erp-modal-value">{{ $invoice->party?->name ?: '-' }}</div></div>
+                        <div class="erp-modal-field">پروژه<div class="erp-modal-value">{{ $invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-' }}</div></div>
                         <div class="erp-modal-field">وضعیت<div class="erp-modal-value">{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'draft' ? 'موقت' : ($invoice->status === 'confirmed' ? 'تایید شده' : $invoice->status)) }}</div></div>
                         <div class="erp-modal-field">مبلغ نهایی (ریال)<div class="erp-modal-value">{{ number_format($invoice->total_amount) }}</div></div>
                         <div class="erp-modal-field md:col-span-2">توضیحات<div class="erp-modal-value">{{ $invoice->description ?: '-' }}</div></div>
@@ -130,6 +135,12 @@
                     <a href="{{ route('invoices.show', $invoice) }}" class="erp-action-btn erp-action-edit">نمایش کامل</a>
                     <a href="{{ route('invoices.edit', $invoice) }}" class="erp-action-btn erp-action-edit">ویرایش</a>
                     <a href="{{ route('invoices.print', $invoice) }}" target="_blank" data-no-spa class="erp-action-btn erp-action-detail">چاپ</a>
+                    @if($invoice->settled_at)
+                        <form method="POST" action="{{ route('invoices.unsettle', $invoice) }}">
+                            @csrf
+                            <button class="erp-action-btn erp-action-detail">خروج از تسویه</button>
+                        </form>
+                    @endif
                 </div>
             </div>
         </div>

@@ -6,7 +6,7 @@
     <div class="bg-white rounded-lg shadow-md p-6 space-y-4">
         <div class="flex justify-between items-center">
             <div>
-                <h2 class="text-lg font-bold">{{ $account->code }} - {{ $account->title }}</h2>
+                <h2 class="text-lg font-bold">{{ chartAccountDisplayLabel($account) }}</h2>
                 <div class="text-sm text-slate-500">سطح: {{ $account->level }} | ماهیت: {{ $account->nature }}</div>
             </div>
             <div class="flex gap-2">
@@ -60,7 +60,7 @@
                                 -
                             @endif
                         </td>
-                        <td>{{ data_get($line, 'account.code') }} - {{ data_get($line, 'account.title') }}</td>
+                        <td>{{ chartAccountDisplayLabel(data_get($line, 'account')) }}</td>
                         <td>{{ data_get($line, 'party.name', '-') }}</td>
                         <td>{{ data_get($line, 'project.name', '-') }}</td>
                         <td>{{ data_get($line, 'description') ?: data_get($line, 'document.description', '-') }}</td>

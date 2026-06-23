@@ -9,17 +9,14 @@
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
 
         <!-- Fonts -->
-{{--        <link rel="preconnect" href="https://fonts.bunny.net">--}}
-{{--        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />--}}
-        <!-- لینک فونت وزیر از CDN -->
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css">
+        <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
         <link rel="stylesheet" href="{{ asset('css/style.css') }}">
         <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}">
         @livewireStyles
 
         <!-- Scripts -->
         @vite(['resources/css/app.css'])
-        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="{{ asset('vendor/jquery/jquery-3.6.0.min.js') }}"></script>
     </head>
     <body class="font-sans antialiased">
         <div class="erp-shell min-h-screen bg-slate-100 text-slate-900">
@@ -44,7 +41,7 @@
                     <div class="mx-auto max-w-2xl px-3 py-4 sm:px-5 lg:px-6">
                         <x-erp.ui.alert
                             :tone="session('error') ? 'danger' : 'success'"
-                            :title="session('error') ? 'خطا' : 'انجام شد'"
+                            :title="session('error') ? 'ط®ط·ط§' : 'ط§ظ†ط¬ط§ظ… ط´ط¯'"
                             :message="session('error') ?: session('success')"
                             :details="session('error') ? session('error_details') : []"
                             class="relative"

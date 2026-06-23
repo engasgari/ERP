@@ -23,9 +23,7 @@ class FinancialReportController extends Controller
 {
     public function index(FinancialReportService $reports)
     {
-        return view('financial-reports.index', [
-            'groups' => $reports->catalog(),
-        ]);
+        return redirect()->route('management-reports.index', ['tab' => 'financial']);
     }
 
     public function show(string $report, FinancialReportRequest $request, FinancialReportService $reports)
@@ -67,9 +65,14 @@ class FinancialReportController extends Controller
         $data = $reports->report($report, $request->validated());
 
         $rows = collect($data['export_rows'] ?? []);
-        $firstRow = $rows->first() ?: [];
-        $fields = is_array($firstRow) ? array_keys($firstRow) : [];
-        $headings = collect($data['sections'][0]['headers'] ?? [])->map(fn ($header) => (string) $header)->all();
+        if ($report === 'income-statement') {
+            $fields = ['section', 'code', 'title', 'amount'];
+            $headings = ['بخش', 'کد', 'عنوان', 'مبلغ'];
+        } else {
+            $firstRow = $rows->first() ?: [];
+            $fields = is_array($firstRow) ? array_keys($firstRow) : [];
+            $headings = collect($data['sections'][0]['headers'] ?? [])->map(fn ($header) => (string) $header)->all();
+        }
 
         return Excel::download(
             new FinancialReportExport($fields, $headings, $rows, $data['title'] ?? $report),
@@ -160,6 +163,9 @@ class FinancialReportController extends Controller
             'reportSubtitle' => $data['subtitle'] ?? '',
             'summary' => $data['summary'] ?? [],
             'sections' => $data['sections'] ?? [],
+            'comparison' => $data['comparison'] ?? [],
+            'charts' => $data['charts'] ?? [],
+            'period' => $data['period'] ?? [],
             'filters' => $request->query(),
             'accounts' => ChartAccount::orderBy('code')->get(),
             'parties' => Party::orderBy('name')->get(),

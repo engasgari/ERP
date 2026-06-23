@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Invoice;
 use App\Models\Project;
 use App\Services\ProjectCostingService;
 
@@ -34,6 +35,18 @@ class ProjectCostController extends Controller
         return [
             'project' => $project,
             'summary' => $costing->summary($project),
+            'saleInvoices' => Invoice::with('party')
+                ->where('project_id', $project->id)
+                ->where('direction', 'sale')
+                ->orderByDesc('invoice_date')
+                ->orderByDesc('id')
+                ->get(),
+            'purchaseInvoices' => Invoice::with('party')
+                ->where('project_id', $project->id)
+                ->where('direction', 'purchase')
+                ->orderByDesc('invoice_date')
+                ->orderByDesc('id')
+                ->get(),
         ];
     }
 }

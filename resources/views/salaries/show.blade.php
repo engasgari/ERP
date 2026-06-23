@@ -61,7 +61,7 @@
                             </div>
                             <div>
                                 <h3 class="font-semibold text-blue-800 mb-2">دوره حقوق</h3>
-                                <p class="text-lg font-bold">{{ getPersianMonthName($salary->month) }} {{ $salary->year }}</p>
+                                <p class="text-lg font-bold">{{ getPersianMonthName($salary->month) }} {{ toPersianDigits($salary->year) }}</p>
                                 <p class="text-sm text-gray-600">وضعیت:
                                     @php
                                         $remaining = $salary->final_salary - $salary->payments->sum('amount');

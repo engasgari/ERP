@@ -110,6 +110,11 @@ body {
     font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
 }
 
+.erp-jalali-date-input {
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
 .erp-jalali-picker-header {
     display: flex;
     align-items: center;

@@ -12,6 +12,8 @@ use App\Models\FinancialTransaction;
 use App\Models\CostCenter;
 use App\Models\FiscalYear;
 use App\Models\Invoice;
+use App\Models\PayrollCalculation;
+use App\Models\Salary;
 use App\Models\OrganizationUnit;
 use App\Models\Party;
 use App\Models\Project;
@@ -21,6 +23,8 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class FinancialReportService
@@ -247,7 +251,7 @@ class FinancialReportService
                     'title' => 'گردش حساب بانکی',
                     'headers' => ['تاریخ', 'شماره سند', 'حساب', 'طرف حساب', 'پروژه', 'شرح', 'بدهکار', 'بستانکار', 'مانده جاری'],
                     'rows' => $rows,
-                    'columns' => ['date', 'document_number', 'account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
+                    'columns' => ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
                 ],
             ],
         );
@@ -425,54 +429,140 @@ class FinancialReportService
 
     private function incomeStatementReport(array $filters, FinancialReportContext $context): array
     {
-        $balances = $this->accountBalances($this->postedLines($filters), $this->openingLines($filters));
-        $revenue = $balances->filter(fn ($row) => str_starts_with((string) $row['code'], '4'));
-        $cogs = $balances->filter(fn ($row) => str_starts_with((string) $row['code'], '5'));
-        $expenses = $balances->filter(fn ($row) => str_starts_with((string) $row['code'], '6'));
+        return $this->simpleProfitAndLossReport($filters, $context);
+    }
 
-        $income = (float) $revenue->sum(fn ($row) => $row['closing_credit'] - $row['closing_debit']);
-        $costOfSales = (float) $cogs->sum(fn ($row) => $row['closing_debit'] - $row['closing_credit']);
-        $operatingExpenses = (float) $expenses->sum(fn ($row) => $row['closing_debit'] - $row['closing_credit']);
+    private function simpleProfitAndLossReport(array $filters, FinancialReportContext $context): array
+    {
+        $range = $this->profitAndLossPeriodRange($filters);
+        $cacheKey = $this->profitAndLossCacheKey($filters, $range, 'simple');
 
-        return $this->reportPayload(
-            key: $context->reportKey,
-            title: 'صورت سود و زیان',
-            subtitle: 'درآمد، بهای تمام‌شده و هزینه‌ها',
-            filters: $filters,
-            summary: [
-                'revenue' => $income,
-                'cost_of_sales' => $costOfSales,
-                'expenses' => $operatingExpenses,
-                'net_profit' => $income - $costOfSales - $operatingExpenses,
-            ],
-            sections: [
-                [
-                    'title' => 'درآمدها',
-                    'headers' => ['کد', 'عنوان', 'مبلغ'],
-                    'rows' => $revenue->map(fn ($row) => [
-                        'code' => $row['code'],
-                        'title' => $row['title'],
-                        'amount' => max($row['closing_credit'] - $row['closing_debit'], 0),
-                    ])->values(),
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($filters, $context) {
+            $revenue = $this->pnlGroupRows($filters, ['41'], 'credit', 'درآمدها');
+            $costOfSalesRows = $this->pnlGroupRows($filters, ['51'], 'debit', 'بهای تمام‌شده فروش');
+            $expenseRows = $this->pnlGroupRows($filters, ['52'], 'debit', 'هزینه‌های عملیاتی');
+            $incomeTaxRows = $this->pnlGroupRows($filters, ['53'], 'debit', 'مالیات بر درآمد');
+
+            $costOfSales = $costOfSalesRows['total'];
+            $grossProfit = $revenue['total'] - $costOfSales;
+            $operatingExpenses = $expenseRows['total'];
+            $operatingProfit = $grossProfit - $operatingExpenses;
+            $incomeTaxExpense = $incomeTaxRows['total'];
+            $netProfit = $operatingProfit - $incomeTaxExpense;
+
+            return $this->reportPayload(
+                key: $context->reportKey,
+                title: 'صورت سود و زیان',
+                subtitle: 'محاسبه صرفاً بر اساس سندهای حسابداری ثبت‌شده',
+                filters: $filters,
+                summary: [
+                    'revenue' => $revenue['total'],
+                    'cost_of_sales' => $costOfSales,
+                    'gross_profit' => $grossProfit,
+                    'operating_expenses' => $operatingExpenses,
+                    'operating_profit' => $operatingProfit,
+                    'income_tax_expense' => $incomeTaxExpense,
+                    'net_profit' => $netProfit,
                 ],
-                [
-                    'title' => 'بهای تمام‌شده و هزینه‌ها',
-                    'headers' => ['کد', 'عنوان', 'مبلغ'],
-                    'rows' => $cogs->merge($expenses)->map(fn ($row) => [
-                        'code' => $row['code'],
-                        'title' => $row['title'],
-                        'amount' => max($row['closing_debit'] - $row['closing_credit'], 0),
-                    ])->values(),
+                sections: [
+                    [
+                        'title' => 'درآمدها',
+                        'headers' => ['کد', 'عنوان', 'مبلغ'],
+                        'rows' => $revenue['rows'],
+                    ],
+                    [
+                        'title' => 'بهای تمام‌شده فروش',
+                        'headers' => ['کد', 'عنوان', 'مبلغ'],
+                        'rows' => $costOfSalesRows['rows'],
+                    ],
+                    [
+                        'title' => 'سود ناخالص',
+                        'headers' => ['عنوان', 'مبلغ'],
+                        'rows' => [
+                            ['title' => 'سود ناخالص', 'amount' => $grossProfit],
+                        ],
+                    ],
+                    [
+                        'title' => 'هزینه‌های عملیاتی',
+                        'headers' => ['کد', 'عنوان', 'مبلغ'],
+                        'rows' => $expenseRows['rows'],
+                    ],
+                    [
+                        'title' => 'سود عملیاتی',
+                        'headers' => ['عنوان', 'مبلغ'],
+                        'rows' => [
+                            ['title' => 'سود عملیاتی', 'amount' => $operatingProfit],
+                        ],
+                    ],
+                    [
+                        'title' => 'مالیات بر درآمد',
+                        'headers' => ['کد', 'عنوان', 'مبلغ'],
+                        'rows' => $incomeTaxRows['rows'],
+                    ],
+                    [
+                        'title' => 'سود خالص',
+                        'headers' => ['عنوان', 'مبلغ'],
+                        'rows' => [
+                            ['title' => 'سود خالص', 'amount' => $netProfit],
+                        ],
+                    ],
                 ],
-            ],
-        );
+            );
+        });
+    }
+
+    private function pnlGroupRows(array $filters, array $prefixes, string $nature, string $title, array $excludePrefixes = []): array
+    {
+        $accounts = ChartAccount::query()
+            ->select(['id', 'code', 'title'])
+            ->where(function (Builder $query) use ($prefixes) {
+                foreach ($prefixes as $prefix) {
+                    $query->orWhere('code', 'like', $prefix . '%');
+                }
+            })
+            ->when($excludePrefixes, function (Builder $query) use ($excludePrefixes) {
+                foreach ($excludePrefixes as $prefix) {
+                    $query->where('code', 'not like', $prefix . '%');
+                }
+            })
+            ->whereNotIn('code', ['1102', '2102'])
+            ->orderBy('code')
+            ->get();
+
+        $balances = $this->postedLineQuery($filters)
+            ->select('chart_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereIn('chart_account_id', $accounts->pluck('id'))
+            ->groupBy('chart_account_id')
+            ->get()
+            ->keyBy('chart_account_id');
+
+        $rows = $accounts->map(function (ChartAccount $account) use ($balances, $nature, $filters) {
+            $balance = $balances->get($account->id);
+            $debit = (float) ($balance->debit ?? 0);
+            $credit = (float) ($balance->credit ?? 0);
+            $amount = $nature === 'credit' ? max($credit - $debit, 0) : max($debit - $credit, 0);
+
+            return [
+                'code' => $account->code,
+                'title' => $account->title,
+                'amount' => $amount,
+                'detail_url' => route('financial-reports.account-statement', array_merge(['account' => $account->id], $this->filtersForUrl($filters))),
+            ];
+        })->filter(fn (array $row) => $row['amount'] != 0.0)->values();
+
+        return [
+            'title' => $title,
+            'total' => (float) $rows->sum('amount'),
+            'rows' => $rows,
+        ];
     }
 
     private function cashFlowStatementReport(array $filters, FinancialReportContext $context): array
     {
         $cashAccounts = $this->cashAccountIds();
-        $rows = $this->postedLines($filters)->whereIn('chart_account_id', $cashAccounts)->get();
-        $opening = $this->openingLines($filters)->whereIn('chart_account_id', $cashAccounts)->get();
+        $rows = $this->postedLines($filters)->filter(fn ($line) => in_array((int) $line->chart_account_id, $cashAccounts, true))->values();
+        $opening = $this->openingLines($filters)->filter(fn ($line) => in_array((int) $line->chart_account_id, $cashAccounts, true))->values();
         $movement = $this->accountBalances($rows, $opening);
 
         return $this->reportPayload(
@@ -909,16 +999,21 @@ class FinancialReportService
             ->groupBy('project_id')
             ->map(function (Collection $group) {
                 $project = $group->first()?->project;
-                $debit = (float) $group->sum('debit');
-                $credit = (float) $group->sum('credit');
+                $operating = $group->filter(fn ($line) => $line->account && (
+                    str_starts_with((string) $line->account->code, '4')
+                    || str_starts_with((string) $line->account->code, '5')
+                    || str_starts_with((string) $line->account->code, '6')
+                ));
+                $revenue = $this->operatingRevenueAmount($operating);
+                $cost = $this->operatingCostAmount($operating);
 
                 return [
                     'project' => $project?->name ?: '-',
-                    'revenue' => max($credit - $debit, 0),
-                    'cost' => max($debit - $credit, 0),
-                    'profit' => $credit - $debit,
+                    'revenue' => $revenue,
+                    'cost' => $cost,
+                    'profit' => $revenue - $cost,
                 ];
-            })->values();
+            })->filter(fn (array $row) => $row['revenue'] !== 0.0 || $row['cost'] !== 0.0)->values();
 
         return $this->reportPayload(
             key: $context->reportKey,
@@ -943,16 +1038,21 @@ class FinancialReportService
             ->groupBy('party_id')
             ->map(function (Collection $group) {
                 $party = $group->first()?->party;
-                $debit = (float) $group->sum('debit');
-                $credit = (float) $group->sum('credit');
+                $operating = $group->filter(fn ($line) => $line->account && (
+                    str_starts_with((string) $line->account->code, '4')
+                    || str_starts_with((string) $line->account->code, '5')
+                    || str_starts_with((string) $line->account->code, '6')
+                ));
+                $revenue = $this->operatingRevenueAmount($operating);
+                $cost = $this->operatingCostAmount($operating);
 
                 return [
                     'party' => $party?->name ?: '-',
-                    'revenue' => max($credit - $debit, 0),
-                    'cost' => max($debit - $credit, 0),
-                    'profit' => $credit - $debit,
+                    'revenue' => $revenue,
+                    'cost' => $cost,
+                    'profit' => $revenue - $cost,
                 ];
-            })->values();
+            })->filter(fn (array $row) => $row['revenue'] !== 0.0 || $row['cost'] !== 0.0)->values();
 
         return $this->reportPayload(
             key: $context->reportKey,
@@ -1181,6 +1281,7 @@ class FinancialReportService
         $balances = $this->accountBalances($this->postedLines($filters), $this->openingLines($filters))
             ->filter(fn ($row) => str_starts_with((string) $row['code'], $prefix))
             ->values();
+        $amountResolver = fn (array $row) => $this->analysisBalanceAmount($row, $prefix);
 
         return $this->reportPayload(
             key: $context->reportKey,
@@ -1189,7 +1290,7 @@ class FinancialReportService
             filters: $filters,
             summary: [
                 'accounts' => $balances->count(),
-                'amount' => (float) $balances->sum(fn ($row) => $row['closing_credit'] - $row['closing_debit']),
+                'amount' => (float) $balances->sum($amountResolver),
             ],
             sections: [
                 [
@@ -1200,7 +1301,7 @@ class FinancialReportService
                         'title' => $row['title'],
                         'debit' => $row['closing_debit'],
                         'credit' => $row['closing_credit'],
-                        'balance' => $row['closing_credit'] - $row['closing_debit'],
+                        'balance' => $amountResolver($row),
                     ])->values(),
                 ],
             ],
@@ -1332,6 +1433,7 @@ class FinancialReportService
             'outstanding-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
             'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'days_overdue', 'outstanding_balance'],
             'cash-book', 'bank-book', 'bank-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+            'bank-transactions' => ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
             'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
             'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
             'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],
@@ -1429,6 +1531,84 @@ class FinancialReportService
         });
     }
 
+    private function analysisBalanceAmount(array $row, string $prefix): float
+    {
+        $debit = (float) ($row['closing_debit'] ?? 0);
+        $credit = (float) ($row['closing_credit'] ?? 0);
+
+        return match (true) {
+            str_starts_with($prefix, '5'), str_starts_with($prefix, '6') => $debit - $credit,
+            default => $credit - $debit,
+        };
+    }
+
+    private function operatingRevenueAmount(Collection $lines): float
+    {
+        return (float) $lines
+            ->filter(fn ($line) => $line->account && str_starts_with((string) $line->account->code, '4'))
+            ->sum(fn ($line) => max((float) $line->credit - (float) $line->debit, 0));
+    }
+
+    private function operatingCostAmount(Collection $lines): float
+    {
+        return (float) $lines
+            ->filter(fn ($line) => $line->account && (
+                str_starts_with((string) $line->account->code, '5')
+                || str_starts_with((string) $line->account->code, '6')
+            ))
+            ->sum(fn ($line) => max((float) $line->debit - (float) $line->credit, 0));
+    }
+
+    private function filtersForUrl(array $filters): array
+    {
+        return collect($filters)
+            ->only(['date_from', 'date_to', 'fiscal_year_id', 'branch_id', 'company_id', 'project_id', 'party_id', 'cost_center', 'comparison_scope'])
+            ->filter(fn ($value) => $value !== null && $value !== '')
+            ->all();
+    }
+
+    private function profitAndLossPeriodRange(array $filters): array
+    {
+        if (! empty($filters['date_from']) && ! empty($filters['date_to'])) {
+            return [
+                'start' => Carbon::parse($filters['date_from'])->startOfDay(),
+                'end' => Carbon::parse($filters['date_to'])->endOfDay(),
+            ];
+        }
+
+        if (! empty($filters['fiscal_year_id'])) {
+            $fiscalYear = FiscalYear::find($filters['fiscal_year_id']);
+
+            if ($fiscalYear) {
+                return [
+                    'start' => Carbon::parse($fiscalYear->start_date)->startOfDay(),
+                    'end' => Carbon::parse($fiscalYear->end_date)->endOfDay(),
+                ];
+            }
+        }
+
+        return [
+            'start' => now()->startOfYear(),
+            'end' => now()->endOfYear(),
+        ];
+    }
+
+    private function profitAndLossCacheKey(array $filters, array $range, string $comparisonScope): string
+    {
+        $snapshot = sprintf(
+            '%s|%s|%s',
+            (string) (AccountingDocument::query()->where('status', 'posted')->max('updated_at') ?? '0'),
+            (string) (ChartAccount::query()->max('updated_at') ?? '0'),
+            $comparisonScope
+        );
+
+        return 'financial-report:profit-loss:' . md5(json_encode([
+            'filters' => $filters,
+            'range' => [$range['start']->toDateString(), $range['end']->toDateString()],
+            'snapshot' => $snapshot,
+        ]));
+    }
+
     private function ledgerRows(array $filters, bool $includeRunningBalance = true): Collection
     {
         $rows = $this->postedLines($filters)->map(function ($line) {
@@ -1461,6 +1641,9 @@ class FinancialReportService
             'account_code' => $line->account?->code ?: '-',
             'account_title' => $line->account?->title ?: '-',
             'account' => trim(($line->account?->code ?: '') . ' - ' . ($line->account?->title ?: '')),
+            'detail_account_code' => $line->detailAccount?->code ?: '-',
+            'detail_account_title' => $line->detailAccount?->title ?: '-',
+            'detail_account' => trim(($line->detailAccount?->code ?: '') . ' - ' . ($line->detailAccount?->title ?: '')),
             'party' => $line->party?->name ?: '-',
             'project' => $line->project?->name ?: '-',
             'cost_center' => $line->cost_center ?: '-',
@@ -1590,3 +1773,4 @@ class FinancialReportService
         );
     }
 }
+

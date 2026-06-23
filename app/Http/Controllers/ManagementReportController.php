@@ -16,6 +16,7 @@ use App\Models\Payslip;
 use App\Models\Project;
 use App\Models\Salary;
 use App\Models\Warehouse;
+use App\Services\FinancialReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -83,9 +84,9 @@ class ManagementReportController extends Controller
         return view('management-reports.index', compact('groups'));
     }
 
-    public function trialBalance(): View
+    public function trialBalance(FinancialReportService $reports): View
     {
-        return view('management-reports.trial-balance', $this->trialBalanceData());
+        return view('management-reports.trial-balance', $this->trialBalanceData($reports));
     }
 
     public function warehouseCardex(Request $request): View
@@ -223,72 +224,26 @@ class ManagementReportController extends Controller
         ];
     }
 
-    private function trialBalanceData(): array
+    private function trialBalanceData(FinancialReportService $reports): array
     {
-        $financialIncome = (float) FinancialTransaction::where('type', 'income')->sum('amount');
-        $financialExpense = (float) FinancialTransaction::where('type', 'expense')->sum('amount');
-        $salaryExpense = (float) Salary::sum('final_salary');
-        $salaryPayments = (float) Payment::sum('amount');
-        ['in' => $warehouseIn, 'out' => $warehouseOut] = $this->warehouseDocumentTotals();
-
-        $rows = collect([
-            [
-                'code' => '1101',
-                'title' => 'نقد و بانک / دریافتنی پروژه‌ها',
-                'debit' => $financialIncome,
-                'credit' => $financialExpense + $salaryPayments + $warehouseIn,
-            ],
-            [
-                'code' => '1201',
-                'title' => 'موجودی انبار',
-                'debit' => $warehouseIn,
-                'credit' => $warehouseOut,
-            ],
-            [
-                'code' => '2101',
-                'title' => 'حقوق و دستمزد پرداختنی',
-                'debit' => $salaryPayments,
-                'credit' => $salaryExpense,
-            ],
-            [
-                'code' => '4101',
-                'title' => 'درآمدهای ثبت شده پروژه‌ها',
-                'debit' => 0,
-                'credit' => $financialIncome,
-            ],
-            [
-                'code' => '5101',
-                'title' => 'هزینه‌های ثبت شده مالی',
-                'debit' => $financialExpense,
-                'credit' => 0,
-            ],
-            [
-                'code' => '5201',
-                'title' => 'هزینه حقوق و دستمزد',
-                'debit' => $salaryExpense,
-                'credit' => 0,
-            ],
-            [
-                'code' => '5301',
-                'title' => 'هزینه مصرف/خروج انبار پروژه‌ها',
-                'debit' => $warehouseOut,
-                'credit' => 0,
-            ],
-        ])->filter(fn ($row) => ((float) $row['debit']) !== 0.0 || ((float) $row['credit']) !== 0.0)
-            ->values();
+        $report = $reports->report('trial-balance', []);
+        $rows = collect($report['sections'][0]['rows'] ?? []);
+        $summary = $report['summary'] ?? [];
 
         $totals = [
-            'debit' => (float) $rows->sum('debit'),
-            'credit' => (float) $rows->sum('credit'),
+            'opening_debit' => (float) ($summary['opening_debit'] ?? 0),
+            'opening_credit' => (float) ($summary['opening_credit'] ?? 0),
+            'period_debit' => (float) ($summary['period_debit'] ?? 0),
+            'period_credit' => (float) ($summary['period_credit'] ?? 0),
+            'closing_debit' => (float) ($summary['closing_debit'] ?? 0),
+            'closing_credit' => (float) ($summary['closing_credit'] ?? 0),
         ];
 
         $summary = [
-            'income' => $financialIncome,
-            'financial_expense' => $financialExpense,
-            'salary_expense' => $salaryExpense,
-            'warehouse_expense' => $warehouseOut,
-            'net_profit' => $financialIncome - $financialExpense - $salaryExpense - $warehouseOut,
-            'is_balanced' => round($totals['debit'], 2) === round($totals['credit'], 2),
+            'opening' => $totals['opening_debit'] - $totals['opening_credit'],
+            'period' => $totals['period_debit'] - $totals['period_credit'],
+            'closing' => $totals['closing_debit'] - $totals['closing_credit'],
+            'is_balanced' => abs(($totals['opening_debit'] + $totals['period_debit']) - ($totals['opening_credit'] + $totals['period_credit'])) < 0.01,
         ];
 
         return compact('rows', 'totals', 'summary');

@@ -48,6 +48,8 @@
                             <div>
                                 <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-2">پرسنل *</label>
                                 <select id="employee_id" name="employee_id" required
+                                       
+                                       
                                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('employee_id') border-red-500 @enderror">
                                     <option value="">انتخاب پرسنل</option>
                                     @foreach($employees as $employee)
@@ -66,6 +68,8 @@
                             <div>
                                 <label for="project_id" class="block text-sm font-medium text-gray-700 mb-2">پروژه</label>
                                 <select id="project_id" name="project_id"
+                                       
+                                       
                                         class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('project_id') border-red-500 @enderror">
                                     <option value="">بدون پروژه</option>
                                     @foreach($projects as $project)
@@ -205,3 +209,4 @@
         calculateTotalAmount();
     </script>
 </x-app-layout>
+

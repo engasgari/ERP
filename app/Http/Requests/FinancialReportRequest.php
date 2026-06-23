@@ -55,6 +55,10 @@ class FinancialReportRequest extends FormRequest
             $filters['cost_center'] = trim((string) $filters['cost_center']);
         }
 
+        if (! empty($filters['comparison_scope'])) {
+            $filters['comparison_scope'] = trim((string) $filters['comparison_scope']);
+        }
+
         $this->replace($filters);
     }
 
@@ -71,6 +75,7 @@ class FinancialReportRequest extends FormRequest
             'account_id' => ['nullable', 'integer', 'exists:chart_accounts,id'],
             'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
             'cost_center' => ['nullable', 'string', 'max:255'],
+            'comparison_scope' => ['nullable', 'in:monthly,quarterly,annual'],
             'search' => ['nullable', 'string', 'max:255'],
             'sort' => ['nullable', 'string', 'max:100'],
             'direction' => ['nullable', 'in:asc,desc'],

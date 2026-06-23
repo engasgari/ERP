@@ -23,7 +23,11 @@
             <form wire:submit.prevent="calculate" class="grid grid-cols-1 gap-3 sm:grid-cols-6 xl:min-w-[900px]">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">سال</span>
-                    <input type="number" wire:model.live="year" min="1400" max="1500" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                    <select wire:model.live="year" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                        @for($y = verta()->year; $y >= 1400; $y--)
+                            <option value="{{ $y }}">{{ toPersianDigits($y) }}</option>
+                        @endfor
+                    </select>
                 </label>
 
                 <label class="block">
@@ -84,7 +88,7 @@
             <div>
                 <h3 class="text-lg font-bold text-slate-900">لیست محاسبه کارکردها</h3>
                 <p class="mt-1 text-sm text-slate-500">
-                    دوره انتخابی: {{ getPersianMonthName($month) }} {{ $year }}
+                    دوره انتخابی: {{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}
                     @if($period)
                         ، از {{ formatJalaliDateSafe($period->starts_at) }} تا {{ formatJalaliDateSafe($period->ends_at) }}
                     @endif
@@ -149,3 +153,4 @@
         <div class="mt-4">{{ $calculations->links() }}</div>
     </div>
 </div>
+

@@ -18,6 +18,7 @@ class BankAccountController extends Controller
 
     public function statement(BankAccount $bankAccount, FinancialReportRequest $request, FinancialReportService $reports)
     {
+        $bankAccount->loadMissing('account', 'detailAccount');
         $filters = $request->validated() + ['bank_account_id' => $bankAccount->id];
         $report = $reports->bankTransactions($bankAccount, $filters);
 

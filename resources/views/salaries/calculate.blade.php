@@ -11,7 +11,7 @@
                 <div class="p-6 bg-white border-b border-gray-200">
                     <h2 class="text-2xl font-bold mb-6 text-center">
                         پیش‌نمایش محاسبات حقوق
-                        <span class="text-blue-600">{{getPersianMonthName($month)}}{{ $year }}</span>
+                        <span class="text-blue-600">{{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}</span>
                     </h2>
 
 

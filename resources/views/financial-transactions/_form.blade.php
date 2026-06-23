@@ -201,3 +201,4 @@
 
     renderCoding(typeSelect.value, true);
 </script>
+

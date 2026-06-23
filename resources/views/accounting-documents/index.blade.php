@@ -6,6 +6,7 @@
         'payment' => 'پرداخت',
         'receipt' => 'دریافت',
         'inventory' => 'انبار',
+        'opening' => 'افتتاحیه',
         'closing' => 'اختتامیه',
     ];
 
@@ -65,6 +66,7 @@
                         <th>شماره سند</th>
                         <th>تاریخ</th>
                         <th>نوع</th>
+                        <th>تفصیل</th>
                         <th>وضعیت</th>
                         <th>بدهکار (ریال)</th>
                         <th>بستانکار (ریال)</th>
@@ -77,16 +79,30 @@
                             <td>{{ $document->number }}</td>
                             <td>{{ gregorianToJalaliDate($document->document_date) }}</td>
                             <td>{{ $typeLabels[$document->type] ?? $document->type }}</td>
+                            <td>
+                                @php
+                                    $detailAccounts = $document->lines
+                                        ->pluck('detailAccount')
+                                        ->filter()
+                                        ->unique('id')
+                                        ->map(fn ($detail) => chartAccountDisplayLabel($detail))
+                                        ->values();
+                                @endphp
+                                {{ $detailAccounts->isNotEmpty() ? $detailAccounts->implode('، ') : '-' }}
+                            </td>
                             <td>{{ $statusLabels[$document->status] ?? $document->status }}</td>
                             <td>{{ number_format($document->lines->sum('debit')) }}</td>
                             <td>{{ number_format($document->lines->sum('credit')) }}</td>
                             <td>
-                                <a class="erp-action-btn erp-action-detail" href="{{ route('accounting-documents.show', $document) }}">مشاهده</a>
+                                <div class="d-grid d-sm-flex gap-2">
+                                    <a class="erp-action-btn erp-action-detail" href="{{ route('accounting-documents.show', $document) }}">مشاهده</a>
+                                    <a class="erp-action-btn erp-action-edit" href="{{ route('accounting-documents.print', $document) }}" target="_blank">چاپ</a>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-slate-500 py-6">سندی ثبت نشده است.</td>
+                            <td colspan="8" class="text-center text-slate-500 py-6">سندی ثبت نشده است.</td>
                         </tr>
                     @endforelse
                 </tbody>

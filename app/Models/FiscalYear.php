@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class FiscalYear extends Model
 {
@@ -18,5 +19,10 @@ class FiscalYear extends Model
     public function periods(): HasMany
     {
         return $this->hasMany(FiscalPeriod::class);
+    }
+
+    public function audits(): MorphMany
+    {
+        return $this->morphMany(AccountingAudit::class, 'auditable');
     }
 }

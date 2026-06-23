@@ -38,7 +38,7 @@ class FinancialReportRepository
 
     public function invoiceQuery(array $filters = []): Builder
     {
-        $query = Invoice::query()->with(['party', 'project', 'accountingDocument']);
+        $query = Invoice::query()->with(['party', 'project', 'accountingDocument', 'lines.item']);
 
         if (! empty($filters['fiscal_year_id'])) {
             $query->where('fiscal_year_id', $filters['fiscal_year_id']);

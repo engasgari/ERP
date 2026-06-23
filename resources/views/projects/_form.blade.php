@@ -85,3 +85,4 @@
         <button type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white">{{ $isEdit ? 'به‌روزرسانی پروژه' : 'ثبت پروژه' }}</button>
     </div>
 </form>
+

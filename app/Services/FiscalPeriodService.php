@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AccountingDocument;
+use App\Models\AccountingAudit;
 use App\Models\ChartAccount;
 use App\Models\FiscalPeriod;
 use App\Models\FiscalYear;
@@ -157,40 +158,36 @@ class FiscalPeriodService
             $this->createOpeningBalanceDocument($year, $nextYear, $userId);
             $this->createOpeningInventoryDocuments($year, $nextYear, $userId);
 
-            $year->periods()->update([
+            $this->markFiscalYearAsClosed($year, $userId);
+            $this->recordFiscalYearAudit($year, 'close', $userId, [
+                'status' => 'open',
+                'closed_at' => null,
+            ], [
                 'status' => 'closed',
-                'is_active' => false,
-                'closed_at' => now(),
-                'closed_by' => $userId,
-            ]);
-
-            $year->update([
-                'status' => 'closed',
-                'closed_at' => now(),
+                'closed_at' => $year->closed_at?->toDateTimeString(),
+                'period_id' => $period->id,
             ]);
 
             return $period->refresh();
         });
     }
 
-    public function reopen(FiscalPeriod $period): FiscalPeriod
+    public function reopen(FiscalPeriod $period, ?int $userId = null): FiscalPeriod
     {
-        return DB::transaction(function () use ($period) {
+        return DB::transaction(function () use ($period, $userId) {
             $period->loadMissing('fiscalYear.periods');
             $year = $period->fiscalYear ?? throw new RuntimeException('سال مالی دوره پیدا نشد.');
+            $closedAt = $year->closed_at?->toDateTimeString();
 
             $this->removeGeneratedClosingArtifacts($year);
-
-            $year->periods()->update([
-                'status' => 'open',
-                'is_active' => true,
-                'closed_at' => null,
-                'closed_by' => null,
-            ]);
-
-            $year->update([
+            $this->markFiscalYearAsOpen($year);
+            $this->recordFiscalYearAudit($year, 'reopen', $userId, [
+                'status' => 'closed',
+                'closed_at' => $closedAt,
+            ], [
                 'status' => 'open',
                 'closed_at' => null,
+                'period_id' => $period->id,
             ]);
 
             if ($firstPeriod = $year->periods()->orderBy('period_number')->first()) {
@@ -347,7 +344,8 @@ class FiscalPeriodService
             description: 'سند افتتاحیه سال ' . $nextYear->jalali_year . ' از مانده‌های سال ' . $closedYear->jalali_year,
             lines: $lines,
             userId: $userId,
-            sourceYear: $closedYear
+            sourceYear: $closedYear,
+            type: AccountingDocument::TYPE_OPENING
         );
     }
 
@@ -465,7 +463,8 @@ class FiscalPeriodService
         string $description,
         array $lines,
         ?int $userId,
-        ?FiscalYear $sourceYear = null
+        ?FiscalYear $sourceYear = null,
+        string $type = AccountingDocument::TYPE_CLOSING
     ): ?AccountingDocument {
         $lines = collect($lines)
             ->filter(fn ($line) => ((float) ($line['debit'] ?? 0) > 0.009) || ((float) ($line['credit'] ?? 0) > 0.009))
@@ -487,7 +486,7 @@ class FiscalPeriodService
             'fiscal_period_id' => $period?->id,
             'number' => $this->numbering->next($numberKey, $prefix),
             'document_date' => $date,
-            'type' => 'closing',
+            'type' => $type,
             'status' => 'posted',
             'currency' => $year->currency,
             'source_type' => FiscalYear::class,
@@ -519,12 +518,10 @@ class FiscalPeriodService
 
     private function removeGeneratedClosingArtifacts(FiscalYear $year): void
     {
-        $nextYear = FiscalYear::where('jalali_year', $year->jalali_year + 1)->first();
-
         $documents = AccountingDocument::withTrashed()
             ->where('source_type', FiscalYear::class)
             ->where('source_id', $year->id)
-            ->where('type', 'closing')
+            ->whereIn('type', [AccountingDocument::TYPE_CLOSING, AccountingDocument::TYPE_OPENING])
             ->get();
 
         foreach ($documents as $document) {
@@ -532,17 +529,64 @@ class FiscalPeriodService
             $document->forceDelete();
         }
 
-        if ($nextYear) {
-            $inventoryDocuments = InventoryDocument::where('source_type', FiscalYear::class)
-                ->where('source_id', $year->id)
-                ->where('fiscal_year_id', $nextYear->id)
-                ->get();
+        $inventoryDocuments = InventoryDocument::where('source_type', FiscalYear::class)
+            ->where('source_id', $year->id)
+            ->get();
 
-            foreach ($inventoryDocuments as $document) {
-                $document->lines()->delete();
-                $document->delete();
-            }
+        foreach ($inventoryDocuments as $document) {
+            $document->lines()->delete();
+            $document->delete();
         }
+    }
+
+    private function markFiscalYearAsClosed(FiscalYear $year, ?int $userId): void
+    {
+        $now = now();
+
+        $year->periods()->update([
+            'status' => 'closed',
+            'is_active' => false,
+            'closed_at' => $now,
+            'closed_by' => $userId,
+        ]);
+
+        $year->update([
+            'status' => 'closed',
+            'closed_at' => $now,
+        ]);
+    }
+
+    private function markFiscalYearAsOpen(FiscalYear $year): void
+    {
+        $year->periods()->update([
+            'status' => 'open',
+            'is_active' => true,
+            'closed_at' => null,
+            'closed_by' => null,
+        ]);
+
+        $year->update([
+            'status' => 'open',
+            'closed_at' => null,
+        ]);
+    }
+
+    private function recordFiscalYearAudit(
+        FiscalYear $year,
+        string $event,
+        ?int $userId,
+        ?array $oldValues = null,
+        ?array $newValues = null
+    ): void {
+        AccountingAudit::create([
+            'auditable_type' => FiscalYear::class,
+            'auditable_id' => $year->id,
+            'event' => $event,
+            'user_id' => $userId,
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => request()?->ip(),
+        ]);
     }
 
     private function retainedEarningsAccount(): ChartAccount

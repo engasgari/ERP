@@ -18,7 +18,11 @@
             <form wire:submit.prevent="rebuild" class="grid grid-cols-1 gap-3 sm:grid-cols-4 lg:min-w-[640px]">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">سال</span>
-                    <input type="number" wire:model.live="year" min="1400" max="1500" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                    <select wire:model.live="year" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                        @for($y = verta()->year; $y >= 1400; $y--)
+                            <option value="{{ $y }}">{{ toPersianDigits($y) }}</option>
+                        @endfor
+                    </select>
                 </label>
 
                 <label class="block">
@@ -46,7 +50,7 @@
 
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-lg font-bold text-slate-900">{{ getPersianMonthName($month) }} {{ $year }}</h3>
+            <h3 class="text-lg font-bold text-slate-900">{{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}</h3>
             <div wire:loading.delay class="text-sm text-slate-500">در حال به‌روزرسانی...</div>
         </div>
 
@@ -96,3 +100,4 @@
         <div class="mt-4">{{ $summaries->links() }}</div>
     </div>
 </div>
+

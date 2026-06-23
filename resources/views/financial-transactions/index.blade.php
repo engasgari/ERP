@@ -5,35 +5,40 @@
         </h2>
     </x-slot>
 
-    <div class="py-12">
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex justify-between items-center mb-6">
+    <div class="py-10">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 shadow-sm">
+            <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <h2 class="text-2xl font-bold">هزینه و درآمدهای غیر فاکتوری</h2>
-                    <p class="text-sm text-gray-500 mt-1">برای اجاره، ناهار پرسنل، تنخواه، هزینه‌های روزمره و درآمدهای خاص از این بخش استفاده کنید.</p>
+                    <h2 class="text-2xl font-bold text-slate-800">هزینه و درآمدهای غیر فاکتوری</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                        برای ثبت اجاره، ناهار پرسنل، تنخواه و درآمدهای خاص از این بخش استفاده کنید.
+                    </p>
                 </div>
-                <div class="flex gap-4">
-                    <a href="{{ route('financial-transactions.summary') }}" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded transition duration-200">
+
+                <div class="flex flex-wrap gap-3">
+                    <a href="{{ route('financial-transactions.summary') }}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition duration-200 hover:bg-emerald-100">
                         گزارش جمع‌بندی
                     </a>
-                    <a href="{{ route('financial-transactions.create') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition duration-200">
+                    <a href="{{ route('financial-transactions.create') }}" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition duration-200 hover:bg-blue-700">
                         ثبت تراکنش جدید
                     </a>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div class="text-green-600 text-sm">کل درآمدها</div>
-                    <div class="text-2xl font-bold text-green-700">{{ number_format($summary['total_income']) }} ریال</div>
+            <div class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                    <div class="text-xs font-medium uppercase tracking-wide text-emerald-600">کل درآمدها</div>
+                    <div class="mt-2 text-xl font-bold text-emerald-700">{{ number_format($summary['total_income']) }} ریال</div>
                 </div>
-                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div class="text-red-600 text-sm">کل هزینه‌ها</div>
-                    <div class="text-2xl font-bold text-red-700">{{ number_format($summary['total_expense']) }} ریال</div>
+
+                <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm">
+                    <div class="text-xs font-medium uppercase tracking-wide text-rose-600">کل هزینه‌ها</div>
+                    <div class="mt-2 text-xl font-bold text-rose-700">{{ number_format($summary['total_expense']) }} ریال</div>
                 </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div class="text-blue-600 text-sm">سود / زیان خالص</div>
-                    <div class="text-2xl font-bold {{ $summary['profit_loss'] >= 0 ? 'text-green-700' : 'text-red-700' }}">
+
+                <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
+                    <div class="text-xs font-medium uppercase tracking-wide text-sky-600">سود / زیان خالص</div>
+                    <div class="mt-2 text-xl font-bold {{ $summary['profit_loss'] >= 0 ? 'text-emerald-700' : 'text-rose-700' }}">
                         {{ number_format($summary['profit_loss']) }} ریال
                     </div>
                 </div>
@@ -114,17 +119,12 @@
                     </label>
 
                     <label class="erp-filter-field">
-                        شماره مرجع
-                        <input name="reference_number" value="{{ request('reference_number') }}" placeholder="شماره مرجع">
+                        شرح
+                        <input name="description" value="{{ request('description') }}" placeholder="جستجو در شرح">
                     </label>
                 </div>
 
                 <div class="erp-filter-row erp-filter-row-5">
-                    <label class="erp-filter-field">
-                        شرح
-                        <input name="description" value="{{ request('description') }}" placeholder="جستجو در شرح">
-                    </label>
-
                     <x-filter-actions :reset-route="route('financial-transactions.index')" />
                 </div>
             </form>
@@ -135,27 +135,24 @@
 
             @if($transactions->count() > 0)
                 <div class="overflow-x-auto">
-                    <table class="w-full border-collapse border border-gray-300">
-                        <thead class="bg-gray-200">
+                    <table class="w-full min-w-[1200px] border-collapse border border-gray-300">
+                        <thead class="bg-slate-100">
                         <tr>
-                            <th class="border border-gray-300 p-3">تاریخ</th>
-                            <th class="border border-gray-300 p-3">پروژه</th>
-                            <th class="border border-gray-300 p-3">منبع</th>
-                            <th class="border border-gray-300 p-3">نوع</th>
-                            <th class="border border-gray-300 p-3">دسته‌بندی</th>
-                            <th class="border border-gray-300 p-3">کدینگ</th>
-                            <th class="border border-gray-300 p-3">مبلغ (ریال)</th>
-                            <th class="border border-gray-300 p-3">سند حسابداری</th>
-                            <th class="border border-gray-300 p-3">شرح</th>
-                            <th class="border border-gray-300 p-3">شماره مرجع</th>
-                            <th class="border border-gray-300 p-3">عملیات</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">تاریخ</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">پروژه</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">منبع</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">نوع</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">دسته‌بندی</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">مبلغ (ریال)</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">شرح</th>
+                            <th class="border border-gray-300 px-3 py-3 text-right">عملیات</th>
                         </tr>
                         </thead>
                         <tbody>
                         @foreach($transactions as $transaction)
-                            <tr class="hover:bg-gray-50">
-                                <td class="border border-gray-300 p-3">{{ verta($transaction->transaction_date)->format('Y/m/d') }}</td>
-                                <td class="border border-gray-300 p-3">
+                            <tr class="hover:bg-slate-50">
+                                <td class="border border-gray-300 px-3 py-3">{{ verta($transaction->transaction_date)->format('Y/m/d') }}</td>
+                                <td class="border border-gray-300 px-3 py-3">
                                     @if($transaction->project)
                                         <a href="{{ route('financial-transactions.project-report', $transaction->project_id) }}" class="text-blue-600 hover:underline">
                                             {{ $transaction->project->name }}
@@ -164,32 +161,23 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="border border-gray-300 p-3">{{ $transaction->source_label }}</td>
-                                <td class="border border-gray-300 p-3">
+                                <td class="border border-gray-300 px-3 py-3">{{ $transaction->source_label }}</td>
+                                <td class="border border-gray-300 px-3 py-3">
                                     <span class="{{ $transaction->type_color }} font-semibold">
-                                        {{ $transaction->type_icon }} {{ $transaction->type_label }}
+                                        {{ $transaction->type_label }}
                                     </span>
                                 </td>
-                                <td class="border border-gray-300 p-3">{{ $transaction->category }}</td>
-                                <td class="border border-gray-300 p-3">{{ $transaction->coding_label }}</td>
-                                <td class="border border-gray-300 p-3 font-semibold {{ $transaction->type_color }}">{{ $transaction->signed_amount }}</td>
-                                <td class="border border-gray-300 p-3">
-                                    @if($transaction->accountingDocument)
-                                        <span class="text-green-700 font-semibold">{{ $transaction->accountingDocument->number }}</span>
-                                    @else
-                                        -
-                                    @endif
-                                </td>
-                                <td class="border border-gray-300 p-3">{{ $transaction->description ?: '-' }}</td>
-                                <td class="border border-gray-300 p-3">{{ $transaction->reference_number ?: '-' }}</td>
-                                <td class="border border-gray-300 p-3">
-                                    <div class="flex gap-2 flex-wrap">
-                                        <a href="{{ route('financial-transactions.show', $transaction) }}" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm transition duration-200">جزئیات</a>
-                                        <a href="{{ route('financial-transactions.edit', $transaction) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm transition duration-200">ویرایش</a>
+                                <td class="border border-gray-300 px-3 py-3">{{ $transaction->category }}</td>
+                                <td class="border border-gray-300 px-3 py-3 font-semibold {{ $transaction->type_color }}">{{ $transaction->signed_amount }}</td>
+                                <td class="border border-gray-300 px-3 py-3">{{ $transaction->description ?: '-' }}</td>
+                                <td class="border border-gray-300 px-3 py-3">
+                                    <div class="flex flex-nowrap items-center gap-2">
+                                        <a href="{{ route('financial-transactions.show', $transaction) }}" class="rounded-lg bg-blue-500 px-3 py-1 text-sm text-white transition duration-200 hover:bg-blue-600">جزئیات</a>
+                                        <a href="{{ route('financial-transactions.edit', $transaction) }}" class="rounded-lg bg-amber-500 px-3 py-1 text-sm text-white transition duration-200 hover:bg-amber-600">ویرایش</a>
                                         <form action="{{ route('financial-transactions.destroy', $transaction) }}" method="POST" class="inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition duration-200" onclick="return confirm('آیا از حذف این تراکنش مطمئن هستید؟')">حذف</button>
+                                            <button type="submit" class="rounded-lg bg-red-500 px-3 py-1 text-sm text-white transition duration-200 hover:bg-red-600" onclick="return confirm('آیا از حذف این تراکنش مطمئن هستید؟')">حذف</button>
                                         </form>
                                     </div>
                                 </td>
@@ -203,9 +191,9 @@
                     {{ $transactions->links() }}
                 </div>
             @else
-                <div class="text-center py-8">
-                    <p class="text-gray-500 text-lg">هنوز تراکنش مالی ثبت نشده است.</p>
-                    <a href="{{ route('financial-transactions.create') }}" class="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded transition duration-200">ثبت اولین تراکنش</a>
+                <div class="py-8 text-center">
+                    <p class="text-lg text-gray-500">هنوز تراکنش مالی ثبت نشده است.</p>
+                    <a href="{{ route('financial-transactions.create') }}" class="mt-4 inline-block rounded-xl bg-blue-600 px-6 py-2 text-white transition duration-200 hover:bg-blue-700">ثبت اولین تراکنش</a>
                 </div>
             @endif
         </div>

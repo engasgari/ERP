@@ -22,7 +22,29 @@
             </div>
 
             @if(! $printMode)
-                <x-erp.ui.filter-bar method="GET" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                @if($reportKey === 'income-statement')
+                    <x-erp.ui.filter-bar method="GET" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <label class="text-sm font-bold text-slate-700">از تاریخ
+                            <input type="text" name="date_from" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}" class="mt-1 w-full rounded-lg border-slate-300">
+                        </label>
+                        <label class="text-sm font-bold text-slate-700">تا تاریخ
+                            <input type="text" name="date_to" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}" class="mt-1 w-full rounded-lg border-slate-300">
+                        </label>
+                        <label class="text-sm font-bold text-slate-700">سال مالی
+                            <select name="fiscal_year_id" class="mt-1 w-full rounded-lg border-slate-300">
+                                <option value="">همه</option>
+                                @foreach($fiscalYears ?? [] as $year)
+                                    <option value="{{ $year->id }}" @selected(request('fiscal_year_id') == $year->id)>{{ $year->title }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <div class="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-3">
+                            <button class="erp-action-btn erp-action-detail" type="submit">اعمال فیلتر</button>
+                            <a href="{{ route('financial-reports.show', ['report' => $reportKey]) }}" class="erp-action-btn erp-action-detail">پاک کردن</a>
+                        </div>
+                    </x-erp.ui.filter-bar>
+                @else
+                    <x-erp.ui.filter-bar method="GET" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label class="text-sm font-bold text-slate-700">از تاریخ
                         <input type="text" name="date_from" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}" class="mt-1 w-full rounded-lg border-slate-300">
                     </label>
@@ -55,7 +77,7 @@
                         <select name="account_id" class="mt-1 w-full rounded-lg border-slate-300">
                             <option value="">همه</option>
                             @foreach($accounts ?? [] as $account)
-                                <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ $account->code }} - {{ $account->title }}</option>
+                                <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
                             @endforeach
                         </select>
                     </label>
@@ -94,12 +116,30 @@
                         <a href="{{ route('financial-reports.show', ['report' => $reportKey]) }}" class="erp-action-btn erp-action-detail">پاک کردن</a>
                     </div>
                 </x-erp.ui.filter-bar>
+                @endif
             @endif
         </section>
 
         @if(! empty($summary))
             <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 @php
+                    $summaryItems = $summary;
+                    if ($reportKey === 'income-statement') {
+                        $summaryOrder = [
+                            'net_profit',
+                            'operating_profit',
+                            'gross_profit',
+                            'revenue',
+                            'cost_of_sales',
+                            'operating_expenses',
+                            'income_tax_expense',
+                        ];
+
+                        $summaryItems = collect($summary)
+                            ->sortBy(fn ($value, $key) => array_search($key, $summaryOrder, true) === false ? 999 : array_search($key, $summaryOrder, true))
+                            ->all();
+                    }
+
                     $summaryLabels = [
                         'opening_debit' => 'مانده افتتاحیه بدهکار',
                         'opening_credit' => 'مانده افتتاحیه بستانکار',
@@ -113,12 +153,14 @@
                         'closing_cash' => 'نقد پایان دوره',
                         'net_profit' => 'سود خالص',
                         'revenue' => 'درآمد',
-                        'expenses' => 'هزینه',
-                        'cost_of_sales' => 'بهای تمام‌شده',
-                        'balance' => 'مانده',
+                        'cost_of_sales' => 'بهای تمام‌شده فروش',
+                        'gross_profit' => 'سود ناخالص',
+                        'operating_expenses' => 'هزینه‌های عملیاتی',
+                        'operating_profit' => 'سود عملیاتی',
+                        'income_tax_expense' => 'مالیات بر درآمد',
                     ];
                 @endphp
-                @foreach($summary as $label => $value)
+                @foreach($summaryItems as $label => $value)
                     <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $summaryLabels[$label] ?? str_replace('_', ' ', $label) }}</div>
                         <div class="mt-2 text-lg font-black text-slate-900">{{ is_numeric($value) ? number_format((float) $value) : $value }}</div>
@@ -138,8 +180,8 @@
 
                     return match ($reportKey) {
                         'trial-balance' => ['code', 'title', 'opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit'],
-                        'detailed-trial-balance' => str_contains($title, 'ریز') ? ['date', 'document_number', 'account', 'party', 'project', 'cost_center', 'description', 'debit', 'credit', 'running_balance'] : ['code', 'title', 'opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit'],
-                        'general-ledger', 'detailed-ledger' => ['date', 'document_number', 'account', 'description', 'debit', 'credit', 'running_balance'],
+                        'detailed-trial-balance' => str_contains($title, 'ریز') ? ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'cost_center', 'description', 'debit', 'credit', 'running_balance'] : ['code', 'title', 'opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit'],
+                        'general-ledger', 'detailed-ledger' => ['date', 'document_number', 'account', 'detail_account', 'description', 'debit', 'credit', 'running_balance'],
                         'balance-sheet', 'income-statement' => ['code', 'title', 'amount'],
                         'expense-analysis-by-account', 'revenue-analysis-by-account' => ['code', 'title', 'debit', 'credit', 'balance'],
                         'changes-in-equity' => ['code', 'title', 'opening', 'movement', 'closing'],
@@ -241,3 +283,4 @@
         @endforeach
     </div>
 </div>
+

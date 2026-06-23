@@ -124,19 +124,44 @@ class AccountingPostingService
 
         $lines = [];
         $net = (float) $invoice->subtotal - (float) $invoice->discount_amount;
+        $partyId = $invoice->party_id ? (int) $invoice->party_id : null;
+        $projectId = $invoice->project_id ? (int) $invoice->project_id : null;
 
         if ($invoice->direction === 'sale') {
-            $lines[] = $this->line('1101', $invoice->total_amount, 0, 'حساب دریافتنی مشتری', partyId: $invoice->party_id);
-            $lines[] = $this->line('4101', 0, $net, 'درآمد فروش');
+            $lines[] = $this->line($this->invoiceReceivableCode(), $invoice->total_amount, 0, 'حساب دریافتنی مشتری', partyId: $partyId, projectId: $projectId);
+            $lines[] = $this->line($this->invoiceSalesRevenueCode(), 0, $net, 'درآمد فروش', partyId: $partyId, projectId: $projectId);
             if ((float) $invoice->tax_amount > 0) {
-                $lines[] = $this->line('2102', 0, $invoice->tax_amount, 'مالیات ارزش افزوده فروش');
+                $lines[] = $this->line($this->invoiceSalesVatCode(), 0, $invoice->tax_amount, 'مالیات ارزش افزوده فروش', partyId: $partyId, projectId: $projectId);
             }
         } else {
-            $lines[] = $this->line('1103', $net, 0, 'خرید کالا/خدمات');
-            if ((float) $invoice->tax_amount > 0) {
-                $lines[] = $this->line('1102', $invoice->tax_amount, 0, 'اعتبار مالیات خرید');
+            $purchaseBreakdown = $this->invoicePurchaseBreakdown($invoice);
+
+            if ($purchaseBreakdown['inventory'] > 0) {
+                $lines[] = $this->line(
+                    $this->invoicePurchaseInventoryCode(),
+                    $purchaseBreakdown['inventory'],
+                    0,
+                    'خرید کالا',
+                    partyId: $partyId,
+                    projectId: $projectId
+                );
             }
-            $lines[] = $this->line('2101', 0, $invoice->total_amount, 'حساب پرداختنی فروشنده', partyId: $invoice->party_id);
+
+            if ($purchaseBreakdown['expense'] > 0) {
+                $lines[] = $this->line(
+                    $this->invoicePurchaseExpenseCode(),
+                    $purchaseBreakdown['expense'],
+                    0,
+                    'هزینه خدمات',
+                    partyId: $partyId,
+                    projectId: $projectId
+                );
+            }
+
+            if ((float) $invoice->tax_amount > 0) {
+                $lines[] = $this->line($this->invoicePurchaseVatCode(), $invoice->tax_amount, 0, 'اعتبار مالیات خرید', partyId: $partyId, projectId: $projectId);
+            }
+            $lines[] = $this->line($this->invoicePayableCode(), 0, $invoice->total_amount, 'حساب پرداختنی فروشنده', partyId: $partyId, projectId: $projectId);
         }
 
         $document = $this->automatic(
@@ -205,6 +230,11 @@ class AccountingPostingService
     {
         $treasuryCode = $voucher->treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $creditCode = $voucher->type === 'customer' ? '1101' : (optional($voucher->incomeAccount)->code ?: '4102');
+        $bankAccountId = $voucher->treasury_type === \App\Models\BankAccount::class ? (int) $voucher->treasury_id : null;
+        $detailAccountId = $voucher->treasury_type === \App\Models\BankAccount::class
+            ? \App\Models\BankAccount::find($voucher->treasury_id)?->detail_account_id
+            : null;
+        $cashboxId = $voucher->treasury_type === \App\Models\Cashbox::class ? (int) $voucher->treasury_id : null;
 
         return $this->automatic(
             source: $voucher,
@@ -212,7 +242,7 @@ class AccountingPostingService
             date: $voucher->voucher_date->toDateString(),
             description: 'رسید دریافت ' . $voucher->number,
             lines: [
-                $this->line($treasuryCode, $voucher->amount, 0, 'دریافت خزانه'),
+                $this->line($treasuryCode, $voucher->amount, 0, 'دریافت خزانه', bankAccountId: $bankAccountId, cashboxId: $cashboxId, detailAccountId: $detailAccountId),
                 $this->line($creditCode, 0, $voucher->amount, 'طرف حساب دریافت', partyId: $voucher->party_id),
             ],
             userId: $userId ?? $voucher->created_by
@@ -223,6 +253,11 @@ class AccountingPostingService
     {
         $treasuryCode = $voucher->treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $debitCode = $voucher->type === 'supplier' ? '2101' : (optional($voucher->expenseAccount)->code ?: '5201');
+        $bankAccountId = $voucher->treasury_type === \App\Models\BankAccount::class ? (int) $voucher->treasury_id : null;
+        $detailAccountId = $voucher->treasury_type === \App\Models\BankAccount::class
+            ? \App\Models\BankAccount::find($voucher->treasury_id)?->detail_account_id
+            : null;
+        $cashboxId = $voucher->treasury_type === \App\Models\Cashbox::class ? (int) $voucher->treasury_id : null;
 
         return $this->automatic(
             source: $voucher,
@@ -231,7 +266,7 @@ class AccountingPostingService
             description: 'رسید پرداخت ' . $voucher->number,
             lines: [
                 $this->line($debitCode, $voucher->amount, 0, 'طرف حساب پرداخت', partyId: $voucher->party_id),
-                $this->line($treasuryCode, 0, $voucher->amount, 'پرداخت خزانه'),
+                $this->line($treasuryCode, 0, $voucher->amount, 'پرداخت خزانه', bankAccountId: $bankAccountId, cashboxId: $cashboxId, detailAccountId: $detailAccountId),
             ],
             userId: $userId ?? $voucher->created_by
         );
@@ -243,22 +278,28 @@ class AccountingPostingService
         $bankOrCashTo = $transaction->to_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $bankOrCashFrom = $transaction->from_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $toBankAccountId = $transaction->to_treasury_type === \App\Models\BankAccount::class ? (int) $transaction->to_treasury_id : null;
+        $toBankDetailAccountId = $transaction->to_treasury_type === \App\Models\BankAccount::class
+            ? \App\Models\BankAccount::find($transaction->to_treasury_id)?->detail_account_id
+            : null;
         $toCashboxId = $transaction->to_treasury_type === \App\Models\Cashbox::class ? (int) $transaction->to_treasury_id : null;
         $fromBankAccountId = $transaction->from_treasury_type === \App\Models\BankAccount::class ? (int) $transaction->from_treasury_id : null;
+        $fromBankDetailAccountId = $transaction->from_treasury_type === \App\Models\BankAccount::class
+            ? \App\Models\BankAccount::find($transaction->from_treasury_id)?->detail_account_id
+            : null;
         $fromCashboxId = $transaction->from_treasury_type === \App\Models\Cashbox::class ? (int) $transaction->from_treasury_id : null;
 
         $lines = match ($transaction->type) {
             'deposit', 'cash_receipt', 'bank_receipt' => [
-                $this->line($bankOrCashTo, $amount, 0, 'دریافت خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId),
+                $this->line($bankOrCashTo, $amount, 0, 'دریافت خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId, detailAccountId: $toBankDetailAccountId),
                 $this->line($transaction->party_id ? '1101' : '4102', 0, $amount, 'طرف حساب دریافت', partyId: $transaction->party_id),
             ],
             'withdrawal', 'cash_payment', 'bank_payment' => [
                 $this->line($transaction->party_id ? '2101' : '5201', $amount, 0, 'طرف حساب پرداخت', partyId: $transaction->party_id),
-                $this->line($bankOrCashFrom, 0, $amount, 'پرداخت خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId),
+                $this->line($bankOrCashFrom, 0, $amount, 'پرداخت خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId, detailAccountId: $fromBankDetailAccountId),
             ],
             default => [
-                $this->line($bankOrCashTo, $amount, 0, 'انتقال ورودی خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId),
-                $this->line($bankOrCashFrom, 0, $amount, 'انتقال خروجی خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId),
+                $this->line($bankOrCashTo, $amount, 0, 'انتقال ورودی خزانه', bankAccountId: $toBankAccountId, cashboxId: $toCashboxId, detailAccountId: $toBankDetailAccountId),
+                $this->line($bankOrCashFrom, 0, $amount, 'انتقال خروجی خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId, detailAccountId: $fromBankDetailAccountId),
             ],
         };
 
@@ -282,6 +323,7 @@ class AccountingPostingService
 
         $amount = (float) $transaction->amount;
         $treasuryCode = $transaction->bankAccount ? '1202' : '1201';
+        $bankDetailAccountId = $transaction->bankAccount?->detail_account_id;
         $offsetCode = $this->financialTransactionAccountCode($transaction->type, $transaction->category);
         $offsetDescription = trim((string) ($transaction->detailAccount?->title ?: $transaction->category ?: $transaction->chartAccount?->title));
         $documentDescription = $this->financialTransactionDocumentDescription($transaction->type, $offsetDescription);
@@ -295,7 +337,8 @@ class AccountingPostingService
                     0,
                     $documentDescription,
                     bankAccountId: $transaction->bank_account_id,
-                    cashboxId: $transaction->cashbox_id
+                    cashboxId: $transaction->cashbox_id,
+                    detailAccountId: $bankDetailAccountId
                 ),
                 $this->line(
                     $offsetCode,
@@ -323,7 +366,8 @@ class AccountingPostingService
                     $amount,
                     $documentDescription,
                     bankAccountId: $transaction->bank_account_id,
-                    cashboxId: $transaction->cashbox_id
+                    cashboxId: $transaction->cashbox_id,
+                    detailAccountId: $bankDetailAccountId
                 ),
             ];
 
@@ -339,6 +383,29 @@ class AccountingPostingService
         $transaction->update(['accounting_document_id' => $document->id]);
 
         return $document;
+    }
+
+    public function deleteFinancialTransactionDocument(FinancialTransaction $transaction): void
+    {
+        $ids = collect([$transaction->accounting_document_id])
+            ->merge(AccountingDocument::withTrashed()
+                ->where('source_type', FinancialTransaction::class)
+                ->where('source_id', $transaction->id)
+                ->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($ids as $id) {
+            $document = AccountingDocument::withTrashed()->find($id);
+
+            if (! $document) {
+                continue;
+            }
+
+            $document->lines()->delete();
+            $document->forceDelete();
+        }
     }
 
     public function fromSalary(Salary $salary, ?int $userId = null): AccountingDocument
@@ -505,6 +572,74 @@ class AccountingPostingService
     private function payrollAccountCode(string $key, string $fallback): string
     {
         return PayrollAccountingSetting::where('key', $key)->where('is_active', true)->value('account_code') ?: $fallback;
+    }
+
+    private function invoiceReceivableCode(): string
+    {
+        return $this->resolveChartAccountCode(['1101'], ['حساب‌های دریافتنی تجاری', 'حساب دریافتنی مشتری']);
+    }
+
+    private function invoiceSalesRevenueCode(): string
+    {
+        return $this->resolveChartAccountCode(['4101'], ['فروش کالا و خدمات', 'درآمد فروش']);
+    }
+
+    private function invoiceSalesVatCode(): string
+    {
+        return $this->resolveChartAccountCode(['2102'], ['مالیات ارزش افزوده فروش']);
+    }
+
+    private function invoicePurchaseInventoryCode(): string
+    {
+        return $this->resolveChartAccountCode(['1103'], ['موجودی کالا', 'خرید کالا/خدمات']);
+    }
+
+    private function invoicePurchaseExpenseCode(): string
+    {
+        return $this->resolveChartAccountCode(['5201'], ['هزینه عمومی', 'هزینه خدمات', 'هزینه عملیاتی']);
+    }
+
+    private function invoicePurchaseVatCode(): string
+    {
+        return $this->resolveChartAccountCode(['1102'], ['اعتبار مالیات ارزش افزوده خرید']);
+    }
+
+    private function invoicePayableCode(): string
+    {
+        return $this->resolveChartAccountCode(['2101'], ['حساب‌های پرداختنی تجاری', 'حساب پرداختنی فروشنده']);
+    }
+
+    private function resolveChartAccountCode(array $codes, array $titles = []): string
+    {
+        foreach ($codes as $code) {
+            if (ChartAccount::where('code', $code)->exists()) {
+                return $code;
+            }
+        }
+
+        foreach ($titles as $title) {
+            $code = ChartAccount::where('title', $title)->value('code');
+            if ($code) {
+                return $code;
+            }
+        }
+
+        return $codes[0];
+    }
+
+    private function invoicePurchaseBreakdown(Invoice $invoice): array
+    {
+        return $invoice->lines->reduce(function (array $carry, $line): array {
+            $amount = max(((float) $line->quantity * (float) $line->unit_price) - (float) $line->discount_amount, 0);
+
+            if ($line->item?->type === 'product') {
+                $carry['inventory'] += $amount;
+            } else {
+                $carry['expense'] += $amount;
+            }
+
+            return $carry;
+        }, ['inventory' => 0.0, 'expense' => 0.0]);
     }
 
     private function financialTransactionAccountCode(string $type, ?string $category): string

@@ -14,6 +14,11 @@
                     <a href="{{ route('projects.costing', $project) }}" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white">بهای تمام‌شده</a>
                     <a href="{{ route('production-orders.create', ['project_id' => $project->id]) }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white">ثبت سفارش تولید</a>
                     <a href="{{ route('projects.edit', $project) }}" class="rounded-md bg-amber-500 px-4 py-2 text-sm font-bold text-white">ویرایش</a>
+                    <form action="{{ route('projects.destroy', $project) }}" method="POST" onsubmit="return confirm('آیا از حذف این پروژه و همه سندهای وابسته مطمئن هستید؟');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="rounded-md bg-rose-600 px-4 py-2 text-sm font-bold text-white">حذف پروژه</button>
+                    </form>
                     <a href="{{ route('projects.index') }}" class="rounded-md bg-slate-500 px-4 py-2 text-sm font-bold text-white">بازگشت</a>
                 </div>
             </div>

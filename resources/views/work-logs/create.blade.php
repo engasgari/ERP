@@ -102,6 +102,8 @@
                                             </td>
                                             <td class="py-3 px-4">
                                                 <select name="employees[{{ $index }}][project_id]"
+                                                       
+                                                       
                                                         class="project-select border border-gray-300 rounded px-2 py-1 w-32 text-sm @error('employees.' . $index . '.project_id') border-red-500 @enderror">
                                                     <option value="">بدون پروژه</option>
                                                     @foreach($projects as $project)
@@ -283,3 +285,4 @@
         });
     </script>
 </x-app-layout>
+
