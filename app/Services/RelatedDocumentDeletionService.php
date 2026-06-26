@@ -7,6 +7,7 @@ use App\Models\InventoryDocument;
 use App\Models\ProductionMaterialConsumption;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class RelatedDocumentDeletionService
 {
@@ -21,6 +22,16 @@ class RelatedDocumentDeletionService
                     ->pluck('id'))
                 ->unique()
                 ->values();
+
+            foreach ($accountingIds as $accountingId) {
+                $accountingDocument = AccountingDocument::withTrashed()->find($accountingId);
+
+                if ($accountingDocument?->status === 'posted') {
+                    throw ValidationException::withMessages([
+                        'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
+                    ]);
+                }
+            }
 
             if (Schema::hasTable('production_material_consumptions')) {
                 ProductionMaterialConsumption::where('inventory_document_id', $document->id)
