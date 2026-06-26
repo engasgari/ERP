@@ -88,6 +88,12 @@ class ProjectDeletionService
                     return;
                 }
 
+                if ($document->status === 'posted') {
+                    throw ValidationException::withMessages([
+                        'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
+                    ]);
+                }
+
                 $document->lines()->delete();
                 $document->forceDelete();
             });
