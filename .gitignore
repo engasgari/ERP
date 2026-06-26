@@ -24,5 +24,4 @@ Homestead.yaml
 Thumbs.db
 database/seeders/large-data/
 tests/
-docs/
 resources/lang/

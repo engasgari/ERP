@@ -1,0 +1,4 @@
+class BusinessException extends Exception
+{
+}
+

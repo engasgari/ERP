@@ -1,0 +1,8 @@
+# Financial Engine
+
+| Severity | Location | Reason | Recommendation | Estimated Difficulty |
+| --- | --- | --- | --- | --- |
+| Critical | `app/Http/Controllers/AccountingDocumentController.php:101, 113-119`, `app/Services/AccountingPostingService.php:100-111, 388-407, 668-670`, `app/Http/Controllers/InvoiceController.php:462-494`, `app/Http/Controllers/SalaryController.php:551-589` | Posted accounting documents are being deleted, force-deleted, or moved back to draft. That conflicts with the documented reverse-only rule for posted accounting documents. | Replace hard delete/unpost flows with explicit reversal documents and keep posted documents read-only. | High |
+| High | `app/Http/Controllers/InvoiceController.php:406-408`, `app/Http/Controllers/SalaryController.php:101, 343, 465-466, 507-508`, `app/Services/FinancialReportService.php:1534-1560`, `app/Http/Controllers/ProductionOrderController.php:173` | Monetary and financial calculations frequently use floating-point casts in code paths that should stay decimal-safe. | Keep all money math in decimal/string-safe forms until final formatting, and centralize monetary helpers in the finance layer. | Medium |
+| High | `app/Http/Controllers/InvoiceController.php:121-196`, `app/Http/Controllers/SalaryController.php:164-191, 306-309, 393-424`, `app/Http/Controllers/ProductionOrderController.php:69-131`, `app/Http/Controllers/FinancialTransactionController.php:291, 358, 377` | Accounting document creation, posting, and cleanup are scattered across multiple controllers instead of going through one consistent accounting entry point. | Route every financial posting and reversal through the accounting engine service and keep controller code thin. | High |
+
