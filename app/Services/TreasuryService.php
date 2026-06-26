@@ -105,6 +105,10 @@ class TreasuryService
                 continue;
             }
 
+            if ($document->status === 'posted') {
+             throw new RuntimeException('سند حسابداری ثبت قطعی شده از مسیر خزانه قابل حذف نیست.');
+            }
+
             $document->lines()->delete();
             $document->forceDelete();
         }
