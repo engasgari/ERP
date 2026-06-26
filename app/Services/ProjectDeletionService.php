@@ -60,12 +60,7 @@ class ProjectDeletionService
                     return;
                 }
 
-                if ($document->status === 'posted') {
-                    throw ValidationException::withMessages([
-                        'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
-                    ]);
-                }
-
+                $this->guardAgainstPostedAccountingDocumentDeletion($document);
                 $document->lines()->delete();
                 $document->forceDelete();
             });
@@ -88,12 +83,7 @@ class ProjectDeletionService
                     return;
                 }
 
-                if ($document->status === 'posted') {
-                    throw ValidationException::withMessages([
-                        'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
-                    ]);
-                }
-
+                $this->guardAgainstPostedAccountingDocumentDeletion($document);
                 $document->lines()->delete();
                 $document->forceDelete();
             });
@@ -131,6 +121,7 @@ class ProjectDeletionService
                 continue;
             }
 
+            $this->guardAgainstPostedAccountingDocumentDeletion($document);
             $document->lines()->delete();
             $document->forceDelete();
         }
@@ -181,6 +172,7 @@ class ProjectDeletionService
                         continue;
                     }
 
+                    $this->guardAgainstPostedAccountingDocumentDeletion($document);
                     $document->lines()->delete();
                     $document->forceDelete();
                 }
@@ -208,5 +200,16 @@ class ProjectDeletionService
 
                 $order->delete();
             });
+    }
+
+    private function guardAgainstPostedAccountingDocumentDeletion(AccountingDocument $document): void
+    {
+        if ($document->status !== 'posted') {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
+        ]);
     }
 }
