@@ -69,6 +69,10 @@ class AccountingDocumentController extends Controller
 
     public function edit(AccountingDocument $accountingDocument)
     {
+        if ($redirect = $this->redirectIfPosted($accountingDocument)) {
+            return $redirect;
+        }
+
         if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
             return $redirect;
         }
@@ -78,6 +82,10 @@ class AccountingDocumentController extends Controller
 
     public function update(StoreAccountingDocumentRequest $request, AccountingDocument $accountingDocument)
     {
+        if ($redirect = $this->redirectIfPosted($accountingDocument)) {
+            return $redirect;
+        }
+
         if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
             return $redirect;
         }
@@ -94,6 +102,10 @@ class AccountingDocumentController extends Controller
 
     public function destroy(Request $request, AccountingDocument $accountingDocument)
     {
+        if ($redirect = $this->redirectIfPosted($accountingDocument)) {
+            return $redirect;
+        }
+
         if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
             return $redirect;
         }
@@ -112,6 +124,10 @@ class AccountingDocumentController extends Controller
 
     public function unpost(Request $request, AccountingDocument $accountingDocument)
     {
+        if ($redirect = $this->redirectIfPosted($accountingDocument)) {
+            return $redirect;
+        }
+
         if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
             return $redirect;
         }
@@ -158,5 +174,16 @@ class AccountingDocumentController extends Controller
                 'منبع مرتبط: ' . ($document->source_type ? class_basename($document->source_type) . ' #' . $document->source_id : 'ثبت سیستمی'),
                 'برای تغییر یا حذف، سند مادر را بررسی کنید.',
             ]);
+    }
+
+    private function redirectIfPosted(AccountingDocument $document)
+    {
+        if ($document->status !== 'posted') {
+            return null;
+        }
+
+        return redirect()
+            ->route('accounting-documents.show', $document)
+            ->with('error', 'این سند حسابداری ثبت قطعی شده و ویرایش، حذف یا بازگشت به پیش‌نویس برای آن مجاز نیست.');
     }
 }
