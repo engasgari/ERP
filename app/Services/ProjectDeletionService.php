@@ -13,6 +13,7 @@ use App\Models\ProjectCostSnapshot;
 use App\Models\TreasuryTransaction;
 use App\Models\WorkLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProjectDeletionService
 {
@@ -57,6 +58,12 @@ class ProjectDeletionService
 
                 if (! $document) {
                     return;
+                }
+
+                if ($document->status === 'posted') {
+                    throw ValidationException::withMessages([
+                        'accounting_document_id' => 'سند حسابداری ثبت‌شده قابل حذف نیست.',
+                    ]);
                 }
 
                 $document->lines()->delete();
