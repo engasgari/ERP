@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\Salary;
 use App\Models\Warehouse;
 use App\Services\FinancialReportService;
+use App\Services\ManagementReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -94,9 +95,9 @@ class ManagementReportController extends Controller
         return view('management-reports.warehouse-cardex', $this->warehouseCardexData($request));
     }
 
-    public function warehouseInventory(Request $request): View
+    public function warehouseInventory(Request $request, ManagementReportService $reports): View
     {
-        return view('management-reports.warehouse-inventory', $this->warehouseInventoryData($request));
+        return view('management-reports.warehouse-inventory', $reports->warehouseInventoryData($request, $this->warehouseReportData($request)));
     }
 
     public function hrEmployees(Request $request): View
@@ -374,73 +375,6 @@ class ManagementReportController extends Controller
                 ->whereIn('d.type', ['issue', 'consumption'])
                 ->sum('l.line_total'),
         ];
-    }
-
-    private function warehouseInventoryData(Request $request): array
-    {
-        $aggregates = $this->filteredInventoryDocumentLines($request, false)
-            ->selectRaw("
-                d.warehouse_id,
-                d.project_id,
-                i.name as item_name,
-                i.category,
-                SUM(CASE WHEN d.type = 'receipt' THEN l.quantity ELSE 0 END) as quantity_in,
-                SUM(CASE WHEN d.type IN ('issue', 'consumption') THEN l.quantity ELSE 0 END) as quantity_out,
-                SUM(CASE WHEN d.type = 'receipt' THEN l.line_total ELSE 0 END) as value_in,
-                SUM(CASE WHEN d.type IN ('issue', 'consumption') THEN l.line_total ELSE 0 END) as value_out
-            ")
-            ->groupBy('d.warehouse_id', 'd.project_id', 'i.name', 'i.category')
-            ->orderBy('d.warehouse_id')
-            ->orderBy('i.name')
-            ->get();
-
-        $warehousesById = Warehouse::whereIn('id', $aggregates->pluck('warehouse_id')->filter()->unique())->get()->keyBy('id');
-        $projectsById = Project::whereIn('id', $aggregates->pluck('project_id')->filter()->unique())->get()->keyBy('id');
-
-        $rows = $aggregates->map(function ($row) use ($warehousesById, $projectsById) {
-            $quantityIn = (float) $row->quantity_in;
-            $quantityOut = (float) $row->quantity_out;
-            $valueIn = (float) $row->value_in;
-            $valueOut = (float) $row->value_out;
-            $balanceQuantity = $quantityIn - $quantityOut;
-            $balanceValue = $valueIn - $valueOut;
-            $averagePrice = 0;
-
-            if (abs($balanceQuantity) > 0.000001) {
-                $averagePrice = $balanceValue / $balanceQuantity;
-            }
-
-            return [
-                'warehouse' => $warehousesById->get($row->warehouse_id),
-                'project' => $projectsById->get($row->project_id),
-                'item_name' => $row->item_name,
-                'category' => $row->category,
-                'quantity_in' => $quantityIn,
-                'quantity_out' => $quantityOut,
-                'balance_quantity' => $balanceQuantity,
-                'balance_value' => $balanceValue,
-                'average_price' => $averagePrice,
-            ];
-        })
-            ->filter(fn ($row) => !$request->boolean('only_available') || $row['balance_quantity'] > 0)
-            ->values();
-
-        $totalMatches = $rows->count();
-        $isLimited = $totalMatches > 1000;
-        $rows = $rows->take(1000)->values();
-
-        $summary = [
-            'items_count' => $rows->count(),
-            'balance_quantity' => $rows->sum('balance_quantity'),
-            'balance_value' => $rows->sum('balance_value'),
-        ];
-
-        return $this->warehouseReportData($request) + compact(
-            'rows',
-            'summary',
-            'isLimited',
-            'totalMatches'
-        );
     }
 
     private function filteredInventoryDocumentLines(Request $request, bool $selectColumns = true)
