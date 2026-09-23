@@ -18,11 +18,19 @@ function hydrateErpTables() {
     });
 }
 
-let erpHydrateTimer = null;
+window.erpHydrateTimer = window.erpHydrateTimer || null;
+
+function erpDomRoot(scope) {
+    if (scope instanceof Element || scope instanceof Document) {
+        return scope;
+    }
+
+    return document;
+}
 
 function scheduleErpHydration() {
-    window.clearTimeout(erpHydrateTimer);
-    erpHydrateTimer = window.setTimeout(hydrateErpTables, 40);
+    window.clearTimeout(window.erpHydrateTimer);
+    window.erpHydrateTimer = window.setTimeout(hydrateErpTables, 40);
 }
 
 function enableErpSpaLinks() {
@@ -1202,7 +1210,9 @@ function observeLookupMirrorDisabledState(select) {
 }
 
 function syncLookupMirrorStates(scope = document) {
-    scope.querySelectorAll('select[data-erp-lookup-mirror="1"]').forEach((mirror) => {
+    const root = erpDomRoot(scope);
+
+    root.querySelectorAll('select[data-erp-lookup-mirror="1"]').forEach((mirror) => {
         const wrapper = mirror.__erpLookupWrapper || mirror.previousElementSibling;
 
         if (!wrapper?.dataset?.erpLookupUpgrade) {
@@ -1226,17 +1236,19 @@ function syncLookupMirrorStates(scope = document) {
 }
 
 function enableErpLookupSelects(scope = document) {
-    scope.querySelectorAll('select').forEach((select) => {
+    const root = erpDomRoot(scope);
+
+    root.querySelectorAll('select').forEach((select) => {
         if (shouldUpgradeSelectToLookup(select)) {
             upgradeNativeSelectToSearchSelect(select);
         }
     });
 
-    syncLookupMirrorStates(scope);
+    syncLookupMirrorStates(root);
 }
 
 function syncGlobalSearchSelectOptionSources(scope = document) {
-    const rootScope = scope instanceof Element ? scope : document;
+    const rootScope = erpDomRoot(scope);
     const node = rootScope.id === 'erp-sold-device-item-options-json'
         ? rootScope
         : rootScope.querySelector('#erp-sold-device-item-options-json')
@@ -1641,11 +1653,13 @@ function bindErpSearchSelect(root) {
 }
 
 function enableErpSearchSelects(scope = document) {
-    syncGlobalSearchSelectOptionSources(scope);
-    enableErpLookupSelects(scope);
+    const root = erpDomRoot(scope);
 
-    scope.querySelectorAll('[data-erp-search-select]').forEach((root) => {
-        bindErpSearchSelect(root);
+    syncGlobalSearchSelectOptionSources(root);
+    enableErpLookupSelects(root);
+
+    root.querySelectorAll('[data-erp-search-select]').forEach((node) => {
+        bindErpSearchSelect(node);
     });
 }
 
@@ -1804,7 +1818,9 @@ function handleErpSpaClick(event) {
 }
 
 function enableErpAutoFilters(root = document) {
-    root.querySelectorAll('form[data-erp-auto-filter]').forEach((form) => {
+    const scope = erpDomRoot(root);
+
+    scope.querySelectorAll('form[data-erp-auto-filter]').forEach((form) => {
         if (form.dataset.erpAutoFilterReady === '1') {
             return;
         }
@@ -1854,74 +1870,95 @@ function enableErpAutoFilters(root = document) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', enableErpAutoFilters);
-document.addEventListener('DOMContentLoaded', enableErpSearchSelects);
-document.addEventListener('DOMContentLoaded', hydrateErpTables);
-document.addEventListener('DOMContentLoaded', enableErpSpaLinks);
-document.addEventListener('DOMContentLoaded', enableErpDropdowns);
-document.addEventListener('DOMContentLoaded', enableErpMoneyInputs);
-document.addEventListener('DOMContentLoaded', enableJalaliDatepickers);
-document.addEventListener('DOMContentLoaded', enableErpDeleteConfirms);
-document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
-document.addEventListener('livewire:init', () => {
-    enableErpFlashMessages();
-    enableLivewireValidationToasts();
-    enableJalaliDatepickers();
-    enableErpMoneyInputs();
-
-    if (window.Livewire?.hook) {
-        Livewire.hook('element.init', ({ el }) => {
-            enableErpSearchSelects(el);
-        });
+function bootstrapErpUiListeners() {
+    if (window.__erpUiListenersBound) {
+        return;
     }
-});
-document.addEventListener('livewire:navigated', () => {
-    hydrateErpTables();
-    enableErpSearchSelects();
+
+    window.__erpUiListenersBound = true;
+
+    document.addEventListener('DOMContentLoaded', enableErpAutoFilters);
+    document.addEventListener('DOMContentLoaded', enableErpSearchSelects);
+    document.addEventListener('DOMContentLoaded', hydrateErpTables);
+    document.addEventListener('DOMContentLoaded', enableErpSpaLinks);
+    document.addEventListener('DOMContentLoaded', enableErpDropdowns);
+    document.addEventListener('DOMContentLoaded', enableErpMoneyInputs);
+    document.addEventListener('DOMContentLoaded', enableJalaliDatepickers);
+    document.addEventListener('DOMContentLoaded', enableErpDeleteConfirms);
+    document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
+
+    document.addEventListener('livewire:init', () => {
+        enableErpFlashMessages();
+        enableLivewireValidationToasts();
+        enableJalaliDatepickers();
+        enableErpMoneyInputs();
+
+        if (window.Livewire?.hook && !window.__erpUiElementInitHookBound) {
+            window.__erpUiElementInitHookBound = true;
+            window.Livewire.hook('element.init', ({ el }) => {
+                enableErpSearchSelects(el);
+            });
+        }
+    });
+
+    document.addEventListener('livewire:navigated', () => {
+        hydrateErpTables();
+        enableErpSearchSelects();
+        enableErpAutoFilters();
+        enableErpSpaLinks();
+        enableErpDropdowns();
+        enableErpMoneyInputs();
+        enableJalaliDatepickers();
+        enableErpDeleteConfirms();
+        enableErpFlashMessages();
+    });
+
+    document.addEventListener('livewire:update', hydrateErpTables);
+
+    document.addEventListener('livewire:morphed', () => {
+        hydrateErpTables();
+        enableErpSearchSelects();
+        enableErpMoneyInputs();
+        enableJalaliDatepickers();
+        enableErpDeleteConfirms();
+        enableErpFlashMessages();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const shell = document.querySelector('.erp-shell');
+
+        if (!shell || !window.MutationObserver || window.__erpUiShellObserversBound) {
+            return;
+        }
+
+        window.__erpUiShellObserversBound = true;
+
+        new MutationObserver(scheduleErpHydration).observe(shell, {
+            childList: true,
+            subtree: true,
+        });
+
+        new MutationObserver(() => {
+            enableErpSearchSelects();
+            enableErpMoneyInputs();
+            enableJalaliDatepickers();
+        }).observe(shell, {
+            childList: true,
+            subtree: true,
+        });
+    });
+}
+
+bootstrapErpUiListeners();
+
+if (document.readyState !== 'loading') {
     enableErpAutoFilters();
+    enableErpSearchSelects();
+    hydrateErpTables();
     enableErpSpaLinks();
     enableErpDropdowns();
     enableErpMoneyInputs();
     enableJalaliDatepickers();
     enableErpDeleteConfirms();
     enableErpFlashMessages();
-});
-document.addEventListener('livewire:update', hydrateErpTables);
-document.addEventListener('livewire:morphed', () => {
-    hydrateErpTables();
-    enableErpSearchSelects();
-    enableErpMoneyInputs();
-    enableJalaliDatepickers();
-    enableErpDeleteConfirms();
-    enableErpFlashMessages();
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const shell = document.querySelector('.erp-shell');
-
-    if (!shell || !window.MutationObserver) {
-        return;
-    }
-
-    new MutationObserver(scheduleErpHydration).observe(shell, {
-        childList: true,
-        subtree: true,
-    });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const shell = document.querySelector('.erp-shell');
-
-    if (!shell || !window.MutationObserver) {
-        return;
-    }
-
-    new MutationObserver(() => {
-        enableErpSearchSelects();
-        enableErpMoneyInputs();
-        enableJalaliDatepickers();
-    }).observe(shell, {
-        childList: true,
-        subtree: true,
-    });
-});
+}
