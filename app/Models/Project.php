@@ -36,9 +36,9 @@ class Project extends Model
     public const STATUSES = [
         'planning' => 'برنامه‌ریزی',
         'active' => 'فعال',
-        'procurement' => 'تامین کالا',
-        'manufacturing' => 'در حال تولید',
-        'testing' => 'کنترل کیفیت',
+        'procurement' => 'تامین',
+        'manufacturing' => 'در حال اجرا',
+        'testing' => 'کنترل و تحویل',
         'delivered' => 'تحویل شده',
         'closed' => 'بسته شده',
         'inactive' => 'غیرفعال',
@@ -84,6 +84,11 @@ class Project extends Model
         return self::STATUSES[$this->status] ?? $this->status ?? '-';
     }
 
+    public function getCodeAttribute(): ?string
+    {
+        return $this->project_number;
+    }
+
     public function getTotalWarehouseCostAttribute(): float
     {
         return (float) $this->inventoryDocuments()
@@ -95,21 +100,14 @@ class Project extends Model
 
     public function getTotalIncomeAttribute(): float
     {
-        return (float) $this->financialTransactions()
-            ->where('type', 'income')
-            ->sum('amount');
+        return (float) app(ProjectCostingService::class)->summary($this)['revenue'];
     }
 
     public function getTotalExpenseAttribute(): float
     {
-        $financialExpenses = (float) $this->financialTransactions()
-            ->where('type', 'expense')
-            ->sum('amount');
+        $summary = app(ProjectCostingService::class)->summary($this);
 
-        $laborCosts = $this->total_labor_cost;
-        $serviceCosts = $this->total_service_cost;
-
-        return $financialExpenses + $laborCosts + $serviceCosts + $this->total_warehouse_cost;
+        return (float) ($summary['total_cost_net'] ?? $summary['total_cost']);
     }
 
     public function getTotalLaborCostAttribute(): float

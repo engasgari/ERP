@@ -15,20 +15,9 @@ use Illuminate\Validation\ValidationException;
 
 class FiscalPeriodController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $editingYear = null;
-
-        if ($request->filled('edit')) {
-            $editingYear = FiscalYear::find($request->integer('edit'));
-        }
-
-        return view('fiscal-periods.index', [
-            'years' => FiscalYear::with(['periods' => fn ($query) => $query->orderBy('period_number')])
-                ->latest('jalali_year')
-                ->get(),
-            'editingYear' => $editingYear,
-        ]);
+        return view('fiscal-periods.index');
     }
 
     public function store(Request $request)
@@ -62,6 +51,18 @@ class FiscalPeriodController extends Controller
             ]);
         }
 
+        if ($statusChanged && $data['status'] === 'closed') {
+            throw ValidationException::withMessages([
+                'status' => 'برای بستن سال مالی از دکمه «بستن سال» استفاده کنید تا اسناد اختتامیه و افتتاحیه صادر شود.',
+            ]);
+        }
+
+        if ($statusChanged && $data['status'] === 'open' && $fiscalYear->status === 'closed') {
+            throw ValidationException::withMessages([
+                'status' => 'برای بازگشایی سال مالی از دکمه «بازگشایی سال» استفاده کنید.',
+            ]);
+        }
+
         DB::transaction(function () use ($fiscalYear, $data, $dateOrYearChanged, $statusChanged) {
             $fiscalYear->update($data);
 
@@ -84,40 +85,38 @@ class FiscalPeriodController extends Controller
             ->with('success', 'دوره مالی ویرایش شد.');
     }
 
-    public function destroy(FiscalYear $fiscalYear)
+    public function destroy(FiscalYear $fiscalYear, FiscalPeriodService $service)
     {
-        $relatedCounts = $this->relatedDocumentCounts($fiscalYear);
-
-        if ($relatedCounts->sum() > 0) {
-            $details = $relatedCounts
-                ->filter()
-                ->map(fn ($count, $label) => $label . ': ' . $count)
-                ->implode('، ');
-
-            return back()->with('error', 'این دوره مالی قابل حذف نیست. اسناد مرتبط: ' . $details);
+        try {
+            $service->deleteYear($fiscalYear, auth()->id());
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
         }
 
-        DB::transaction(function () use ($fiscalYear) {
-            $fiscalYear->periods()->delete();
-            $fiscalYear->delete();
-        });
-
         return redirect()->route('fiscal-periods.index')
-            ->with('success', 'دوره مالی حذف شد.');
+            ->with('success', 'سال مالی حذف شد.');
     }
 
     public function close(Request $request, FiscalPeriod $fiscalPeriod, FiscalPeriodService $service)
     {
-        $service->close($fiscalPeriod, $request->user()->id);
+        try {
+            $service->close($fiscalPeriod, $request->user()->id);
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
-        return back()->with('success', 'دوره مالی بسته شد.');
+        return back()->with('success', 'سال مالی بسته شد و اسناد اختتامیه/افتتاحیه صادر شد.');
     }
 
     public function reopen(Request $request, FiscalPeriod $fiscalPeriod, FiscalPeriodService $service)
     {
-        $service->reopen($fiscalPeriod, $request->user()?->id);
+        try {
+            $service->reopen($fiscalPeriod, $request->user()?->id);
+        } catch (\RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
 
-        return back()->with('success', 'دوره مالی دوباره باز شد.');
+        return back()->with('success', 'سال مالی بازگشایی شد. سال‌های بعدی بدون عملیات حذف شدند.');
     }
 
     private function validatedYearData(Request $request, ?FiscalYear $fiscalYear = null): array

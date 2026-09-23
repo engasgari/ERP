@@ -18,12 +18,13 @@
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-5">
                     <label class="grid gap-1 text-sm font-bold text-slate-600 md:col-span-2">
                         محصول نهایی *
-                        <select name="item_id" required class="rounded-md border-slate-300">
-                            <option value="">انتخاب محصول</option>
-                            @foreach($products as $product)
-                                <option value="{{ $product->id }}" @selected(old('item_id', $bom->item_id) == $product->id)>{{ $product->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-erp.ui.item-search-select
+                            name="item_id"
+                            :value="old('item_id', $bom->item_id)"
+                            :items="$products"
+                            inputClass="rounded-md border-slate-300"
+                            required
+                        />
                     </label>
                     <label class="grid gap-1 text-sm font-bold text-slate-600">
                         نسخه *
@@ -66,12 +67,12 @@
                         @foreach($lines as $i => $line)
                             <tr>
                                 <td class="border border-gray-300 p-2">
-                                    <select name="lines[{{ $i }}][component_item_id]" class="w-full rounded-md border-slate-300">
-                                        <option value="">انتخاب</option>
-                                        @foreach($components as $component)
-                                            <option value="{{ $component->id }}" @selected(($line['component_item_id'] ?? null) == $component->id)>{{ $component->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <x-erp.ui.item-search-select
+                                        name="lines[{{ $i }}][component_item_id]"
+                                        :value="$line['component_item_id'] ?? ''"
+                                        :items="$components"
+                                        inputClass="w-full rounded-md border-slate-300"
+                                    />
                                 </td>
                                 <td class="border border-gray-300 p-2"><input name="lines[{{ $i }}][quantity]" type="number" step="0.001" min="0" dir="ltr" value="{{ $line['quantity'] ?? '' }}" class="w-full rounded-md border-slate-300"></td>
                                 <td class="border border-gray-300 p-2">

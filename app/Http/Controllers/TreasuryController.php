@@ -20,11 +20,7 @@ class TreasuryController extends Controller
 
     public function index(Request $request)
     {
-        return view('treasury.index', [
-            'transactions' => $this->treasury->paginate($this->normalizedFilters($request)),
-            'banks' => BankAccount::latest()->get(),
-            'cashboxes' => Cashbox::latest()->get(),
-        ]);
+        return view('treasury.index');
     }
 
     public function create()

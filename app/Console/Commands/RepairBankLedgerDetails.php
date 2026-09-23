@@ -31,6 +31,7 @@ class RepairBankLedgerDetails extends Command
             ['سطرهای سند حسابداری', $result['accounting_document_lines']],
             ['تراکنش‌های مالی', $result['financial_transactions']],
             ['سطرهای سند مبتنی بر منبع', $result['document_source_lines']],
+            ['بازگردانی bank_account_id', $result['bank_account_id_backfill']],
         ]);
 
         return self::SUCCESS;

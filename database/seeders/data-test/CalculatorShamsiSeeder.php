@@ -14,6 +14,7 @@ use App\Models\WorkGroup;
 use App\Models\WorkLog;
 use App\Models\WorkShift;
 use App\Support\WorkCalendarDefaults;
+use App\Services\NewAttendanceEngineService;
 use App\Services\PayrollCalculationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,7 @@ class CalculatorShamsiSeeder extends Seeder
                 self::JALALI_MONTH
             );
 
+            app(NewAttendanceEngineService::class)->processPeriod($period, $employee->id);
             app(PayrollCalculationService::class)->calculate($period);
         });
     }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\FinancialReportExport;
 use App\Http\Requests\FinancialReportRequest;
 use App\Models\BankAccount;
 use App\Models\Cashbox;
@@ -14,10 +13,11 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Services\FinancialReportService;
 use App\Support\FinancialReportContext;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PersianPdf;
+use App\Support\SimpleXlsxExporter;
+use App\Support\TaxElectronicBooksExcelExporter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Maatwebsite\Excel\Facades\Excel;
 
 class FinancialReportController extends Controller
 {
@@ -50,11 +50,10 @@ class FinancialReportController extends Controller
         $this->authorizeExport($report);
         $data = $reports->report($report, $request->validated());
 
-        $pdf = Pdf::loadView('financial-reports.print.report', $this->viewData($report, $data, $request) + [
+        $pdf = PersianPdf::loadView('financial-reports.print.report', $this->viewData($report, $data, $request) + [
             'company' => CompanySetting::first(),
             'forPrint' => true,
-            'forPdf' => true,
-        ])->setPaper('a4', 'landscape');
+        ], 'a4', 'landscape');
 
         return $pdf->download($this->fileName($report, 'pdf'));
     }
@@ -63,6 +62,45 @@ class FinancialReportController extends Controller
     {
         $this->authorizeExport($report);
         $data = $reports->report($report, $request->validated());
+
+        if ($report === 'tax-electronic-books') {
+            $analysis = $data['analysis'] ?? [];
+
+            if (! ($analysis['export_ready'] ?? false)) {
+                abort(422, (string) ($analysis['export_status_message'] ?? 'خروجی دفاتر الکترونیک مالیاتی آماده نیست.'));
+            }
+
+            return TaxElectronicBooksExcelExporter::download(
+                $this->fileName($report, 'xlsx'),
+                $data['tax_export_rows'] ?? []
+            );
+        }
+
+        if (! empty($data['export_sheets'])) {
+            $sheets = collect($data['export_sheets'])->map(function (array $sheet) {
+                $fields = $sheet['fields'] ?? [];
+                $headings = $sheet['headings'] ?? [];
+                $rows = collect($sheet['rows'] ?? [])->map(function ($row) use ($fields) {
+                    if (! is_array($row)) {
+                        return [$row];
+                    }
+
+                    if ($fields) {
+                        return array_map(fn ($column) => $row[$column] ?? '', $fields);
+                    }
+
+                    return array_values($row);
+                })->all();
+
+                return [
+                    'name' => $sheet['name'] ?? 'Sheet',
+                    'headings' => $headings,
+                    'rows' => $rows,
+                ];
+            })->all();
+
+            return SimpleXlsxExporter::downloadMultiSheet($this->fileName($report, 'xlsx'), $sheets);
+        }
 
         $rows = collect($data['export_rows'] ?? []);
         if ($report === 'income-statement') {
@@ -74,9 +112,18 @@ class FinancialReportController extends Controller
             $headings = collect($data['sections'][0]['headers'] ?? [])->map(fn ($header) => (string) $header)->all();
         }
 
-        return Excel::download(
-            new FinancialReportExport($fields, $headings, $rows, $data['title'] ?? $report),
-            $this->fileName($report, 'xlsx')
+        $exportRows = $rows->map(function ($row) use ($fields) {
+            if (! is_array($row)) {
+                return [$row];
+            }
+
+            return array_map(fn ($column) => $row[$column] ?? '', $fields);
+        })->all();
+
+        return SimpleXlsxExporter::download(
+            $this->fileName($report, 'xlsx'),
+            $headings,
+            $exportRows,
         );
     }
 
@@ -92,11 +139,30 @@ class FinancialReportController extends Controller
 
     public function statement(Request $request, FinancialReportService $reports)
     {
+        $filters = $this->normalizedFilters($request);
+        unset($filters['side']);
+
         return view('financial-reports.statement', [
-            'summaries' => $reports->partyStatementSummaries($request->integer('account_id') ?: null, $request->integer('party_id') ?: null, $this->normalizedFilters($request)),
-            'accounts' => ChartAccount::orderBy('code')->get(),
-            'parties' => Party::orderBy('name')->get(),
+            'summaries' => $reports->partyStatementSummaries(
+                null,
+                $request->integer('party_id') ?: null,
+                $filters,
+            ),
+            'parties' => $this->statementParties(),
         ]);
+    }
+
+    public function employeeStatement(Request $request)
+    {
+        $query = $request->query();
+        unset($query['side']);
+
+        return redirect()->route('financial-reports.statement', $query);
+    }
+
+    public function printEmployeeStatement(Request $request, FinancialReportService $reports)
+    {
+        return $this->printStatement($request->merge(['side' => 'personnel']), $reports);
     }
 
     public function accountStatement(Request $request, ChartAccount $account, FinancialReportService $reports)
@@ -119,15 +185,20 @@ class FinancialReportController extends Controller
 
     public function printStatement(Request $request, FinancialReportService $reports)
     {
+        $filters = $this->normalizedFilters($request);
+        unset($filters['side']);
+
         $summaries = $reports->partyStatementSummaries(
-            $request->integer('account_id') ?: null,
+            null,
             $request->integer('party_id') ?: null,
-            $this->normalizedFilters($request)
+            $filters,
         );
+
+        $reportTitle = $request->filled('party_id') ? 'صورتحساب شخص / شرکت' : 'صورتحساب اشخاص';
 
         return view('financial-reports.print.statement', [
             'summaries' => $summaries,
-            'reportTitle' => $request->filled('party_id') ? 'صورتحساب شخص / شرکت' : 'صورتحساب اشخاص و شرکت‌ها',
+            'reportTitle' => $reportTitle,
             'backRoute' => route('financial-reports.statement', $request->query()),
         ]);
     }
@@ -208,5 +279,21 @@ class FinancialReportController extends Controller
     private function fileName(string $title, string $extension): string
     {
         return 'financial-report-' . str()->slug($title, '-') . '.' . $extension;
+    }
+
+    private function normalizeStatementSide(?string $side): ?string
+    {
+        if ($side === null || $side === '') {
+            return null;
+        }
+
+        $side = strtolower(trim($side));
+
+        return $side === 'employee' ? 'personnel' : $side;
+    }
+
+    private function statementParties()
+    {
+        return Party::query()->with('types')->orderBy('name')->get();
     }
 }

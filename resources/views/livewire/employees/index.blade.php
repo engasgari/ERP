@@ -51,6 +51,7 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>کد پرسنلی</th>
                         <th>نام</th>
                         <th>کد ملی</th>
                         <th>سمت</th>
@@ -63,8 +64,9 @@
                 </thead>
                 <tbody>
                 @forelse($employees as $employee)
-                    <tr wire:key="employee-{{ $employee->id }}" class="cursor-pointer hover:bg-slate-50" onclick="window.location='{{ route('salaries.employee-statement', $employee) }}'">
+                    <tr wire:key="employee-{{ $employee->id }}" class="cursor-pointer hover:bg-slate-50" onclick="window.location='{{ route('employees.show', $employee) }}'">
                         <td class="font-semibold">{{ $employee->id }}</td>
+                        <td class="text-nowrap" dir="ltr">{{ $employee->personnel_code ?: $employee->employee_code ?: '-' }}</td>
                         <td>
                             <span class="font-bold text-blue-700">{{ $employee->full_name }}</span>
                             <div class="text-xs text-gray-600 mt-1">{{ $employee->email ?: '-' }}</div>
@@ -81,16 +83,24 @@
                             <span class="px-2 py-1 rounded text-xs {{ $employee->status_color }}">{{ $employee->employment_status }}</span>
                         </td>
                         <td onclick="event.stopPropagation()">
-                            <div class="d-grid d-sm-flex gap-2">
-                                <a href="{{ route('employees.show', $employee) }}" class="erp-action-btn erp-action-detail text-center">جزئیات</a>
-                                <a href="{{ route('employees.edit', $employee) }}" class="erp-action-btn erp-action-edit text-center">ویرایش پرونده</a>
-                                <button type="button" wire:click="delete({{ $employee->id }})" wire:confirm="آیا از حذف این پرسنل مطمئن هستید؟" wire:loading.attr="disabled" wire:target="delete({{ $employee->id }})" class="erp-action-btn erp-action-delete">حذف</button>
-                            </div>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action icon="view" label="جزئیات" :href="route('employees.show', $employee)" />
+                                <x-erp.ui.row-action icon="edit" label="ویرایش پرونده" :href="route('employees.edit', $employee)" />
+                                <x-erp.ui.row-action
+                                    icon="delete"
+                                    label="حذف"
+                                    tone="danger"
+                                    wire:click="delete({{ $employee->id }})"
+                                    wire:confirm="آیا از حذف این پرسنل مطمئن هستید؟"
+                                    wire:loading.attr="disabled"
+                                    wire:target="delete({{ $employee->id }})"
+                                />
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="text-center text-gray-500 py-6">هنوز پرسنلی اضافه نکرده‌اید.</td>
+                        <td colspan="10" class="text-center text-gray-500 py-6">هنوز پرسنلی اضافه نکرده‌اید.</td>
                     </tr>
                 @endforelse
                 </tbody>

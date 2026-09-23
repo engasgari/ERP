@@ -17,9 +17,9 @@
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <div class="rounded-md border border-slate-200 bg-slate-50 p-4"><div class="text-sm font-bold text-slate-600">وضعیت</div><div class="mt-1 text-xl font-black">{{ $order->status_label }}</div></div>
-                <div class="rounded-md border border-blue-200 bg-blue-50 p-4"><div class="text-sm font-bold text-blue-700">تعداد تولید</div><div class="mt-1 text-xl font-black">{{ number_format((float) $order->quantity, 3) }}</div></div>
-                <div class="rounded-md border border-emerald-200 bg-emerald-50 p-4"><div class="text-sm font-bold text-emerald-700">مواد واقعی</div><div class="mt-1 text-xl font-black">{{ number_format($summary['actual_material_cost']) }}</div></div>
-                <div class="rounded-md border border-amber-200 bg-amber-50 p-4"><div class="text-sm font-bold text-amber-700">مغایرت مواد</div><div class="mt-1 text-xl font-black">{{ number_format($summary['material_variance']) }}</div></div>
+                <div class="rounded-md border border-blue-200 bg-blue-50 p-4"><div class="text-sm font-bold text-blue-700">تعداد تولید</div><div class="mt-1 text-xl font-black">{{ formatQuantity((float) $order->quantity) }}</div></div>
+                <div class="rounded-md border border-emerald-200 bg-emerald-50 p-4"><div class="text-sm font-bold text-emerald-700">مواد واقعی</div><div class="mt-1 text-xl font-black">{{ formatMoney($summary['actual_material_cost']) }}</div></div>
+                <div class="rounded-md border border-amber-200 bg-amber-50 p-4"><div class="text-sm font-bold text-amber-700">مغایرت مواد</div><div class="mt-1 text-xl font-black">{{ formatMoney($summary['material_variance']) }}</div></div>
             </div>
 
             <form method="POST" action="{{ route('production-orders.consume', $order) }}" class="space-y-4">
@@ -52,7 +52,7 @@
                                     {{ $line->item?->name }}
                                     <input type="hidden" name="lines[{{ $i }}][id]" value="{{ $line->id }}">
                                 </td>
-                                <td class="border border-gray-300 p-2">{{ number_format((float) $line->planned_quantity, 3) }}</td>
+                                <td class="border border-gray-300 p-2">{{ formatQuantity((float) $line->planned_quantity) }}</td>
                                 <td class="border border-gray-300 p-2"><input name="lines[{{ $i }}][actual_quantity]" type="number" step="0.001" min="0" dir="ltr" value="{{ $line->actual_quantity }}" class="w-full rounded-md border-slate-300"></td>
                                 <td class="border border-gray-300 p-2"><input name="lines[{{ $i }}][unit_cost]" type="number" step="0.01" min="0" dir="ltr" value="{{ $line->unit_cost }}" class="w-full rounded-md border-slate-300"></td>
                                 <td class="border border-gray-300 p-2">
@@ -79,7 +79,7 @@
                                         -
                                     @endif
                                 </td>
-                                <td class="border border-gray-300 p-2">{{ number_format((float) $line->variance_quantity, 3) }}</td>
+                                <td class="border border-gray-300 p-2">{{ formatQuantity((float) $line->variance_quantity) }}</td>
                             </tr>
                         @empty
                             <tr><td colspan="8" class="border border-gray-300 p-5 text-center text-slate-500">برای این سفارش ردیف مصرف مواد ثبت نشده است.</td></tr>

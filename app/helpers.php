@@ -151,6 +151,11 @@ if (!function_exists('jalaliToGregorianDate')) {
 
         try {
             $normalized = str_replace(['.', '/'], '-', $value);
+            $digitsOnly = preg_replace('/[^\d]/', '', $value);
+
+            if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $digitsOnly, $compactMatches) === 1) {
+                $normalized = sprintf('%04d-%02d-%02d', (int) $compactMatches[1], (int) $compactMatches[2], (int) $compactMatches[3]);
+            }
 
             if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $normalized, $matches) !== 1) {
                 return null;
@@ -191,9 +196,24 @@ if (!function_exists('gregorianToJalaliDate')) {
         }
 
         try {
-            return Verta::instance($value)->format('Y/m/d');
+            return toPersianDigits(Verta::instance($value)->format('Y/m/d'));
         } catch (Throwable) {
             return '';
+        }
+    }
+}
+
+if (!function_exists('formatJalaliDateTime')) {
+    function formatJalaliDateTime($value, string $fallback = '-'): string
+    {
+        if (!$value) {
+            return $fallback;
+        }
+
+        try {
+            return toPersianDigits(Verta::instance($value)->format('Y/m/d H:i'));
+        } catch (Throwable) {
+            return $fallback;
         }
     }
 }
@@ -244,7 +264,7 @@ if (!function_exists('formatJalaliDateSafe')) {
                 $jDayNo -= $jDaysInMonth[$i];
             }
 
-            return sprintf('%04d/%02d/%02d', $jy, $i + 1, $jDayNo + 1);
+            return toPersianDigits(sprintf('%04d/%02d/%02d', $jy, $i + 1, $jDayNo + 1));
         } catch (Throwable) {
             return $fallback;
         }
@@ -356,7 +376,183 @@ if (!function_exists('jalaliDateInputValue')) {
 
         $converted = jalaliToGregorianDate($normalized);
 
-        return $converted ? gregorianToJalaliDate($converted) : $normalized;
+        return $converted ? gregorianToJalaliDate($converted) : toPersianDigits($normalized);
+    }
+}
+
+if (!function_exists('jalaliDateTimeInputValue')) {
+    function jalaliDateTimeInputValue($value = null): string
+    {
+        if (!$value) {
+            return '';
+        }
+
+        try {
+            return toPersianDigits(Verta::instance($value)->format('Y/m/d H:i'));
+        } catch (Throwable) {
+            return '';
+        }
+    }
+}
+
+if (!function_exists('jalaliToGregorianDateTime')) {
+    function jalaliToGregorianDateTime(?string $value): ?string
+    {
+        $value = trim((string) normalizePersianDigits($value));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})[T\s](\d{1,2}):(\d{2})(?::(\d{2}))?$/', $value, $isoMatches) === 1) {
+            $year = (int) substr($isoMatches[1], 0, 4);
+
+            if ($year >= 1700) {
+                try {
+                    return Carbon::parse($value)->format('Y-m-d H:i:s');
+                } catch (Throwable) {
+                    return null;
+                }
+            }
+        }
+
+        $datePart = $value;
+        $hour = 0;
+        $minute = 0;
+        $second = 0;
+
+        if (preg_match('/^(.+?)\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $value, $matches) === 1) {
+            $datePart = trim($matches[1]);
+            $hour = (int) $matches[2];
+            $minute = (int) $matches[3];
+            $second = isset($matches[4]) ? (int) $matches[4] : 0;
+        }
+
+        $gregorianDate = jalaliToGregorianDate($datePart);
+
+        if (!$gregorianDate) {
+            try {
+                return Carbon::parse($value)->format('Y-m-d H:i:s');
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        if ($hour > 23 || $minute > 59 || $second > 59) {
+            return null;
+        }
+
+        return Carbon::parse($gregorianDate)
+            ->setTime($hour, $minute, $second)
+            ->format('Y-m-d H:i:s');
+    }
+}
+
+if (!function_exists('normalizeJalaliFilterDate')) {
+    function normalizeJalaliFilterDate(?string $value): string
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        $digits = preg_replace('/[^\d]/', '', normalizePersianDigits($value));
+
+        if (strlen($digits) === 8) {
+            $formatted = sprintf(
+                '%s/%s/%s',
+                substr($digits, 0, 4),
+                substr($digits, 4, 2),
+                substr($digits, 6, 2),
+            );
+
+            return toPersianDigits($formatted);
+        }
+
+        return jalaliDateInputValue($value);
+    }
+}
+
+if (!function_exists('formatNumber')) {
+    function formatNumber($value, int $decimals = 0): string
+    {
+        if ($value === null || $value === '') {
+            $value = 0;
+        }
+
+        if (extension_loaded('intl')) {
+            $formatter = new NumberFormatter('fa_IR', NumberFormatter::DECIMAL);
+            $formatter->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, $decimals);
+            $formatter->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, $decimals);
+            $formatted = $formatter->format((float) $value);
+
+            if ($formatted !== false) {
+                return $formatted;
+            }
+        }
+
+        $formatted = number_format((float) $value, $decimals, '.', ',');
+        $formatted = str_replace(',', '٬', $formatted);
+
+        if ($decimals > 0) {
+            $formatted = str_replace('.', '٫', $formatted);
+        }
+
+        return toPersianDigits($formatted);
+    }
+}
+
+if (!function_exists('formatMoney')) {
+    function formatMoney($value, int $decimals = 0): string
+    {
+        return formatNumber($value, $decimals);
+    }
+}
+
+if (!function_exists('formatQuantity')) {
+    function formatQuantity($value, int $maxDecimals = 3): string
+    {
+        if ($value === null || $value === '') {
+            $value = 0;
+        }
+
+        $numeric = round((float) $value, $maxDecimals);
+        $plain = rtrim(rtrim(sprintf('%.' . $maxDecimals . 'f', $numeric), '0'), '.');
+        $decimals = str_contains($plain, '.') ? strlen(explode('.', $plain)[1]) : 0;
+
+        return formatNumber($numeric, $decimals);
+    }
+}
+
+if (!function_exists('normalizeMoneyValue')) {
+    function normalizeMoneyValue(mixed $value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $normalized = normalizePersianDigits((string) $value);
+        $normalized = str_replace(['٬', ',', ' ', '٫'], ['', '', '', '.'], $normalized);
+
+        if ($normalized === '' || ! is_numeric($normalized)) {
+            return null;
+        }
+
+        return (float) $normalized;
+    }
+}
+
+if (!function_exists('moneyInputValue')) {
+    function moneyInputValue(mixed $value, int $decimals = 0): string
+    {
+        $numeric = normalizeMoneyValue($value);
+
+        if ($numeric === null || abs($numeric) < 0.0000001) {
+            return '';
+        }
+
+        return formatMoney($numeric, $decimals);
     }
 }
 
@@ -426,5 +622,138 @@ if (!function_exists('persianNumberToWords')) {
         }
 
         return ($negative ? 'منفی ' : '') . implode(' و ', $parts);
+    }
+}
+
+if (! function_exists('searchSelectOptions')) {
+    /**
+     * @param  iterable<mixed>  $items
+     * @return list<array{id:int|string,label:string,code:?string,category:?string,type:?string}>
+     */
+    function searchSelectOptions(
+        iterable $items,
+        ?callable $labelResolver = null,
+        ?callable $codeResolver = null,
+        ?callable $idResolver = null,
+    ): array {
+        $options = [];
+
+        foreach ($items as $key => $item) {
+            if (is_array($item)) {
+                $options[] = [
+                    'id' => $item['id'] ?? $key,
+                    'label' => (string) ($item['label'] ?? $item['name'] ?? ''),
+                    'code' => $item['code'] ?? null,
+                    'category' => $item['category'] ?? null,
+                    'type' => isset($item['type']) && is_string($item['type']) ? $item['type'] : null,
+                ];
+
+                continue;
+            }
+
+            if (is_string($item) || is_numeric($item)) {
+                $options[] = [
+                    'id' => $key,
+                    'label' => (string) $item,
+                    'code' => null,
+                    'category' => null,
+                    'type' => null,
+                ];
+
+                continue;
+            }
+
+            $options[] = [
+                'id' => $idResolver ? $idResolver($item) : ($item->id ?? $key),
+                'label' => $labelResolver ? (string) $labelResolver($item) : (string) ($item->name ?? $item->label ?? $item->title ?? ''),
+                'code' => $codeResolver ? $codeResolver($item) : ($item->code ?? null),
+                'category' => $item->category ?? null,
+                'type' => isset($item->type) && is_string($item->type) ? $item->type : null,
+            ];
+        }
+
+        return $options;
+    }
+}
+
+if (! function_exists('itemSearchSelectOptions')) {
+    /**
+     * @param  iterable<object>  $items
+     * @return list<array{id:int,label:string,code:?string,category:?string,type:string}>
+     */
+    function itemSearchSelectOptions(iterable $items, ?string $defaultTypeLabel = null): array
+    {
+        $options = [];
+
+        foreach ($items as $item) {
+            $type = $item->type ?? null;
+            $typeLabel = match ($type) {
+                'product' => 'کالا',
+                'service' => 'خدمت',
+                default => $defaultTypeLabel ?? 'کالا/خدمت',
+            };
+
+            $options[] = [
+                'id' => (int) $item->id,
+                'label' => (string) ($item->name ?? ''),
+                'code' => $item->code ?? null,
+                'category' => $item->category ?? null,
+                'type' => $typeLabel,
+            ];
+        }
+
+        return $options;
+    }
+}
+
+if (! function_exists('erp_breadcrumb_url')) {
+    function erp_breadcrumb_url(string $routeName, array $params = [], ?string $fallback = null): string
+    {
+        $context = app(\App\Services\BreadcrumbContextService::class);
+
+        return $context->recall($routeName, $fallback)
+            ?? (Route::has($routeName) ? route($routeName, $params) : ($fallback ?? url('/')));
+    }
+}
+
+if (! function_exists('erp_with_return_to')) {
+    function erp_with_return_to(string $url, ?string $returnTo = null, ?string $fromRoute = null): string
+    {
+        $returnTo ??= request()->query('return_to');
+        $fromRoute ??= request()->query('from');
+
+        if ($returnTo === null) {
+            $currentRoute = request()->route()?->getName();
+            $context = app(\App\Services\BreadcrumbContextService::class);
+
+            if (is_string($currentRoute) && $currentRoute !== '' && ! $context->isReportRoute($currentRoute)) {
+                $returnTo = request()->fullUrl();
+                $fromRoute ??= $currentRoute;
+            }
+        }
+
+        $query = array_filter([
+            'return_to' => $returnTo,
+            'from' => $fromRoute,
+        ], fn ($value) => is_string($value) && $value !== '');
+
+        if ($query === []) {
+            return $url;
+        }
+
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separator . http_build_query($query);
+    }
+}
+
+if (! function_exists('erp_report_url')) {
+    function erp_report_url(string $routeName, array $params = [], ?string $returnTo = null, ?string $fromRoute = null): string
+    {
+        if (! Route::has($routeName)) {
+            return erp_with_return_to(url('/'), $returnTo, $fromRoute);
+        }
+
+        return erp_with_return_to(route($routeName, $params), $returnTo, $fromRoute);
     }
 }

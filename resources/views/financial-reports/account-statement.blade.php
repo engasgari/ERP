@@ -28,9 +28,9 @@
         </form>
 
         <div class="grid gap-3 md:grid-cols-4">
-            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">جمع بدهکار (ریال)</div><div class="font-bold">{{ number_format($summary['debit']) }}</div></div>
-            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">جمع بستانکار (ریال)</div><div class="font-bold">{{ number_format($summary['credit']) }}</div></div>
-            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده</div><div class="font-bold">{{ number_format(abs($summary['balance'])) }}</div></div>
+            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">جمع بدهکار (ریال)</div><div class="font-bold">{{ formatMoney($summary['debit']) }}</div></div>
+            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">جمع بستانکار (ریال)</div><div class="font-bold">{{ formatMoney($summary['credit']) }}</div></div>
+            <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده</div><div class="font-bold">{{ formatMoney(abs($summary['balance'])) }}</div></div>
             <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">ماهیت مانده</div><div class="font-bold">{{ $summary['balance_type'] }}</div></div>
         </div>
 
@@ -64,9 +64,9 @@
                         <td>{{ data_get($line, 'party.name', '-') }}</td>
                         <td>{{ data_get($line, 'project.name', '-') }}</td>
                         <td>{{ data_get($line, 'description') ?: data_get($line, 'document.description', '-') }}</td>
-                        <td>{{ (float) data_get($line, 'debit') ? number_format((float) data_get($line, 'debit')) : '-' }}</td>
-                        <td>{{ (float) data_get($line, 'credit') ? number_format((float) data_get($line, 'credit')) : '-' }}</td>
-                        <td>{{ number_format((float) data_get($line, 'running_balance')) }}</td>
+                        <td>{{ (float) data_get($line, 'debit') ? formatMoney((float) data_get($line, 'debit')) : '-' }}</td>
+                        <td>{{ (float) data_get($line, 'credit') ? formatMoney((float) data_get($line, 'credit')) : '-' }}</td>
+                        <td>{{ formatMoney((float) data_get($line, 'running_balance')) }}</td>
                     </tr>
                 @empty
                     <tr>
@@ -77,9 +77,9 @@
                 <tfoot>
                 <tr>
                     <td colspan="6" class="font-bold">جمع</td>
-                    <td class="font-bold">{{ number_format($summary['debit']) }}</td>
-                    <td class="font-bold">{{ number_format($summary['credit']) }}</td>
-                    <td class="font-bold">{{ number_format($summary['balance']) }}</td>
+                    <td class="font-bold">{{ formatMoney($summary['debit']) }}</td>
+                    <td class="font-bold">{{ formatMoney($summary['credit']) }}</td>
+                    <td class="font-bold">{{ formatMoney($summary['balance']) }}</td>
                 </tr>
                 </tfoot>
             </table>

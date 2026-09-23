@@ -13,14 +13,33 @@ abstract class BaseListPage extends Component
     public ?int $detailsId = null;
     public int $perPage = 20;
 
-    protected array $queryString = [
-        'page' => ['except' => 1],
-    ];
+    public function mount(): void
+    {
+        foreach (['date_from', 'date_to'] as $property) {
+            if (property_exists($this, $property) && is_string($this->{$property})) {
+                $this->{$property} = normalizeJalaliFilterDate($this->{$property});
+            }
+        }
+    }
 
     public function updated(string $name): void
     {
         if ($name !== 'selectedRows' && $name !== 'detailsId') {
             $this->resetPage();
+        }
+    }
+
+    public function updatedDateFrom(string $value): void
+    {
+        if (property_exists($this, 'date_from')) {
+            $this->date_from = normalizeJalaliFilterDate($value);
+        }
+    }
+
+    public function updatedDateTo(string $value): void
+    {
+        if (property_exists($this, 'date_to')) {
+            $this->date_to = normalizeJalaliFilterDate($value);
         }
     }
 

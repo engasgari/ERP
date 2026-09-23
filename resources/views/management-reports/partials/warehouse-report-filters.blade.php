@@ -14,7 +14,12 @@
 
         <label class="erp-filter-field">
             کالا
-            <input name="item_name" value="{{ request('item_name') }}" placeholder="نام کالا">
+            <x-erp.ui.item-search-select
+                name="item_id"
+                :value="request('item_id')"
+                :items="$items ?? collect()"
+                placeholder="جستجو نام، کد یا دسته..."
+            />
         </label>
 
         <label class="erp-filter-field">

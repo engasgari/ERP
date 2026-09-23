@@ -17,10 +17,16 @@ class AccountingDocumentService
     public function postInvoice(Invoice $invoice): AccountingDocument
     {
         return DB::transaction(function () use ($invoice) {
-            $invoice->load('lines.item', 'party');
+            $invoice->load('lines.item', 'party', 'accountingDocument');
+
+            $document = $invoice->accountingDocument;
+            if ($document && $this->posting->isActiveSourceAccountingDocument($document)) {
+                return $document;
+            }
 
             if ($invoice->accounting_document_id) {
-                return $invoice->accountingDocument;
+                $invoice->update(['accounting_document_id' => null]);
+                $invoice->refresh();
             }
 
             $this->inventory->postInvoice($invoice);

@@ -12,6 +12,12 @@ class StoreAccountingDocumentRequest extends FormRequest
     {
         $documentDate = $this->input('document_date');
         $lines = collect($this->input('lines', []))
+            ->map(function ($line) {
+                $line['debit'] = normalizeMoneyValue($line['debit'] ?? null) ?? 0;
+                $line['credit'] = normalizeMoneyValue($line['credit'] ?? null) ?? 0;
+
+                return $line;
+            })
             ->filter(fn ($line) => !empty($line['chart_account_id']) || (float) ($line['debit'] ?? 0) > 0 || (float) ($line['credit'] ?? 0) > 0)
             ->values()
             ->all();

@@ -6,6 +6,7 @@ use App\Models\InventoryDocument;
 use App\Models\Item;
 use App\Models\Project;
 use App\Models\Warehouse;
+use App\Services\FiscalPeriodService;
 use App\Services\InventoryPostingService;
 use App\Services\AccountingPostingService;
 use App\Services\NumberingService;
@@ -16,37 +17,9 @@ use RuntimeException;
 
 class InventoryDocumentController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = InventoryDocument::with([
-            'warehouse',
-            'targetWarehouse',
-            'project',
-            'creator',
-            'confirmer',
-            'source',
-            'accountingDocument',
-            'lines.item.unit',
-        ])->latest();
-
-        foreach (['type', 'status', 'entry_mode', 'warehouse_id'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->{$filter});
-            }
-        }
-
-        if ($request->filled('search')) {
-            $query->where(fn ($q) => $q
-                ->where('number', 'like', '%' . $request->search . '%')
-                ->orWhere('description', 'like', '%' . $request->search . '%')
-                ->orWhereHas('lines.item', fn ($lineQuery) => $lineQuery->where('name', 'like', '%' . $request->search . '%'))
-            );
-        }
-
-        return view('inventory-documents.index', [
-            'documents' => $query->paginate(20)->withQueryString(),
-            'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
-        ]);
+        return view('inventory-documents.index');
     }
 
     public function create(Request $request)
@@ -75,8 +48,15 @@ class InventoryDocumentController extends Controller
                     $this->assertManualIssueStock($inventory, $validated);
                 }
 
+                $fiscalYear = app(FiscalPeriodService::class)->fiscalYearForDate($validated['document_date']);
+
                 $document = InventoryDocument::create([
-                    'number' => $numbering->next($this->numberingKey($validated['type']), $this->numberingPrefix($validated['type'])),
+                    'fiscal_year_id' => $fiscalYear?->id,
+                    'number' => $numbering->next(
+                        $this->numberingKey($validated['type']),
+                        $this->numberingPrefix($validated['type']),
+                        $fiscalYear?->id
+                    ),
                     'type' => $validated['type'],
                     'document_date' => $validated['document_date'],
                     'document_time' => $validated['document_time'] ?? now()->format('H:i:s'),
@@ -160,6 +140,15 @@ class InventoryDocumentController extends Controller
 
     public function destroy(InventoryDocument $inventoryDocument, RelatedDocumentDeletionService $deletion)
     {
+        if ($inventoryDocument->is_initial_stock) {
+            return redirect()->route('inventory-documents.index')
+                ->with('error', 'سند موجودی اولیه را از صفحه ویرایش کالا یا خود سند انبار اصلاح کنید.')
+                ->with('error_details', [
+                    'سند انبار: ' . $inventoryDocument->number,
+                    'کالا: ' . ($inventoryDocument->source?->name ?: '#'.$inventoryDocument->source_id),
+                ]);
+        }
+
         if ($inventoryDocument->is_automatic) {
             $source = $inventoryDocument->source_type
                 ? class_basename($inventoryDocument->source_type) . ' #' . $inventoryDocument->source_id

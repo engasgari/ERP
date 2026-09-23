@@ -119,22 +119,22 @@
                         <td>{{ formatJalaliDateSafe($leave->start_date ?: $leave->leave_date) }} تا {{ formatJalaliDateSafe($leave->end_date ?: $leave->leave_date) }}</td>
                         <td>
                             @if($leave->request_type === 'daily')
-                                {{ number_format((float) $leave->total_days, 2) }} روز
+                                {{ formatMoney((float) $leave->total_days, 2) }} روز
                             @else
-                                {{ number_format(((int) $leave->duration_minutes) / 60, 2) }} ساعت
+                                {{ formatMoney(((int) $leave->duration_minutes) / 60, 2) }} ساعت
                             @endif
                         </td>
                         <td>@include('livewire.attendance.partials.status-badge', ['status' => $leave->status])</td>
                         <td>
-                            <div class="flex flex-col gap-2 sm:flex-row">
-                                @if($leave->status === 'pending')
-                                    <button type="button" wire:click="approve({{ $leave->id }})" class="erp-action-btn erp-action-edit">تایید</button>
-                                    <button type="button" wire:click="reject({{ $leave->id }})" class="erp-action-btn erp-action-delete">رد</button>
-                                    <button type="button" wire:click="cancel({{ $leave->id }})" class="erp-action-btn">لغو</button>
-                                @else
-                                    <span class="text-xs text-slate-500">اقدام فعال ندارد</span>
-                                @endif
-                            </div>
+                            @if($leave->status === 'pending')
+                                <x-erp.ui.row-actions>
+                                    <x-erp.ui.row-action icon="confirm" label="تایید" tone="success" wire:click="approve({{ $leave->id }})" />
+                                    <x-erp.ui.row-action icon="reject" label="رد" tone="danger" wire:click="reject({{ $leave->id }})" />
+                                    <x-erp.ui.row-action icon="close" label="لغو" wire:click="cancel({{ $leave->id }})" />
+                                </x-erp.ui.row-actions>
+                            @else
+                                <span class="text-xs text-slate-500">اقدام فعال ندارد</span>
+                            @endif
                         </td>
                     </tr>
                 @empty

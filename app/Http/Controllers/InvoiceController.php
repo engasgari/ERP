@@ -12,40 +12,24 @@ use App\Models\PartyType;
 use App\Models\Project;
 use App\Models\Warehouse;
 use App\Services\AccountingDocumentService;
+use App\Services\FiscalPeriodService;
 use App\Services\InventoryPostingService;
+use App\Services\InvoiceCalculationService;
 use App\Services\InvoiceExcelTemplateService;
+use App\Services\ItemSalePriceService;
 use App\Services\NumberingService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PersianPdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class InvoiceController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = Invoice::with(['party', 'project', 'lines.item', 'accountingDocument', 'settledBy'])->latest();
-
-        foreach (['direction', 'document_type', 'status'] as $filter) {
-            if ($request->filled($filter)) {
-                $query->where($filter, $request->{$filter});
-            }
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(fn ($q) => $q
-                ->where('number', 'like', '%' . $search . '%')
-                ->orWhere('description', 'like', '%' . $search . '%')
-                ->orWhereHas('party', fn ($partyQuery) => $partyQuery->where('name', 'like', '%' . $search . '%'))
-                ->orWhereHas('lines.item', fn ($lineQuery) => $lineQuery->where('name', 'like', '%' . $search . '%'))
-            );
-        }
-
-        return view('invoices.index', [
-            'invoices' => $query->paginate(15)->withQueryString(),
-        ]);
+        return view('invoices.index');
     }
 
     public function create(Request $request)
@@ -56,23 +40,56 @@ class InvoiceController extends Controller
         ));
     }
 
-    public function edit(Invoice $invoice)
+    public function edit(Request $request, Invoice $invoice)
     {
-        return view('invoices.create', $this->formData(
+        $data = $this->formData(
             direction: $invoice->direction,
             documentType: $invoice->document_type,
             invoice: $invoice->load('party', 'lines')
-        ));
+        );
+
+        if ($request->boolean('embedded')) {
+            return view('invoices.edit-embedded', $data);
+        }
+
+        return view('invoices.create', $data);
     }
 
-    public function show(Invoice $invoice)
+    /**
+     * @return array<string, mixed>
+     */
+    public function embeddedEditFormData(Invoice $invoice): array
+    {
+        return $this->formData(
+            direction: $invoice->direction,
+            documentType: $invoice->document_type,
+            invoice: $invoice->load('party', 'lines')
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function newEmbeddedFormData(string $direction, string $documentType): array
+    {
+        return $this->formData($direction, $documentType, null);
+    }
+
+    public function show(Request $request, Invoice $invoice)
     {
         $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy']);
 
-        return view('invoices.show', [
+        $data = [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
-        ]);
+            'crmContext' => $request->boolean('crm'),
+        ];
+
+        if ($request->boolean('embedded')) {
+            return view('invoices.show-embedded', $data);
+        }
+
+        return view('invoices.show', $data);
     }
 
     public function print(Invoice $invoice)
@@ -89,11 +106,10 @@ class InvoiceController extends Controller
     {
         $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
 
-        $pdf = Pdf::loadView('invoices.print', [
+        $pdf = PersianPdf::loadView('invoices.print', [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
-            'forPdf' => true,
-        ])->setPaper('a4', 'landscape');
+        ], 'a4', 'landscape');
 
         return $pdf->download('invoice-' . $invoice->number . '.pdf');
     }
@@ -102,8 +118,9 @@ class InvoiceController extends Controller
     {
         $invoice->load(['party', 'project', 'lines.item.unit']);
         $path = $excel->build($invoice, CompanySetting::first());
+        $filename = 'invoice-' . preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number) . '.xlsx';
 
-        return response()->download($path, 'invoice-' . $invoice->number . '.xlsx')->deleteFileAfterSend(true);
+        return response()->download($path, $filename)->deleteFileAfterSend(true);
     }
 
     public function store(Request $request, NumberingService $numbering, InventoryPostingService $inventory)
@@ -119,10 +136,13 @@ class InvoiceController extends Controller
             : ($payload['data']['direction'] === 'sale' ? 'sale_invoice' : 'purchase_invoice');
 
         $invoice = DB::transaction(function () use ($payload, $numbering, $key) {
+            $fiscalYear = app(FiscalPeriodService::class)->fiscalYearForDate($payload['data']['invoice_date']);
+
             $invoice = Invoice::create([
+                'fiscal_year_id' => $fiscalYear?->id,
                 'direction' => $payload['data']['direction'],
                 'document_type' => $payload['data']['document_type'],
-                'number' => $payload['data']['number'] ?: $numbering->next($key),
+                'number' => ($payload['data']['number'] ?? null) ?: $numbering->next($key, null, $fiscalYear?->id),
                 'invoice_date' => $payload['data']['invoice_date'],
                 'party_id' => $payload['data']['party_id'],
                 'project_id' => $payload['data']['project_id'] ?? null,
@@ -142,6 +162,13 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload(
+                $invoice->fresh(['party', 'lines.item.unit', 'project']),
+                'فاکتور/پیش‌فاکتور ثبت موقت شد.'
+            );
+        }
+
         return redirect()
             ->route('invoices.show', $invoice)
             ->with('success', 'فاکتور/پیش‌فاکتور ثبت موقت شد.');
@@ -160,6 +187,7 @@ class InvoiceController extends Controller
                 }
 
                 $invoice->update([
+                    'fiscal_year_id' => app(FiscalPeriodService::class)->fiscalYearForDate($payload['data']['invoice_date'])?->id,
                     'direction' => $payload['data']['direction'],
                     'document_type' => $payload['data']['document_type'],
                     'number' => $payload['data']['number'] ?: $invoice->number,
@@ -183,7 +211,21 @@ class InvoiceController extends Controller
                 $this->syncLines($invoice, $payload['lines']);
             });
         } catch (RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'errors' => ['lines' => [$exception->getMessage()]],
+                ], 422);
+            }
+
             return back()->withInput()->withErrors(['lines' => $exception->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload(
+                $invoice->fresh(),
+                'فاکتور ویرایش شد. اسناد قبلی انبار و مالی حذف شدند؛ برای صدور سند جدید دوباره تایید کنید.'
+            );
         }
 
         return redirect()
@@ -234,14 +276,25 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function confirm(Invoice $invoice, AccountingDocumentService $documents)
+    public function confirm(Request $request, Invoice $invoice, AccountingDocumentService $documents)
     {
         abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور مستقیم تایید مالی نمی‌شود.');
 
         try {
             $documents->postInvoice($invoice);
         } catch (RuntimeException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'errors' => ['inventory' => [$exception->getMessage()]],
+                ], 422);
+            }
+
             return back()->withErrors(['inventory' => $exception->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
         }
 
         return redirect()->route('invoices.show', $invoice)->with('success', 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
@@ -253,6 +306,10 @@ class InvoiceController extends Controller
         abort_if($invoice->status !== 'confirmed', 422, 'فقط فاکتور تایید شده را می‌توان تسویه کرد.');
 
         if ($invoice->settled_at) {
+            if ($request->expectsJson()) {
+                return $this->invoiceJsonPayload($invoice, 'این فاکتور قبلاً تسویه شده است.');
+            }
+
             return back()->with('success', 'این فاکتور قبلاً تسویه شده است.');
         }
 
@@ -260,6 +317,10 @@ class InvoiceController extends Controller
             'settled_at' => now(),
             'settled_by' => $request->user()?->id,
         ]);
+
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور با موفقیت تسویه شد.');
+        }
 
         return back()->with('success', 'فاکتور با موفقیت تسویه شد.');
     }
@@ -275,15 +336,23 @@ class InvoiceController extends Controller
             'settled_by' => null,
         ]);
 
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور از حالت تسویه خارج شد و به وضعیت تایید شده برگشت.');
+        }
+
         return back()->with('success', 'فاکتور از حالت تسویه خارج شد و به وضعیت تایید شده برگشت.');
     }
 
-    public function convert(Invoice $invoice, NumberingService $numbering)
+    public function convert(Request $request, Invoice $invoice, NumberingService $numbering)
     {
         abort_if($invoice->document_type !== 'proforma', 422);
 
         $new = $invoice->replicate(['number', 'document_type', 'status', 'accounting_document_id', 'confirmed_at', 'settled_at', 'settled_by']);
-        $new->number = $numbering->next($invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice');
+        $new->number = $numbering->next(
+            $invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
+            null,
+            $invoice->fiscal_year_id
+        );
         $new->document_type = 'invoice';
         $new->status = 'draft';
         $new->converted_from_id = $invoice->id;
@@ -293,16 +362,31 @@ class InvoiceController extends Controller
             $new->lines()->create($line->only(['item_id', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_rate', 'tax_amount', 'line_total']));
         }
 
+        if ($request->expectsJson()) {
+            return $this->invoiceJsonPayload(
+                $new->fresh(),
+                'پیش‌فاکتور به فاکتور تبدیل شد.',
+                reloadShowId: $new->id
+            );
+        }
+
         return redirect()->route('invoices.show', $new)->with('success', 'پیش‌فاکتور به فاکتور تبدیل شد.');
     }
 
-    public function destroy(Invoice $invoice)
+    public function destroy(Request $request, Invoice $invoice)
     {
         DB::transaction(function () use ($invoice) {
             $this->deleteDownstreamDocuments($invoice);
             $invoice->lines()->delete();
             $invoice->delete();
         });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'فاکتور و همه اسناد انبار و مالی وابسته حذف شدند.',
+                'deleted_id' => $invoice->id,
+            ]);
+        }
 
         return redirect()->route('invoices.index')->with('success', 'فاکتور و همه اسناد انبار و مالی وابسته حذف شدند.');
     }
@@ -336,6 +420,32 @@ class InvoiceController extends Controller
         ];
     }
 
+    private function invoiceNumberRule(Request $request, ?Invoice $invoice = null, bool $allowDuplicateNumber = false): array|string
+    {
+        if ($allowDuplicateNumber) {
+            return 'nullable|string|max:255';
+        }
+
+        $fiscalYearId = app(FiscalPeriodService::class)->fiscalYearForDate(
+            $this->normalizeInvoiceDate($request->input('invoice_date'))
+                ?? $invoice?->invoice_date?->toDateString()
+        )?->id ?? $invoice?->fiscal_year_id;
+
+        $rule = Rule::unique('invoices', 'number')->where(function ($query) use ($fiscalYearId) {
+            if ($fiscalYearId) {
+                $query->where('fiscal_year_id', $fiscalYearId);
+            } else {
+                $query->whereNull('fiscal_year_id');
+            }
+        });
+
+        if ($invoice) {
+            $rule->ignore($invoice->id);
+        }
+
+        return ['nullable', 'string', 'max:255', $rule];
+    }
+
     private function validatedPayload(Request $request, ?Invoice $invoice = null, bool $allowDuplicateNumber = false): array
     {
         $request->merge([
@@ -351,10 +461,7 @@ class InvoiceController extends Controller
             })->all(),
         ]);
 
-        $numberRule = 'nullable|string|max:255';
-        if (!$allowDuplicateNumber) {
-            $numberRule .= '|unique:invoices,number' . ($invoice ? ',' . $invoice->id : '');
-        }
+        $numberRule = $this->invoiceNumberRule($request, $invoice, $allowDuplicateNumber);
 
         $validated = $request->validate([
             'direction' => 'required|in:sale,purchase',
@@ -375,45 +482,21 @@ class InvoiceController extends Controller
         ]);
 
         $lines = collect($validated['lines'])
-            ->filter(fn ($line) => !empty($line['item_id']))
-            ->map(function ($line) {
-                $quantity = (float) ($line['quantity'] ?? 0);
-                $unitPrice = (float) ($line['unit_price'] ?? 0);
-                $discountAmount = (float) ($line['discount_amount'] ?? 0);
-                $taxRate = (float) ($line['tax_rate'] ?? 0);
-                $baseAmount = $quantity * $unitPrice;
-                $taxableAmount = max($baseAmount - $discountAmount, 0);
-                $taxAmount = $taxableAmount * ($taxRate / 100);
+            ->filter(fn ($line) => !empty($line['item_id']));
 
-                return [
-                    'item_id' => (int) $line['item_id'],
-                    'description' => $line['description'] ?? null,
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'discount_amount' => $discountAmount,
-                    'tax_rate' => $taxRate,
-                    'tax_amount' => $taxAmount,
-                    'line_total' => $taxableAmount + $taxAmount,
-                    'base_amount' => $baseAmount,
-                ];
-            })
-            ->values();
+        $calculated = app(InvoiceCalculationService::class)->calculateDocument($lines);
 
-        if ($lines->isEmpty()) {
+        if ($calculated['lines'] === []) {
             throw ValidationException::withMessages(['lines' => 'حداقل یک ردیف کالا یا خدمت وارد کنید.']);
         }
 
-        $subtotal = $lines->sum('base_amount');
-        $discountAmount = $lines->sum('discount_amount');
-        $taxAmount = $lines->sum('tax_amount');
-
         return [
             'data' => $validated,
-            'lines' => $lines,
-            'subtotal' => $subtotal,
-            'discount_amount' => $discountAmount,
-            'tax_amount' => $taxAmount,
-            'total_amount' => $subtotal - $discountAmount + $taxAmount,
+            'lines' => collect($calculated['lines']),
+            'subtotal' => $calculated['subtotal'],
+            'discount_amount' => $calculated['discount_amount'],
+            'tax_amount' => $calculated['tax_amount'],
+            'total_amount' => $calculated['total_amount'],
         ];
     }
 
@@ -422,9 +505,11 @@ class InvoiceController extends Controller
         $invoice->lines()->delete();
 
         foreach ($lines as $line) {
-            unset($line['base_amount']);
+            unset($line['base_amount'], $line['taxable_amount']);
             $invoice->lines()->create($line);
         }
+
+        app(ItemSalePriceService::class)->syncItemSalePricesFromInvoice($invoice->fresh(['lines']));
     }
 
     private function stockErrorMessage(array $payload, InventoryPostingService $inventory): ?string
@@ -552,5 +637,26 @@ class InvoiceController extends Controller
         ]);
 
         return str_replace('٫', '.', $value);
+    }
+
+    private function invoiceJsonPayload(Invoice $invoice, string $message, ?int $reloadShowId = null)
+    {
+        $invoice->loadMissing(['party', 'project']);
+
+        return response()->json([
+            'message' => $message,
+            'reload_show_id' => $reloadShowId,
+            'invoice' => [
+                'id' => $invoice->id,
+                'number' => $invoice->number,
+                'type_label' => ($invoice->direction === 'sale' ? 'فروش' : 'خرید') . ' / ' . ($invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور'),
+                'invoice_date' => gregorianToJalaliDate($invoice->invoice_date),
+                'party_name' => $invoice->party?->name ?: 'طرف حساب حذف شده',
+                'project_number' => $invoice->project?->project_number ?: '-',
+                'total_amount_formatted' => formatMoney((float) $invoice->total_amount),
+                'status' => $invoice->status,
+                'settled_at' => $invoice->settled_at,
+            ],
+        ]);
     }
 }

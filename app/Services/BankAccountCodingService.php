@@ -177,7 +177,39 @@ class BankAccountCodingService
             'accounting_document_lines' => $accountingLines,
             'financial_transactions' => $financialTransactions,
             'document_source_lines' => $documentSourceLines,
+            'bank_account_id_backfill' => $this->backfillMissingBankAccountIds(),
         ];
+    }
+
+    private function backfillMissingBankAccountIds(): int
+    {
+        $updated = 0;
+
+        BankAccount::query()
+            ->whereNotNull('detail_account_id')
+            ->orderBy('id')
+            ->chunkById(100, function ($banks) use (&$updated): void {
+                foreach ($banks as $bank) {
+                    $count = AccountingDocumentLine::query()
+                        ->whereNull('bank_account_id')
+                        ->where(function ($query) use ($bank) {
+                            $query->where('detail_account_id', $bank->detail_account_id)
+                                ->orWhere('chart_account_id', $bank->detail_account_id);
+
+                            if ($bank->chart_account_id) {
+                                $query->orWhere(function ($nested) use ($bank) {
+                                    $nested->where('chart_account_id', $bank->chart_account_id)
+                                        ->where('detail_account_id', $bank->detail_account_id);
+                                });
+                            }
+                        })
+                        ->update(['bank_account_id' => $bank->id]);
+
+                    $updated += $count;
+                }
+            });
+
+        return $updated;
     }
 
     private function resolveSourceBankAccountId(object $source, AccountingDocumentLine $line): ?int

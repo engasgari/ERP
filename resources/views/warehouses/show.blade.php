@@ -23,7 +23,7 @@
                     <h2 class="text-2xl font-bold">{{ $warehouse->name }}</h2>
                     <div class="text-sm text-gray-600 mt-2">
                         وضعیت: {{ $warehouse->is_active ? 'فعال' : 'غیرفعال' }} |
-                        تاریخ ایجاد: {{ $warehouse->created_at ? verta($warehouse->created_at)->format('Y/m/d') : '-' }}
+                        تاریخ ایجاد: {{ $warehouse->created_at ? gregorianToJalaliDate($warehouse->created_at) : '-' }}
                     </div>
                 </div>
 
@@ -46,7 +46,7 @@
                 </div>
                 <div class="rounded-lg border border-gray-200 bg-slate-50 p-4">
                     <div class="text-sm text-gray-600">ارزش موجودی</div>
-                    <div class="text-xl font-bold mt-2">{{ number_format(collect($warehouse->available_items)->sum('total_value')) }}</div>
+                    <div class="text-xl font-bold mt-2">{{ formatMoney(collect($warehouse->available_items)->sum('total_value')) }}</div>
                 </div>
             </div>
         </div>
@@ -71,9 +71,9 @@
                                 <tr>
                                     <td>{{ $itemName }}</td>
                                     <td>{{ $itemData['category'] ?? '-' }}</td>
-                                    <td>{{ number_format($itemData['quantity'], 3) }}</td>
-                                    <td>{{ number_format($itemData['average_price']) }}</td>
-                                    <td>{{ number_format($itemData['total_value']) }}</td>
+                                    <td>{{ formatQuantity($itemData['quantity']) }}</td>
+                                    <td>{{ formatMoney($itemData['average_price']) }}</td>
+                                    <td>{{ formatMoney($itemData['total_value']) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

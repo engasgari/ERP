@@ -21,15 +21,15 @@
 
             @if($isLimited)
                 <div class="mb-3 rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                    {{ number_format($totalMatches) }} رکورد پیدا شد؛ فقط 500 رکورد اول نمایش داده می‌شود. فیلتر را دقیق‌تر کنید.
+                    {{ formatMoney($totalMatches) }} رکورد پیدا شد؛ فقط 500 رکورد اول نمایش داده می‌شود. فیلتر را دقیق‌تر کنید.
                 </div>
             @endif
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <div class="bg-green-50 rounded-lg p-3"><div class="text-xs text-gray-500">ورود</div><div class="font-bold text-green-700">{{ number_format($summary['quantity_in']) }}</div></div>
-                <div class="bg-red-50 rounded-lg p-3"><div class="text-xs text-gray-500">خروج</div><div class="font-bold text-red-700">{{ number_format($summary['quantity_out']) }}</div></div>
-                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده</div><div class="font-bold text-gray-700">{{ number_format($summary['balance_quantity']) }}</div></div>
-                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده ریالی</div><div class="font-bold text-gray-700">{{ number_format($summary['balance_value']) }}</div></div>
+                <div class="bg-green-50 rounded-lg p-3"><div class="text-xs text-gray-500">ورود</div><div class="font-bold text-green-700">{{ formatQuantity($summary['quantity_in']) }}</div></div>
+                <div class="bg-red-50 rounded-lg p-3"><div class="text-xs text-gray-500">خروج</div><div class="font-bold text-red-700">{{ formatQuantity($summary['quantity_out']) }}</div></div>
+                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده</div><div class="font-bold text-gray-700">{{ formatQuantity($summary['balance_quantity']) }}</div></div>
+                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده ریالی</div><div class="font-bold text-gray-700">{{ formatMoney($summary['balance_value']) }}</div></div>
             </div>
 
             <div class="overflow-x-auto">
@@ -52,15 +52,15 @@
                     @forelse($rows as $row)
                         @php($transaction = $row['transaction'])
                         <tr>
-                            <td class="border border-gray-300 p-2 whitespace-nowrap">{{ verta($transaction->transaction_date)->format('Y/m/d') }}</td>
+                            <td class="border border-gray-300 p-2 whitespace-nowrap">{{ gregorianToJalaliDate($transaction->transaction_date) }}</td>
                             <td class="border border-gray-300 p-2">{{ $transaction->warehouse?->name }}</td>
                             <td class="border border-gray-300 p-2 font-medium">{{ $transaction->item_name }}</td>
                             <td class="border border-gray-300 p-2">{{ $transaction->category }}</td>
                             <td class="border border-gray-300 p-2">{{ $transaction->project?->name ?: '-' }}</td>
-                            <td class="border border-gray-300 p-2 text-green-700">{{ $row['quantity_in'] ? number_format($row['quantity_in']) : '-' }}</td>
-                            <td class="border border-gray-300 p-2 text-red-700">{{ $row['quantity_out'] ? number_format($row['quantity_out']) : '-' }}</td>
-                            <td class="border border-gray-300 p-2 font-bold">{{ number_format($row['balance_quantity']) }}</td>
-                            <td class="border border-gray-300 p-2 font-bold">{{ number_format($row['balance_value']) }}</td>
+                            <td class="border border-gray-300 p-2 text-green-700">{{ $row['quantity_in'] ? formatQuantity($row['quantity_in']) : '-' }}</td>
+                            <td class="border border-gray-300 p-2 text-red-700">{{ $row['quantity_out'] ? formatQuantity($row['quantity_out']) : '-' }}</td>
+                            <td class="border border-gray-300 p-2 font-bold">{{ formatQuantity($row['balance_quantity']) }}</td>
+                            <td class="border border-gray-300 p-2 font-bold">{{ formatMoney($row['balance_value']) }}</td>
                             <td class="border border-gray-300 p-2">{{ $transaction->reference_number ?: '-' }}</td>
                         </tr>
                     @empty

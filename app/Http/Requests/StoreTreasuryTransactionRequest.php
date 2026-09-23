@@ -15,6 +15,7 @@ class StoreTreasuryTransactionRequest extends FormRequest
 
         $this->merge([
             'transaction_date' => jalaliToGregorianDate($date) ?: $date,
+            'amount' => normalizeMoneyValue($this->input('amount')),
         ]);
     }
 

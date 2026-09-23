@@ -22,6 +22,8 @@ class AccountingDocument extends Model
     public const TYPE_INVENTORY = 'inventory';
     public const TYPE_CLOSING = 'closing';
     public const TYPE_OPENING = 'opening';
+    public const TYPE_PARTNER_CURRENT = 'partner_current';
+    public const TYPE_PAYROLL = 'payroll';
 
     protected $fillable = [
         'fiscal_year_id',

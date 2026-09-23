@@ -4,24 +4,29 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>چاپ سند حسابداری {{ $document->number }}</title>
-    <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
+    @include('components.pdf-persian-font-styles', [
+        'forPdf' => $forPdf ?? false,
+        'pdfFontRegular' => $pdfFontRegular ?? null,
+        'pdfFontBold' => $pdfFontBold ?? null,
+    ])
     <style>
         @page { size: A4 landscape; margin: 6mm; }
         * { box-sizing: border-box; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        body { margin: 0; font-family: Vazirmatn, Tahoma, Arial, sans-serif; background: #f3f4f6; color: #111827; }
+        body { margin: 0; font-family: vazirmatn, Vazirmatn, Tahoma, Arial, sans-serif; background: #f3f4f6; color: #111827; direction: rtl; text-align: right; line-height: 1.65; }
         .sheet { width: 285mm; min-height: 190mm; margin: 0 auto; background: #fff; border: 1px solid #111827; padding: 6mm; }
         .actions { display: flex; justify-content: flex-end; gap: 8px; margin: 0 auto 8px; width: 285mm; }
         .actions a, .actions button { border: 0; border-radius: 4px; background: #334155; color: #fff; padding: 7px 12px; font-size: 12px; font-weight: 700; text-decoration: none; cursor: pointer; }
         h1 { margin: 0; font-size: 18px; }
-        .meta { margin-top: 4px; font-size: 12px; color: #475569; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #111827; padding: 4px 6px; font-size: 11px; vertical-align: middle; }
+        .meta { margin-top: 4px; font-size: 12px; color: #475569; line-height: 1.7; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; direction: rtl; }
+        th, td { border: 1px solid #111827; padding: 5px 8px; font-size: 11px; vertical-align: top; line-height: 1.6; text-align: right; }
         th { background: #e5e7eb; font-weight: 800; text-align: center; }
-        .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-        .card { border: 1px solid #111827; padding: 6px; }
-        .card span { display: block; font-size: 11px; color: #475569; }
-        .card strong { display: block; margin-top: 4px; font-size: 14px; }
-        .bank-tag { font-size: 11px; color: #0f172a; margin-top: 4px; }
+        td.pdf-num { direction: ltr; text-align: left; unicode-bidi: embed; white-space: nowrap; }
+        .summary-table { margin-top: 10px; }
+        .summary-table td { width: 25%; }
+        .summary-table .summary-label { background: #f8fafc; color: #475569; font-size: 11px; font-weight: 700; }
+        .summary-table .summary-value { font-size: 14px; font-weight: 800; }
+        .bank-tag { font-size: 11px; color: #0f172a; margin-top: 4px; line-height: 1.5; }
         @media print {
             body { background: #fff; }
             .actions { display: none !important; }
@@ -29,7 +34,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ ($forPdf ?? false) ? 'pdf-document' : '' }}">
 @php
     $typeLabels = [
         'manual' => 'دستی',
@@ -62,12 +67,20 @@
         <div class="meta">{{ $document->description ?: '-' }}</div>
     </header>
 
-    <div class="summary">
-        <div class="card"><span>بدهکار</span><strong>{{ number_format((float) $document->lines->sum('debit')) }}</strong></div>
-        <div class="card"><span>بستانکار</span><strong>{{ number_format((float) $document->lines->sum('credit')) }}</strong></div>
-        <div class="card"><span>تعداد سطر</span><strong>{{ number_format($document->lines->count()) }}</strong></div>
-        <div class="card"><span>تفصیل‌های بانکی</span><strong>{{ $document->lines->pluck('detailAccount')->filter()->unique('id')->count() }}</strong></div>
-    </div>
+    <table class="summary-table">
+        <tr>
+            <td class="summary-label">بدهکار</td>
+            <td class="summary-label">بستانکار</td>
+            <td class="summary-label">تعداد سطر</td>
+            <td class="summary-label">تفصیل‌های بانکی</td>
+        </tr>
+        <tr>
+            <td class="summary-value pdf-num">{{ formatMoney((float) $document->lines->sum('debit')) }}</td>
+            <td class="summary-value pdf-num">{{ formatMoney((float) $document->lines->sum('credit')) }}</td>
+            <td class="summary-value pdf-num">{{ number_format($document->lines->count()) }}</td>
+            <td class="summary-value pdf-num">{{ number_format($document->lines->pluck('detailAccount')->filter()->unique('id')->count()) }}</td>
+        </tr>
+    </table>
 
     <table>
         <thead>
@@ -94,8 +107,8 @@
                 <td>{{ $line->party?->name ?: '-' }}</td>
                 <td>{{ $line->project?->name ?: '-' }}</td>
                 <td>{{ $line->description ?: '-' }}</td>
-                <td>{{ number_format((float) $line->debit) }}</td>
-                <td>{{ number_format((float) $line->credit) }}</td>
+                <td class="pdf-num">{{ formatMoney((float) $line->debit) }}</td>
+                <td class="pdf-num">{{ formatMoney((float) $line->credit) }}</td>
             </tr>
         @endforeach
         </tbody>

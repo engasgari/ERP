@@ -7,8 +7,6 @@
 
     <div class="py-4 py-md-5">
         <div class="bg-white rounded-lg shadow-md p-3 p-md-4 space-y-5">
-            @if(session('success'))<div class="rounded-md bg-green-50 p-3 text-green-700">{{ session('success') }}</div>@endif
-
             <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
                 <div>
                     <h2 class="text-2xl font-bold mb-1">{{ $employee->full_name }}</h2>
@@ -33,7 +31,7 @@
 
             <section>
                 <h3 class="font-bold text-slate-800 mb-2">احکام کارگزینی</h3>
-                <div class="table-responsive"><table class="erp-ui-data-table w-full"><thead><tr><th>شماره</th><th>نوع</th><th>تاریخ اثر</th><th>پست</th><th>حقوق پایه</th><th>وضعیت</th></tr></thead><tbody>@forelse($employee->employmentOrders as $order)<tr><td>{{ $order->number }}</td><td>{{ $order->order_type }}</td><td>{{ formatJalaliDateSafe($order->effective_date) }}</td><td>{{ $order->position?->title ?: '-' }}</td><td>{{ number_format((float) $order->base_salary) }}</td><td>{{ $order->status === 'approved' ? 'تایید شده' : 'پیش‌نویس' }}</td></tr>@empty<tr><td colspan="6" class="text-center py-4 text-slate-500">حکمی ثبت نشده است.</td></tr>@endforelse</tbody></table></div>
+                <div class="table-responsive"><table class="erp-ui-data-table w-full"><thead><tr><th>شماره</th><th>نوع</th><th>تاریخ اثر</th><th>پست</th><th>حقوق پایه</th><th>وضعیت</th></tr></thead><tbody>@forelse($employee->employmentOrders as $order)<tr><td>{{ $order->number }}</td><td>{{ $order->order_type }}</td><td>{{ formatJalaliDateSafe($order->effective_date) }}</td><td>{{ $order->position?->title ?: '-' }}</td><td>{{ formatMoney((float) $order->base_salary) }}</td><td>{{ $order->status === 'approved' ? 'تایید شده' : 'پیش‌نویس' }}</td></tr>@empty<tr><td colspan="6" class="text-center py-4 text-slate-500">حکمی ثبت نشده است.</td></tr>@endforelse</tbody></table></div>
             </section>
 
             <section>

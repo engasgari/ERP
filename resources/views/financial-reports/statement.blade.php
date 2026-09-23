@@ -1,33 +1,38 @@
 <x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl">صورتحساب اشخاص و شرکت‌ها</h2></x-slot>
+    <x-slot name="header"><h2 class="font-semibold text-xl">صورتحساب اشخاص</h2></x-slot>
 
     <div class="bg-white rounded-lg shadow-md p-6 space-y-4 statement-page">
-        <form method="get" class="grid md:grid-cols-4 gap-3 items-end no-print">
-            <label>شخص/شرکت
-                <select name="party_id" class="w-full">
-                    <option value="">همه</option>
-                    @foreach($parties as $party)
-                        <option value="{{ $party->id }}" @selected(request('party_id') == $party->id)>{{ $party->name }}</option>
-                    @endforeach
-                </select>
-            </label>
-            <label>حساب
-                <select name="account_id" class="w-full">
-                    <option value="">همه حساب‌ها</option>
-                    @foreach($accounts as $account)
-                        <option value="{{ $account->id }}" @selected(request('account_id') == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
-                    @endforeach
-                </select>
-            </label>
-            <label>از تاریخ
-                <input name="date_from" inputmode="numeric" dir="ltr" placeholder="1405/01/01" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}" class="w-full">
-            </label>
-            <label>تا تاریخ
-                <input name="date_to" inputmode="numeric" dir="ltr" placeholder="1405/12/29" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}" class="w-full">
-            </label>
-            <div class="md:col-span-4 flex gap-2">
-                <button class="bg-blue-600 text-white px-4 py-2 rounded">اعمال فیلتر</button>
-                <a href="{{ route('financial-reports.statement') }}" class="bg-gray-500 text-white px-4 py-2 rounded">پاک کردن</a>
+        <p class="text-sm text-slate-500 no-print">گردش یکپارچه هر طرف حساب: فروش، خرید، حقوق و پرداخت‌ها — بدون تفکیک نوع (مشتری/پیمانکار/پرسنل).</p>
+        <form method="get" class="erp-ui-filter-bar no-print">
+            <div class="erp-filter-row statement-filter-row">
+                <label class="erp-filter-field">شخص/شرکت
+                    <select name="party_id">
+                        <option value="">همه</option>
+                        @foreach($parties as $party)
+                            @php
+                                $typeLabel = $party->types->pluck('title')->filter()->implode('، ');
+                            @endphp
+                            <option value="{{ $party->id }}" @selected(request('party_id') == $party->id)>
+                                {{ $party->name }}@if($party->code) ({{ $party->code }})@endif@if($typeLabel !== '') — {{ $typeLabel }}@endif
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="erp-filter-field">مانده
+                    <select name="balance_nature">
+                        <option value="" @selected(! request()->filled('balance_nature'))>همه</option>
+                        <option value="debit" @selected(request('balance_nature') === 'debit')>بدهکار</option>
+                        <option value="credit" @selected(request('balance_nature') === 'credit')>بستانکار</option>
+                        <option value="settled" @selected(request('balance_nature') === 'settled')>تسویه</option>
+                    </select>
+                </label>
+                <label class="erp-filter-field">از تاریخ
+                    <input name="date_from" inputmode="numeric" dir="ltr" placeholder="1405/01/01" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}">
+                </label>
+                <label class="erp-filter-field">تا تاریخ
+                    <input name="date_to" inputmode="numeric" dir="ltr" placeholder="1405/12/29" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}">
+                </label>
+                <x-filter-actions :reset-route="route('financial-reports.statement')" />
             </div>
         </form>
 
@@ -49,9 +54,9 @@
                         data-statement-index="{{ $index }}">
                         <td>{{ $summary['party_code'] }}</td>
                         <td class="font-bold text-slate-800">{{ $summary['party_name'] }}</td>
-                        <td>{{ number_format($summary['debit']) }}</td>
-                        <td>{{ number_format($summary['credit']) }}</td>
-                        <td>{{ number_format(abs($summary['balance'])) }}</td>
+                        <td>{{ formatMoney($summary['debit']) }}</td>
+                        <td>{{ formatMoney($summary['credit']) }}</td>
+                        <td>{{ formatMoney(abs($summary['balance'])) }}</td>
                         <td>{{ $summary['balance_type'] }}</td>
                     </tr>
                 @empty
@@ -83,8 +88,7 @@
                     <thead>
                     <tr>
                         <th>تاریخ</th>
-                        <th>شماره سند</th>
-                        <th>حساب</th>
+                        <th>نوع تراکنش</th>
                         <th>شرح</th>
                         <th>بدهکار (ریال)</th>
                         <th>بستانکار (ریال)</th>
@@ -98,6 +102,24 @@
     </div>
 
     <style>
+        .statement-page .statement-filter-row {
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.75fr) minmax(0, 0.8fr) minmax(0, 0.8fr) auto;
+        }
+
+        .statement-page .statement-filter-row .erp-filter-actions {
+            flex-wrap: nowrap;
+        }
+
+        @media (max-width: 1023px) {
+            .statement-page .statement-filter-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .statement-page .statement-filter-row .erp-filter-actions {
+                grid-column: 1 / -1;
+            }
+        }
+
         .statement-summary-row { transition: background-color .15s ease; }
         .statement-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(15, 23, 42, .45); padding: 1rem; }
         .statement-modal-backdrop[hidden] { display: none; }
@@ -136,7 +158,7 @@
             const printMeta = document.getElementById('statement-print-meta');
             const linesBody = document.getElementById('statement-lines');
 
-            const formatNumber = (value) => Number(value || 0).toLocaleString('fa-IR');
+            const formatNumber = (value) => window.ErpFormat?.money(value) ?? Number(value || 0).toLocaleString('fa-IR');
 
             const openStatement = (statement) => {
                 title.textContent = `صورتحساب ${statement.party_name}`;
@@ -154,8 +176,7 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${line.date || '-'}</td>
-                        <td>${line.document_number || '-'}</td>
-                        <td>${line.account || '-'}</td>
+                        <td>${line.transaction_type || '-'}</td>
                         <td>${line.description || '-'}</td>
                         <td>${formatNumber(line.debit)}</td>
                         <td>${formatNumber(line.credit)}</td>

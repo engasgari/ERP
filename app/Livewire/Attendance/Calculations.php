@@ -6,6 +6,7 @@ use App\Exceptions\AttendancePrerequisiteException;
 use App\Models\Employee;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollPeriod;
+use App\Services\AttendanceAdjustmentService;
 use App\Services\NewAttendanceEngineService;
 use App\Services\PayrollCalculationService;
 use Livewire\Component;
@@ -16,11 +17,21 @@ class Calculations extends Component
     use WithPagination;
 
     public int $year = 0;
+
     public int $month = 0;
+
     public string $search = '';
+
     public string $salaryType = '';
+
     public string $scope = 'with_data';
+
     public ?int $employee_id = null;
+
+    public ?int $editingId = null;
+
+    /** @var array<string, float|int|string> */
+    public array $editForm = [];
 
     protected $queryString = [
         'year' => ['except' => 0],
@@ -33,20 +44,15 @@ class Calculations extends Component
 
     public function mount(): void
     {
-        $todayParts = explode('/', formatJalaliDateSafe(now()));
-        $this->year = (int) request()->integer('year', (int) ($todayParts[0] ?? 1405));
-        $this->month = (int) request()->integer('month', (int) ($todayParts[1] ?? 1));
-    }
-
-    public function updated($name): void
-    {
-        if (in_array($name, ['year', 'month', 'search', 'salaryType', 'scope', 'employee_id'], true)) {
-            $this->resetPage();
-        }
+        $this->year = (int) request()->integer('year', (int) getCurrentPersianYear());
+        $this->month = (int) request()->integer('month', (int) getCurrentPersianMonth());
+        $this->normalizePeriodFilters();
     }
 
     public function calculate(): void
     {
+        $this->normalizePeriodFilters();
+
         $this->validate([
             'year' => ['required', 'integer', 'min:1400', 'max:1500'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
@@ -64,10 +70,109 @@ class Calculations extends Component
             );
         } catch (AttendancePrerequisiteException $exception) {
             session()->flash('error', $exception->getMessage());
+
             return;
         }
 
-        session()->flash('success', 'محاسبه کارکرد برای ' . number_format($rows->count()) . ' نفر انجام شد.');
+        $this->cancelEdit();
+        session()->flash('success', 'محاسبه کارکرد برای ' . formatMoney($rows->count()) . ' نفر انجام شد. می‌توانید اعداد هر نفر را دستی ویرایش کنید.');
+    }
+
+    public function updated($name): void
+    {
+        if (in_array($name, ['year', 'month', 'search', 'salaryType', 'scope', 'employee_id'], true)) {
+            $this->resetPage();
+            $this->cancelEdit();
+        }
+    }
+
+    private function normalizePeriodFilters(): void
+    {
+        if ($this->year < 1400 || $this->year > 1500) {
+            $this->year = (int) getCurrentPersianYear();
+        }
+
+        if ($this->month < 1 || $this->month > 12) {
+            $this->month = (int) getCurrentPersianMonth();
+        }
+    }
+
+    public function startEdit(int $attendanceId): void
+    {
+        $attendance = MonthlyAttendance::query()->findOrFail($attendanceId);
+
+        $this->editingId = $attendance->id;
+        $this->editForm = [
+            'work_days' => (float) ($attendance->work_days ?? $attendance->present_days ?? 0),
+            'absence_days' => (float) ($attendance->absence_days ?? 0),
+            'normal_hours' => (float) $attendance->normal_hours,
+            'overtime_hours' => (float) $attendance->overtime_hours,
+            'delay_hours' => (float) $attendance->delay_hours,
+            'early_leave_hours' => (float) $attendance->early_leave_hours,
+            'absence_hours' => (float) $attendance->absence_hours,
+            'leave_hours' => (float) $attendance->leave_hours,
+            'mission_hours' => (float) $attendance->mission_hours,
+            'night_hours' => (float) $attendance->night_hours,
+            'holiday_hours' => (float) $attendance->holiday_hours,
+            'payable_hours' => (float) $attendance->payable_hours,
+            'net_payable_hours' => (float) $attendance->net_payable_hours,
+            'required_hours' => (float) $attendance->required_hours,
+        ];
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editingId = null;
+        $this->editForm = [];
+        $this->resetValidation();
+    }
+
+    public function saveEdit(bool $recalculatePayable = false): void
+    {
+        if (! $this->editingId) {
+            return;
+        }
+
+        $this->validate([
+            'editForm.work_days' => ['required', 'numeric', 'min:0'],
+            'editForm.absence_days' => ['required', 'numeric', 'min:0'],
+            'editForm.normal_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.overtime_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.delay_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.early_leave_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.absence_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.leave_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.mission_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.night_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.holiday_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.payable_hours' => ['required', 'numeric', 'min:0'],
+            'editForm.net_payable_hours' => ['required', 'numeric', 'min:0'],
+        ], [], [
+            'editForm.work_days' => 'روز کارکرد',
+            'editForm.absence_days' => 'روز غیبت',
+            'editForm.normal_hours' => 'کارکرد عادی',
+            'editForm.overtime_hours' => 'اضافه‌کاری',
+            'editForm.delay_hours' => 'تأخیر',
+            'editForm.early_leave_hours' => 'تعجیل',
+            'editForm.absence_hours' => 'غیبت',
+            'editForm.leave_hours' => 'مرخصی',
+            'editForm.mission_hours' => 'ماموریت',
+            'editForm.night_hours' => 'شب‌کاری',
+            'editForm.holiday_hours' => 'تعطیل‌کاری',
+            'editForm.payable_hours' => 'قابل پرداخت',
+            'editForm.net_payable_hours' => 'خالص قابل پرداخت',
+        ]);
+
+        $attendance = MonthlyAttendance::query()->findOrFail($this->editingId);
+
+        app(AttendanceAdjustmentService::class)->update(
+            $attendance,
+            $this->editForm + ['recalculate_payable' => $recalculatePayable],
+            auth()->id()
+        );
+
+        $this->cancelEdit();
+        session()->flash('success', 'اعداد کارکرد با موفقیت ذخیره شد.');
     }
 
     public function render()

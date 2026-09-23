@@ -28,18 +28,6 @@
                         </div>
                     @endif
 
-                    <!-- نمایش پیام موفقیت -->
-                    @if (session('success'))
-                        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div class="flex items-center">
-                                <svg class="w-5 h-5 text-green-400 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                </svg>
-                                <span class="text-green-800 font-semibold">{{ session('success') }}</span>
-                            </div>
-                        </div>
-                    @endif
-
                     <form method="POST" action="{{ route('work-logs.update', $workLog->id) }}" id="workLogForm">
                         @csrf
                         @method('PUT')
@@ -56,7 +44,7 @@
                                         <option value="{{ $employee->id }}"
                                                 {{ old('employee_id', $workLog->employee_id) == $employee->id ? 'selected' : '' }}
                                                 data-hourly-rate="{{ $employee->hourly_rate }}">
-                                            {{ $employee->full_name }} ({{ number_format($employee->hourly_rate) }} ریال)
+                                            {{ $employee->full_name }} ({{ formatMoney($employee->hourly_rate) }} ریال)
                                         </option>
                                     @endforeach
                                 </select>
@@ -135,15 +123,15 @@
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                 <div>
                                     <span class="text-gray-600">ساعت کار:</span>
-                                    <span id="calculated_hours" class="font-semibold">{{ number_format($workLog->hours, 1) }} ساعت</span>
+                                    <span id="calculated_hours" class="font-semibold">{{ formatMoney($workLog->hours, 1) }} ساعت</span>
                                 </div>
                                 <div>
                                     <span class="text-gray-600">نرخ ساعتی (ریال):</span>
-                                    <span id="hourly_rate_display" class="font-semibold">{{ number_format($workLog->hourly_rate) }} ریال</span>
+                                    <span id="hourly_rate_display" class="font-semibold">{{ formatMoney($workLog->hourly_rate) }} ریال</span>
                                 </div>
                                 <div>
                                     <span class="text-gray-600">مبلغ کل (ریال):</span>
-                                    <span id="total_amount_display" class="font-semibold text-green-600">{{ number_format($workLog->total_amount) }} ریال</span>
+                                    <span id="total_amount_display" class="font-semibold text-green-600">{{ formatMoney($workLog->total_amount) }} ریال</span>
                                 </div>
                             </div>
                         </div>

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\FinancialReportRequest;
 use App\Models\BankAccount;
-use App\Models\ChartAccount;
 use App\Models\Party;
 use App\Models\Project;
 use App\Services\FinancialReportService;
@@ -28,7 +27,6 @@ class BankAccountController extends Controller
             'filters' => $filters,
             'parties' => Party::orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
-            'accounts' => ChartAccount::orderBy('code')->get(),
         ]);
     }
 }

@@ -61,18 +61,46 @@ class ItemController extends Controller
         return redirect()->route('items.index')->with('success', 'کالا/خدمت ثبت شد.');
     }
 
-    public function edit(Item $item)
+    public function edit(Request $request, Item $item, InventoryPostingService $inventory)
     {
-        return view('items.create', [
+        $data = [
             'item' => $item,
             'units' => MeasurementUnit::where('is_active', true)->orderBy('name')->get(),
             'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
-        ]);
+            'initialStockDocument' => $inventory->initialStockDocument($item),
+        ];
+
+        if ($request->boolean('embedded')) {
+            return view('items.edit-embedded', $data);
+        }
+
+        return view('items.create', $data);
     }
 
-    public function update(Request $request, Item $item)
+    public function update(Request $request, Item $item, InventoryPostingService $inventory)
     {
-        $item->update($this->validated($request));
+        $validated = $this->validated($request);
+        $item->update($validated);
+
+        if ($request->filled('relocate_initial_warehouse_id')) {
+            try {
+                $inventory->relocateInitialStock(
+                    $item->fresh(),
+                    (int) $request->input('relocate_initial_warehouse_id'),
+                    auth()->id()
+                );
+            } catch (RuntimeException $exception) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $exception->getMessage()], 422);
+                }
+
+                return back()->withInput()->with('error', $exception->getMessage());
+            }
+        }
+
+        if ($request->expectsJson()) {
+            return $this->itemJsonPayload($item->fresh(), 'کالا/خدمت ویرایش شد.', $inventory);
+        }
 
         return redirect()->route('items.index')->with('success', 'کالا/خدمت ویرایش شد.');
     }
@@ -235,6 +263,14 @@ class ItemController extends Controller
         $validated = $request->validate($rules);
         $validated['is_active'] = $request->boolean('is_active', true);
 
+        if ($includeInitialStock
+            && (float) ($validated['initial_quantity'] ?? 0) > 0
+            && empty($validated['initial_warehouse_id'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'initial_warehouse_id' => 'برای ثبت موجودی اولیه، انتخاب انبار الزامی است.',
+            ]);
+        }
+
         return $validated;
     }
 
@@ -263,7 +299,11 @@ class ItemController extends Controller
             $warehouseId = null;
         }
 
-        if ($type === 'product' && $initialQuantity > 0 && ! $warehouseId && ! Warehouse::where('is_active', true)->exists()) {
+        if ($type === 'product' && $initialQuantity > 0 && ! $warehouseId) {
+            throw new RuntimeException('برای ثبت موجودی اولیه، نام انبار در فایل اکسل الزامی است.');
+        }
+
+        if ($type === 'product' && $initialQuantity > 0 && ! Warehouse::where('is_active', true)->exists()) {
             throw new RuntimeException('برای ثبت موجودی اولیه، ابتدا یک انبار فعال تعریف کنید.');
         }
 
@@ -774,5 +814,40 @@ class ItemController extends Controller
         $value = trim(mb_strtolower((string) $value));
 
         return in_array($value, ['1', 'true', 'yes', 'y', 'بله', 'فعال', ''], true);
+    }
+
+    private function itemJsonPayload(Item $item, string $message, InventoryPostingService $inventory)
+    {
+        $item->loadMissing('unit');
+        $stock = $this->totalStock($item, $inventory);
+
+        return response()->json([
+            'message' => $message,
+            'item' => [
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'type' => $item->type,
+                'type_label' => $item->type === 'service' ? 'خدمت' : 'کالا',
+                'category' => $item->category ?: '-',
+                'unit_name' => $item->unit?->name ?: '-',
+                'sale_price_formatted' => $item->sale_price !== null ? formatMoney((float) $item->sale_price) : '-',
+                'purchase_price_formatted' => $item->purchase_price !== null ? formatMoney((float) $item->purchase_price) : '-',
+                'stock_formatted' => $item->type === 'product' ? formatQuantity($stock) : '-',
+                'is_active' => $item->is_active,
+                'status_label' => $item->is_active ? 'فعال' : 'غیرفعال',
+            ],
+        ]);
+    }
+
+    private function totalStock(Item $item, InventoryPostingService $inventory): float
+    {
+        if ($item->type !== 'product') {
+            return 0;
+        }
+
+        return (float) Warehouse::where('is_active', true)
+            ->pluck('id')
+            ->sum(fn (int $warehouseId) => $inventory->availableQuantity($item->id, $warehouseId));
     }
 }

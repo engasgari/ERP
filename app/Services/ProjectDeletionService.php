@@ -19,7 +19,8 @@ class ProjectDeletionService
 {
     public function __construct(
         private RelatedDocumentDeletionService $relatedDocuments,
-        private AccountingPostingService $accountingPosting
+        private AccountingPostingService $accountingPosting,
+        private TreasuryService $treasury
     ) {
     }
 
@@ -28,13 +29,13 @@ class ProjectDeletionService
         DB::transaction(function () use ($project): void {
             $projectId = $project->id;
 
-            $this->deleteAccountingDocumentsForProjectLines($projectId);
-            $this->deleteOverheadAllocationAccountingDocuments($projectId);
             $this->deleteInvoices($projectId);
             $this->deleteInventoryDocuments($projectId);
             $this->deleteFinancialTransactions($projectId);
             $this->deleteTreasuryTransactions($projectId);
             $this->deleteProductionOrders($projectId);
+            $this->deleteAccountingDocumentsForProjectLines($projectId);
+            $this->deleteOverheadAllocationAccountingDocuments($projectId);
 
             WorkLog::where('project_id', $projectId)->delete();
             DB::table('project_overhead_allocations')->where('project_id', $projectId)->delete();
@@ -57,6 +58,10 @@ class ProjectDeletionService
                 $document = AccountingDocument::withTrashed()->find($accountingId);
 
                 if (! $document) {
+                    return;
+                }
+
+                if ($this->accountingPosting->isReversalDocument($document)) {
                     return;
                 }
 
@@ -83,6 +88,10 @@ class ProjectDeletionService
                     return;
                 }
 
+                if ($this->accountingPosting->isReversalDocument($document)) {
+                    return;
+                }
+
                 $this->guardAgainstPostedAccountingDocumentDeletion($document);
                 $document->lines()->delete();
                 $document->forceDelete();
@@ -104,17 +113,21 @@ class ProjectDeletionService
         $invoice->loadMissing('inventoryDocuments');
 
         $inventoryDocuments = $invoice->inventoryDocuments()->with('lines')->get();
-        $accountingIds = collect([$invoice->accounting_document_id])
-            ->merge($inventoryDocuments->pluck('accounting_document_id'))
-            ->filter()
-            ->unique()
-            ->values();
 
         foreach ($inventoryDocuments as $inventoryDocument) {
             $this->relatedDocuments->deleteInventoryDocumentWithRelated($inventoryDocument);
         }
 
-        foreach ($accountingIds as $accountingId) {
+        if ($invoice->accounting_document_id) {
+            $this->accountingPosting->deleteSourceAccountingDocuments(
+                Invoice::class,
+                $invoice->id,
+                $invoice->accounting_document_id,
+                $invoice->created_by
+            );
+        }
+
+        foreach ($inventoryDocuments->pluck('accounting_document_id')->filter()->unique() as $accountingId) {
             $document = AccountingDocument::withTrashed()->find($accountingId);
 
             if (! $document) {
@@ -144,7 +157,7 @@ class ProjectDeletionService
             ->orderBy('id')
             ->get()
             ->each(function (FinancialTransaction $transaction): void {
-                $this->accountingPosting->deleteFinancialTransactionDocument($transaction);
+                $this->accountingPosting->deleteFinancialTransactionDocument($transaction, $transaction->created_by);
                 $transaction->delete();
             });
     }
@@ -156,33 +169,7 @@ class ProjectDeletionService
             ->orderBy('id')
             ->get()
             ->each(function (TreasuryTransaction $transaction): void {
-                $accountingIds = collect([$transaction->accounting_document_id])
-                    ->merge(AccountingDocument::withTrashed()
-                        ->where('source_type', TreasuryTransaction::class)
-                        ->where('source_id', $transaction->id)
-                        ->pluck('id'))
-                    ->filter()
-                    ->unique()
-                    ->values();
-
-                foreach ($accountingIds as $accountingId) {
-                    $document = AccountingDocument::withTrashed()->find($accountingId);
-
-                    if (! $document) {
-                        continue;
-                    }
-
-                    $this->guardAgainstPostedAccountingDocumentDeletion($document);
-                    $document->lines()->delete();
-                    $document->forceDelete();
-                }
-
-                if (method_exists($transaction, 'forceDelete')) {
-                    $transaction->forceDelete();
-                    return;
-                }
-
-                $transaction->delete();
+                $this->treasury->deleteWithAccounting($transaction, $transaction->created_by);
             });
     }
 

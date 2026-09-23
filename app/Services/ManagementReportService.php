@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\FiscalYear;
 use App\Models\Project;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class ManagementReportService
             $valueIn = (float) $row->value_in;
             $valueOut = (float) $row->value_out;
             $balanceQuantity = $quantityIn - $quantityOut;
-            $balanceValue = $valueIn - $valueOut;
+            $balanceValue = abs($balanceQuantity) > 0.000001 ? ($valueIn - $valueOut) : 0.0;
             $averagePrice = 0;
 
             if (abs($balanceQuantity) > 0.000001) {
@@ -129,7 +130,9 @@ class ManagementReportService
             $query->where('d.project_id', $request->project_id);
         }
 
-        if ($request->filled('item_name')) {
+        if ($request->filled('item_id')) {
+            $query->where('i.id', $request->integer('item_id'));
+        } elseif ($request->filled('item_name')) {
             $query->where('i.name', 'like', '%' . $request->item_name . '%');
         }
 
@@ -161,6 +164,13 @@ class ManagementReportService
             if ($endDate) {
                 $query->where('d.document_date', '<=', $endDate);
             }
+        }
+
+        if (! $request->filled('start_date') && ! $request->filled('end_date')) {
+            $query->where(function ($scope) {
+                $scope->where('d.entry_mode', '!=', 'automatic')
+                    ->orWhere('d.source_type', '!=', FiscalYear::class);
+            });
         }
 
         return $query;

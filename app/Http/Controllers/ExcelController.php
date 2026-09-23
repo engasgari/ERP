@@ -85,7 +85,7 @@ class ExcelController extends Controller
                     fputcsv($file, [
                         $user->name,
                         $user->email,
-                        verta($user->created_at)->format('Y/m/d H:i')
+                        formatJalaliDateTime($user->created_at)
                     ]);
                 }
 

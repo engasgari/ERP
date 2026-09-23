@@ -112,6 +112,8 @@ class Index extends Component
             $query->whereHas('types', fn ($typeQuery) => $typeQuery->where('party_types.id', $this->type_id));
         }
 
+        PartyType::ensureDefaults();
+
         $parties = $query->paginate(15);
         $types = PartyType::orderBy('title')->get();
         $showingParty = $this->showingId ? Party::with('types')->find($this->showingId) : null;

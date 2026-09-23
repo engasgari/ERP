@@ -1,42 +1,56 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">جزئیات تراکنش مالی</h2>
+        <h2 class="font-semibold text-xl text-slate-800">جزئیات تراکنش مالی</h2>
     </x-slot>
 
-    <div class="py-12">
-        <div class="bg-white rounded-lg shadow-md p-6 max-w-3xl mx-auto">
-            <div class="mb-6 flex items-center justify-between">
-                <h2 class="text-2xl font-bold">{{ $financialTransaction->type_label }}</h2>
-                <div class="flex gap-2">
-                    <a href="{{ route('financial-transactions.edit', $financialTransaction) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded">ویرایش</a>
-                    <a href="{{ route('financial-transactions.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">بازگشت</a>
+    <x-erp.ui.detail-page
+        :title="$financialTransaction->type_label"
+        :description="($financialTransaction->category ?: 'بدون دسته') . ' — ' . gregorianToJalaliDate($financialTransaction->transaction_date)"
+        route="financial-transactions.show"
+        :actions="[['label' => 'بازگشت', 'url' => route('financial-transactions.index'), 'class' => 'erp-action-detail']]"
+    >
+        <x-slot name="toolbar">
+            <a href="{{ route('financial-transactions.edit', $financialTransaction) }}" class="erp-action-btn erp-action-edit text-center">ویرایش</a>
+            <form method="POST" action="{{ route('financial-transactions.destroy', $financialTransaction) }}" onsubmit="return confirm('آیا از حذف این تراکنش مطمئن هستید؟')">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="erp-action-btn erp-action-delete">حذف</button>
+            </form>
+        </x-slot>
+
+        <div class="erp-modal-grid">
+            <div class="erp-modal-field">نوع
+                <div class="erp-modal-value">
+                    <x-erp.ui.status-badge
+                        :label="$financialTransaction->type_label"
+                        :tone="$financialTransaction->type === 'income' ? 'success' : 'danger'"
+                    />
                 </div>
             </div>
-
-            <table class="w-full border-collapse border border-gray-300">
-                <tbody>
-                    <tr><th class="border border-gray-300 p-3">پروژه</th><td class="border border-gray-300 p-3">{{ $financialTransaction->project?->name ?: '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">بانک</th><td class="border border-gray-300 p-3">{{ $financialTransaction->bankAccount ? $financialTransaction->bankAccount->bank_name . ' - ' . $financialTransaction->bankAccount->code : '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">صندوق</th><td class="border border-gray-300 p-3">{{ $financialTransaction->cashbox ? $financialTransaction->cashbox->name . ' - ' . $financialTransaction->cashbox->code : '-' }}</td></tr>
-                    <tr>
-                        <th class="border border-gray-300 p-3">سند حسابداری</th>
-                        <td class="border border-gray-300 p-3">
-                            @if($financialTransaction->accountingDocument)
-                                <a href="{{ route('accounting-documents.show', $financialTransaction->accountingDocument) }}" class="text-blue-600 hover:underline">
-                                    {{ $financialTransaction->accountingDocument->number }}
-                                </a>
-                            @else
-                                -
-                            @endif
-                        </td>
-                    </tr>
-                    <tr><th class="border border-gray-300 p-3">دسته بندی</th><td class="border border-gray-300 p-3">{{ $financialTransaction->category }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">مبلغ (ریال)</th><td class="border border-gray-300 p-3">{{ $financialTransaction->signed_amount }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">تاریخ</th><td class="border border-gray-300 p-3">{{ verta($financialTransaction->transaction_date)->format('Y/m/d') }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">شماره مرجع</th><td class="border border-gray-300 p-3">{{ $financialTransaction->reference_number ?: '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">شرح</th><td class="border border-gray-300 p-3">{{ $financialTransaction->description ?: '-' }}</td></tr>
-                </tbody>
-            </table>
+            <div class="erp-modal-field">مبلغ (ریال)
+                <div class="erp-modal-value font-semibold {{ $financialTransaction->type === 'income' ? 'text-emerald-700' : 'text-rose-700' }}">
+                    {{ $financialTransaction->signed_amount }}
+                </div>
+            </div>
+            <div class="erp-modal-field">تاریخ<div class="erp-modal-value">{{ gregorianToJalaliDate($financialTransaction->transaction_date) }}</div></div>
+            <div class="erp-modal-field">دسته‌بندی<div class="erp-modal-value">{{ $financialTransaction->category ?: '-' }}</div></div>
+            <div class="erp-modal-field">پروژه<div class="erp-modal-value">{{ $financialTransaction->project?->name ?: '-' }}</div></div>
+            <div class="erp-modal-field">بانک<div class="erp-modal-value">{{ $financialTransaction->bankAccount ? $financialTransaction->bankAccount->bank_name . ' - ' . $financialTransaction->bankAccount->code : '-' }}</div></div>
+            <div class="erp-modal-field">صندوق<div class="erp-modal-value">{{ $financialTransaction->cashbox ? $financialTransaction->cashbox->name . ' - ' . $financialTransaction->cashbox->code : '-' }}</div></div>
+            <div class="erp-modal-field">کدینگ<div class="erp-modal-value">{{ $financialTransaction->coding_label }}</div></div>
+            <div class="erp-modal-field">سند حسابداری
+                <div class="erp-modal-value">
+                    @if($financialTransaction->accountingDocument)
+                        <a href="{{ route('accounting-documents.show', $financialTransaction->accountingDocument) }}" class="text-blue-700 font-semibold">
+                            {{ $financialTransaction->accountingDocument->number }}
+                        </a>
+                    @else
+                        -
+                    @endif
+                </div>
+            </div>
+            <div class="erp-modal-field">شماره مرجع<div class="erp-modal-value">{{ $financialTransaction->reference_number ?: '-' }}</div></div>
+            <div class="erp-modal-field md:col-span-2">شرح<div class="erp-modal-value">{{ $financialTransaction->description ?: '-' }}</div></div>
         </div>
-    </div>
+    </x-erp.ui.detail-page>
 </x-app-layout>

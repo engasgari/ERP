@@ -4,10 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Employee;
 use App\Models\EmploymentOrder;
-use App\Models\PayrollPeriod;
+use App\Models\PayrollCalculation;
 use App\Models\Project;
-use App\Models\Salary;
 use App\Models\WorkLog;
+use App\Services\NewAttendanceEngineService;
 use App\Services\PayrollCalculationService;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -107,17 +107,17 @@ class LeilaPayrollTestSeeder extends Seeder
         }
 
         $period = app(PayrollCalculationService::class)->createOrGetPeriod(1405, 3, null);
+        app(NewAttendanceEngineService::class)->processPeriod($period, $employee->id);
         app(PayrollCalculationService::class)->calculate($period, null);
 
-        $salary = Salary::with('lines')
+        $calculation = PayrollCalculation::query()
             ->where('employee_id', $employee->id)
-            ->where('year', 1405)
-            ->where('month', 3)
+            ->where('payroll_period_id', $period->id)
             ->firstOrFail();
 
         $this->command?->info('کارکرد و حقوق تستی لیلا ثبت شد.');
-        $this->command?->info('شناسه فیش حقوقی: ' . $salary->id);
-        $this->command?->info('مبلغ نهایی: ' . number_format((float) $salary->final_salary) . ' ریال');
+        $this->command?->info('شناسه محاسبه حقوق: ' . $calculation->id);
+        $this->command?->info('مبلغ خالص: ' . number_format((float) $calculation->net_payable) . ' ریال');
     }
 
     private function dayData(int $day): array

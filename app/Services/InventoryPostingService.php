@@ -36,10 +36,12 @@ class InventoryPostingService
             return null;
         }
 
-        $warehouseId = $warehouseId ?: $this->defaultWarehouse()?->id;
+        if (! $warehouseId) {
+            throw new RuntimeException('برای ثبت موجودی اولیه، انتخاب انبار الزامی است.');
+        }
 
-        if (!$warehouseId) {
-            throw new RuntimeException('برای ثبت موجودی اولیه، ابتدا یک انبار تعریف کنید.');
+        if (! Warehouse::where('id', $warehouseId)->where('is_active', true)->exists()) {
+            throw new RuntimeException('انبار انتخاب‌شده برای موجودی اولیه معتبر نیست.');
         }
 
         return $this->createDocument(
@@ -55,6 +57,75 @@ class InventoryPostingService
             ]]),
             date: now()->toDateString(),
             userId: $userId
+        );
+    }
+
+    public function initialStockDocument(Item $item): ?InventoryDocument
+    {
+        return InventoryDocument::query()
+            ->with(['warehouse', 'lines'])
+            ->where('source_type', Item::class)
+            ->where('source_id', $item->id)
+            ->where('type', 'receipt')
+            ->where('status', 'confirmed')
+            ->orderBy('id')
+            ->first();
+    }
+
+    public function relocateInitialStock(Item $item, int $targetWarehouseId, ?int $userId = null): InventoryDocument
+    {
+        if ($item->type !== 'product') {
+            throw new RuntimeException('فقط برای کالا می‌توان انبار موجودی اولیه را تغییر داد.');
+        }
+
+        if (! Warehouse::where('id', $targetWarehouseId)->where('is_active', true)->exists()) {
+            throw new RuntimeException('انبار مقصد معتبر نیست.');
+        }
+
+        $document = $this->initialStockDocument($item);
+
+        if (! $document) {
+            throw new RuntimeException('سند موجودی اولیه برای این کالا یافت نشد.');
+        }
+
+        if ((int) $document->warehouse_id === $targetWarehouseId) {
+            return $document;
+        }
+
+        $openingQuantity = (float) $document->lines->sum('quantity');
+        $availableInSource = $this->availableQuantity($item->id, (int) $document->warehouse_id, $document->id);
+
+        if ($openingQuantity <= 0) {
+            throw new RuntimeException('مقدار موجودی اولیه این کالا صفر است.');
+        }
+
+        if (abs($availableInSource - $openingQuantity) < 0.0001) {
+            $document->update(['warehouse_id' => $targetWarehouseId]);
+
+            return $document->fresh(['warehouse', 'lines']);
+        }
+
+        $transferQuantity = min($openingQuantity, max(0, $availableInSource));
+
+        if ($transferQuantity <= 0) {
+            throw new RuntimeException('موجودی قابل انتقال در انبار فعلی وجود ندارد. ابتدا گردش انبار این کالا را بررسی کنید.');
+        }
+
+        $line = $document->lines->first();
+
+        return $this->createTransferDocument(
+            fromWarehouseId: (int) $document->warehouse_id,
+            toWarehouseId: $targetWarehouseId,
+            lines: collect([[
+                'item_id' => $item->id,
+                'quantity' => $transferQuantity,
+                'unit_price' => (float) ($line?->unit_price ?? 0),
+                'description' => 'انتقال موجودی اولیه از انبار اشتباه',
+            ]]),
+            source: $item,
+            description: 'اصلاح انبار موجودی اولیه کالا ' . $item->name,
+            date: now()->toDateString(),
+            userId: $userId,
         );
     }
 
@@ -123,8 +194,11 @@ class InventoryPostingService
         return DB::transaction(function () use ($type, $warehouseId, $source, $description, $lines, $date, $userId) {
             $this->periods->ensureDateIsAllowed($date);
 
+            $year = $this->periods->fiscalYearForDate($date);
+
             $document = InventoryDocument::create([
-                'number' => $this->numbering->next($this->numberingKey($type), $this->numberingPrefix($type)),
+                'fiscal_year_id' => $year?->id,
+                'number' => $this->numbering->next($this->numberingKey($type), $this->numberingPrefix($type), $year?->id),
                 'type' => $type,
                 'document_date' => $date,
                 'document_time' => now()->format('H:i:s'),
@@ -132,6 +206,65 @@ class InventoryPostingService
                 'source_type' => get_class($source),
                 'source_id' => $source->id,
                 'entry_mode' => get_class($source) === Item::class ? 'manual' : 'automatic',
+                'status' => 'confirmed',
+                'description' => $description,
+                'created_by' => $userId,
+                'confirmed_by' => auth()->id() ?: $userId,
+                'confirmed_at' => now(),
+            ]);
+
+            foreach ($lines as $line) {
+                $quantity = (float) $line['quantity'];
+                $unitPrice = (float) ($line['unit_price'] ?? 0);
+
+                $document->lines()->create([
+                    'item_id' => $line['item_id'],
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $quantity * $unitPrice,
+                    'description' => $line['description'] ?? null,
+                ]);
+            }
+
+            return $document;
+        });
+    }
+
+    private function createTransferDocument(
+        int $fromWarehouseId,
+        int $toWarehouseId,
+        Collection $lines,
+        object $source,
+        string $description,
+        string $date,
+        ?int $userId = null,
+    ): InventoryDocument {
+        return DB::transaction(function () use ($fromWarehouseId, $toWarehouseId, $lines, $source, $description, $date, $userId) {
+            $this->periods->ensureDateIsAllowed($date);
+
+            foreach ($lines->groupBy('item_id') as $itemId => $group) {
+                $required = $group->sum(fn ($line) => (float) $line['quantity']);
+                $available = $this->availableQuantity((int) $itemId, $fromWarehouseId);
+
+                if ($available + 0.0001 < $required) {
+                    $itemName = Item::find($itemId)?->name ?: 'کالا';
+                    throw new RuntimeException("موجودی {$itemName} در انبار مبدأ کافی نیست.");
+                }
+            }
+
+            $year = $this->periods->fiscalYearForDate($date);
+
+            $document = InventoryDocument::create([
+                'fiscal_year_id' => $year?->id,
+                'number' => $this->numbering->next('inventory_transfer', 'IT-', $year?->id),
+                'type' => 'transfer',
+                'document_date' => $date,
+                'document_time' => now()->format('H:i:s'),
+                'warehouse_id' => $fromWarehouseId,
+                'target_warehouse_id' => $toWarehouseId,
+                'source_type' => get_class($source),
+                'source_id' => $source->id,
+                'entry_mode' => 'manual',
                 'status' => 'confirmed',
                 'description' => $description,
                 'created_by' => $userId,

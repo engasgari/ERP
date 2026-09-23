@@ -1,6 +1,9 @@
-@props(['title' => 'جزئیات', 'open' => true, 'actions' => [], 'id' => null, 'hidden' => false, 'staticBackdrop' => false])
+@props(['title' => 'جزئیات', 'open' => true, 'actions' => [], 'id' => null, 'hidden' => false, 'staticBackdrop' => false, 'nested' => false])
 @if($open)
-    <div @if($id) id="{{ $id }}" @endif class="{{ $staticBackdrop ? 'erp-modal' : 'erp-ui-modal-backdrop' }}" @if($hidden) hidden @endif>
+    <div @if($id) id="{{ $id }}" @endif @class([
+        $staticBackdrop ? 'erp-modal' : 'erp-ui-modal-backdrop',
+        'erp-modal-nested' => $nested,
+    ]) @if($hidden) hidden @endif>
         @if($staticBackdrop)
             <div class="erp-ui-modal-backdrop" data-erp-modal-close></div>
         @endif

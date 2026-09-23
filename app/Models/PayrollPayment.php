@@ -13,6 +13,8 @@ class PayrollPayment extends Model
         'payment_date',
         'amount',
         'method',
+        'bank_account_id',
+        'cashbox_id',
         'reference_number',
         'status',
         'description',
@@ -29,6 +31,16 @@ class PayrollPayment extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class);
+    }
+
+    public function cashbox(): BelongsTo
+    {
+        return $this->belongsTo(Cashbox::class);
     }
 
     public function accountingDocument(): BelongsTo

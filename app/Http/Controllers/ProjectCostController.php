@@ -27,9 +27,6 @@ class ProjectCostController extends Controller
             'party',
             'manager',
             'workLogs.employee',
-            'inventoryDocuments.warehouse',
-            'inventoryDocuments.lines.item',
-            'productionOrders.item',
         ]);
 
         return [
@@ -45,6 +42,12 @@ class ProjectCostController extends Controller
                 ->where('project_id', $project->id)
                 ->where('direction', 'purchase')
                 ->orderByDesc('invoice_date')
+                ->orderByDesc('id')
+                ->get(),
+            'registeredExpenses' => $project->financialTransactions()
+                ->with(['bankAccount', 'cashbox', 'chartAccount', 'detailAccount'])
+                ->where('type', 'expense')
+                ->orderByDesc('transaction_date')
                 ->orderByDesc('id')
                 ->get(),
         ];

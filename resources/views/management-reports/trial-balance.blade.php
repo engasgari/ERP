@@ -24,15 +24,15 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
                 <div class="bg-green-50 rounded-lg p-3">
                     <div class="text-xs text-gray-500">مانده افتتاحیه</div>
-                    <div class="mt-1 font-bold text-green-700">{{ number_format($summary['opening']) }} تومان</div>
+                    <div class="mt-1 font-bold text-green-700">{{ formatMoney($summary['opening']) }} تومان</div>
                 </div>
                 <div class="bg-red-50 rounded-lg p-3">
                     <div class="text-xs text-gray-500">گردش دوره</div>
-                    <div class="mt-1 font-bold text-red-700">{{ number_format($summary['period']) }} تومان</div>
+                    <div class="mt-1 font-bold text-red-700">{{ formatMoney($summary['period']) }} تومان</div>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-3">
                     <div class="text-xs text-gray-500">مانده نهایی</div>
-                    <div class="mt-1 font-bold text-gray-700">{{ number_format($summary['closing']) }} تومان</div>
+                    <div class="mt-1 font-bold text-gray-700">{{ formatMoney($summary['closing']) }} تومان</div>
                 </div>
                 <div class="bg-gray-50 rounded-lg p-3">
                     <div class="text-xs text-gray-500">وضعیت تراز</div>
@@ -66,12 +66,12 @@
                         <tr>
                             <td class="border border-gray-300 p-2 text-gray-500">{{ $row['code'] }}</td>
                             <td class="border border-gray-300 p-2 font-medium">{{ $row['title'] }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['opening_debit'] ?? 0)) }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['opening_credit'] ?? 0)) }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['period_debit'] ?? 0)) }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['period_credit'] ?? 0)) }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['closing_debit'] ?? 0)) }}</td>
-                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format((float) ($row['closing_credit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['opening_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['opening_credit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['period_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['period_credit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['closing_debit'] ?? 0)) }}</td>
+                            <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney((float) ($row['closing_credit'] ?? 0)) }}</td>
                         </tr>
                     @empty
                         <tr>
@@ -84,12 +84,12 @@
                     <tfoot>
                     <tr class="font-bold">
                         <td class="border border-gray-300 p-2" colspan="2">جمع کل</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['opening_debit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['opening_credit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['period_debit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['period_credit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['closing_debit']) }}</td>
-                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ number_format($totals['closing_credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['opening_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['opening_credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['period_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['period_credit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['closing_debit']) }}</td>
+                        <td class="border border-gray-300 p-2 text-left" dir="ltr">{{ formatMoney($totals['closing_credit']) }}</td>
                     </tr>
                     </tfoot>
                 </table>

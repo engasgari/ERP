@@ -4,7 +4,6 @@ use App\Http\Controllers\ProjectCostController;
 use App\Http\Controllers\BomVersionController;
 use App\Http\Controllers\ProductionOrderController;
 use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\WorkLogController;
 use App\Http\Controllers\FinancialTransactionController;
@@ -16,14 +15,18 @@ use App\Http\Controllers\AccountingDocumentController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\ChartAccountController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InsurancePaymentController;
 use App\Http\Controllers\FinancialReportController;
 use App\Http\Controllers\FiscalPeriodController;
 use App\Http\Controllers\InventoryDocumentController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\SalesReportController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PartyController;
 use App\Http\Controllers\CompanySettingController;
+use App\Http\Controllers\NumberingSettingController;
 use App\Http\Controllers\TreasuryController;
+use App\Http\Controllers\PartnerCurrentAccountController;
 use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\WorkCalendarController;
 use App\Http\Controllers\WorkGroupController;
@@ -37,17 +40,18 @@ use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\PayslipController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
+use App\Services\AppAccessService;
 
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->route('dashboard');
+        return redirect(app(AppAccessService::class)->homeRouteForSession());
     }
 
-    return redirect()->route('login');
-});
+    return view('app.choose');
+})->name('home');
 
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::view('self-service', 'self-service.index')->name('self-service.index');
     Route::resource('parties', PartyController::class)->except(['show'])->middleware('permission:base-info.view');
     Route::get('items/import', [ItemController::class, 'importForm'])->middleware('permission:base-info.view')->name('items.import.form');
@@ -62,6 +66,9 @@ Route::middleware('auth')->group(function () {
         ->name('bank-accounts.statement');
     Route::get('company-settings', [CompanySettingController::class, 'edit'])->middleware('permission:settings.manage')->name('company-settings.edit');
     Route::put('company-settings', [CompanySettingController::class, 'update'])->middleware('permission:settings.manage')->name('company-settings.update');
+    Route::get('numbering-settings', [NumberingSettingController::class, 'index'])->middleware('permission:settings.manage')->name('numbering-settings.index');
+    Route::put('numbering-settings', [NumberingSettingController::class, 'update'])->middleware('permission:settings.manage')->name('numbering-settings.update');
+    Route::post('numbering-settings/sync', [NumberingSettingController::class, 'sync'])->middleware('permission:settings.manage')->name('numbering-settings.sync');
     Route::post('invoices/preview', [InvoiceController::class, 'preview'])->middleware('permission:commerce.view')->name('invoices.preview');
     Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.print');
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.pdf');
@@ -71,6 +78,21 @@ Route::middleware('auth')->group(function () {
     Route::post('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.settle');
     Route::post('invoices/{invoice}/unsettle', [InvoiceController::class, 'unsettle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.unsettle');
     Route::post('invoices/{invoice}/convert', [InvoiceController::class, 'convert'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.convert');
+    Route::view('commerce/contractor-service-purchases', 'commerce.contractor-service-purchases.index')
+        ->middleware('permission:commerce.view')
+        ->name('commerce.contractor-service-purchases.index');
+
+    Route::get('sales/intelligence', fn () => view('sales.intelligence'))
+        ->middleware('permission:reports.sales.view')
+        ->name('sales.intelligence');
+
+    Route::prefix('sales/reports')->name('sales-reports.')->group(function () {
+        Route::get('/', [SalesReportController::class, 'index'])->middleware('permission:reports.sales.view')->name('index');
+        Route::get('{report}/print', [SalesReportController::class, 'print'])->middleware('permission:reports.sales.view')->name('report.print');
+        Route::get('{report}/pdf', [SalesReportController::class, 'pdf'])->middleware('permission:reports.sales.export')->name('report.pdf');
+        Route::get('{report}/excel', [SalesReportController::class, 'excel'])->middleware('permission:reports.sales.export')->name('report.excel');
+        Route::get('{report}', [SalesReportController::class, 'show'])->middleware('permission:reports.sales.view')->name('show');
+    });
     Route::get('accounting-documents', [AccountingDocumentController::class, 'index'])->middleware('permission:accounting.view')->name('accounting-documents.index');
     Route::get('accounting-documents/create', [AccountingDocumentController::class, 'create'])->middleware('permission:accounting.documents.create')->name('accounting-documents.create');
     Route::post('accounting-documents', [AccountingDocumentController::class, 'store'])->middleware('permission:accounting.documents.create')->name('accounting-documents.store');
@@ -90,18 +112,24 @@ Route::middleware('auth')->group(function () {
     Route::put('treasury/{transaction}', [TreasuryController::class, 'update'])->whereNumber('transaction')->middleware('permission:treasury.manage')->name('treasury.update');
     Route::delete('treasury/{transaction}', [TreasuryController::class, 'destroy'])->whereNumber('transaction')->middleware('permission:treasury.manage')->name('treasury.destroy');
 
+    Route::get('partner-current-accounts', [PartnerCurrentAccountController::class, 'index'])->middleware('permission:treasury.manage')->name('partner-current-accounts.index');
+    Route::get('partner-current-accounts/create', [PartnerCurrentAccountController::class, 'create'])->middleware('permission:treasury.manage')->name('partner-current-accounts.create');
+    Route::post('partner-current-accounts', [PartnerCurrentAccountController::class, 'store'])->middleware('permission:treasury.manage')->name('partner-current-accounts.store');
+
     Route::get('fiscal-periods', [FiscalPeriodController::class, 'index'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.index');
     Route::post('fiscal-periods', [FiscalPeriodController::class, 'store'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.store');
     Route::put('fiscal-periods/{fiscalYear}', [FiscalPeriodController::class, 'update'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.update');
     Route::delete('fiscal-periods/{fiscalYear}', [FiscalPeriodController::class, 'destroy'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.destroy');
     Route::post('fiscal-periods/{fiscalPeriod}/close', [FiscalPeriodController::class, 'close'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.close');
-    Route::post('fiscal-periods/{fiscalPeriod}/reopen', [FiscalPeriodController::class, 'reopen'])->middleware('permission:fiscal-periods.reopen')->name('fiscal-periods.reopen');
+    Route::post('fiscal-periods/{fiscalPeriod}/reopen', [FiscalPeriodController::class, 'reopen'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.reopen');
 
     Route::get('financial-reports', [FinancialReportController::class, 'index'])->middleware('permission:financial.reports.view')->name('financial-reports.index');
     Route::get('financial-reports/general-ledger', [FinancialReportController::class, 'generalLedger'])->middleware('permission:financial.reports.view')->name('financial-reports.general-ledger');
     Route::get('financial-reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->middleware('permission:financial.reports.view')->name('financial-reports.trial-balance');
     Route::get('financial-reports/statement', [FinancialReportController::class, 'statement'])->middleware('permission:financial.reports.view')->name('financial-reports.statement');
     Route::get('financial-reports/statement/print', [FinancialReportController::class, 'printStatement'])->middleware('permission:financial.reports.view')->name('financial-reports.statement.print');
+    Route::get('financial-reports/employee-statement', [FinancialReportController::class, 'employeeStatement'])->middleware('permission:financial.reports.view')->name('financial-reports.employee-statement');
+    Route::get('financial-reports/employee-statement/print', [FinancialReportController::class, 'printEmployeeStatement'])->middleware('permission:financial.reports.view')->name('financial-reports.employee-statement.print');
     Route::get('financial-reports/accounts/{account}/statement', [FinancialReportController::class, 'accountStatement'])->middleware('permission:financial.reports.view')->name('financial-reports.account-statement');
     Route::get('financial-reports/accounts/{account}/statement/print', [FinancialReportController::class, 'printAccountStatement'])->middleware('permission:financial.reports.view')->name('financial-reports.account-statement.print');
     Route::get('financial-reports/balance-sheet', [FinancialReportController::class, 'balanceSheet'])->middleware('permission:financial.reports.view')->name('financial-reports.balance-sheet');
@@ -148,9 +176,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/management-reports/hr-employment-orders', [ManagementReportController::class, 'hrEmploymentOrders'])
         ->middleware('permission:reports.view')
         ->name('management-reports.hr-employment-orders');
+    Route::get('/management-reports/hr-employment-orders/print', [ManagementReportController::class, 'hrEmploymentOrdersPrint'])
+        ->middleware('permission:reports.view')
+        ->name('management-reports.hr-employment-orders.print');
+    Route::get('/management-reports/hr-employment-orders/{employmentOrder}/print-form', [ManagementReportController::class, 'hrEmploymentOrderFormPrint'])
+        ->middleware('permission:reports.view')
+        ->name('management-reports.hr-employment-orders.print-form');
     Route::get('/management-reports/attendance-monthly', [ManagementReportController::class, 'attendanceMonthly'])
         ->middleware('permission:reports.view')
         ->name('management-reports.attendance-monthly');
+    Route::get('/management-reports/attendance-daily', [ManagementReportController::class, 'attendanceDaily'])
+        ->middleware('permission:reports.view')
+        ->name('management-reports.attendance-daily');
     Route::get('/management-reports/attendance-exceptions', [ManagementReportController::class, 'attendanceExceptions'])
         ->middleware('permission:reports.view')
         ->name('management-reports.attendance-exceptions');
@@ -166,6 +203,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/management-reports/insurance-summary', [ManagementReportController::class, 'insuranceSummary'])
         ->middleware('permission:reports.view')
         ->name('management-reports.insurance-summary');
+    Route::get('/management-reports/insurance-employees', [ManagementReportController::class, 'insuranceEmployeeSummary'])
+        ->middleware('permission:reports.view')
+        ->name('management-reports.insurance-employees');
     Route::get('/management-reports/tax-summary', [ManagementReportController::class, 'taxSummary'])
         ->middleware('permission:reports.view')
         ->name('management-reports.tax-summary');
@@ -198,9 +238,6 @@ Route::middleware('auth')->group(function () {
     Route::resource('employees', EmployeeController::class)->only(['index', 'show'])->middleware('permission:employees.view');
     Route::resource('work-logs', WorkLogController::class)->except(['index', 'show'])->middleware('permission:worklogs.manage');
     Route::resource('financial-transactions', FinancialTransactionController::class)->except(['index', 'show'])->middleware('permission:financial.manage');
-    Route::get('/financial-transactions/summary', [FinancialTransactionController::class, 'summary'])
-        ->middleware('permission:financial.view')
-        ->name('financial-transactions.summary');
 
 // ط¹آ¯ط·آ²ط·آ§ط·آ±ط·آ´أ¢â‚¬إ’ط¸â€،ط·آ§ط؛إ’ ط¸â€¦ط·آ§ط¸â€‍ط؛إ’
     Route::get('/financial-transactions/project/{project}',
@@ -238,31 +275,22 @@ Route::middleware('auth')->group(function () {
 // ط¸â€ڑط·آ¨ط¸â€‍ ط·آ§ط·آ² ط¸â€،ط¸â€¦ط¸â€، Routeط¸â€،ط·آ§ ط·آ§ط؛إ’ط¸â€  ط·آ±ط·آ§ ط·آ§ط·آ¶ط·آ§ط¸ظ¾ط¸â€، ط¹آ©ط¸â€ ط؛إ’ط·آ¯
     Route::resource('warehouses', WarehouseController::class)->only(['index', 'show'])->middleware('permission:warehouse.view');
 
-    // ط¸آ¾ط·آ±ط·آ¯ط·آ§ط·آ®ط·ع¾ ط·آ­ط¸â€ڑط¸ث†ط¸â€ڑ ط¸ث† ط¸â€¦ط·آ­ط·آ§ط·آ³ط·آ¨ط¸â€، ط·آ­ط¸â€ڑط¸ث†ط¸â€ڑ
-    Route::get('bulk-delete', [SalaryController::class, 'bulkDeleteForm'])->middleware('permission:salaries.manage')->name('salaries.bulk-delete');
-    Route::delete('salaries/destroy-multiple', [SalaryController::class, 'destroyMultiple'])->middleware('permission:salaries.manage')->name('salaries.destroy-multiple');
-    Route::resource('salaries', SalaryController::class)->except(['index', 'show'])->middleware('permission:salaries.manage');
-    Route::post('salaries/calculate', [SalaryController::class, 'calculate'])->middleware('permission:salaries.manage')->name('salaries.calculate');
-    Route::post('salaries/{salary}/payments', [SalaryController::class, 'storePayment'])->middleware('permission:salaries.manage')->name('salaries.payments.store');
-    // routes/web.php
-    Route::get('financial-report', [SalaryController::class, 'financialReport'])->middleware('permission:salaries.view')->name('salaries.financial-report');
     Route::get('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'index'])->middleware('permission:salaries.manage')->name('payroll.accounting-settings.index');
     Route::put('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'update'])->middleware('permission:salaries.manage')->name('payroll.accounting-settings.update');
     Route::view('payroll/periods', 'payroll.periods.index')->middleware('permission:salaries.manage')->name('payroll.periods.index');
+    Route::view('payroll/payments', 'payroll.payments.index')->middleware('permission:salaries.manage')->name('payroll.payments.index');
+    Route::view('insurance/periods', 'insurance.periods.index')->middleware('permission:insurance.view')->name('insurance.periods.index');
+    Route::view('insurance/payments', 'insurance.payments.index')->middleware('permission:insurance.view')->name('insurance.payments.index');
+    Route::get('insurance/payments/{payment}', [InsurancePaymentController::class, 'show'])->middleware('permission:insurance.view')->name('insurance.payments.show');
     Route::get('payslips/{payslip}/print', [PayslipController::class, 'print'])->middleware('permission:salaries.view')->name('payslips.print');
     Route::get('payslips/{payslip}/download', [PayslipController::class, 'download'])->middleware('permission:salaries.view')->name('payslips.download');
-    Route::get('employee-statement/{employee}', [SalaryController::class, 'employeeStatement'])->middleware('permission:salaries.view')->name('salaries.employee-statement');
-    // routes/web.php
-    Route::get('/salaries/{salary}/print', [SalaryController::class, 'printSalarySlip'])->middleware('permission:salaries.view')->name('salaries.print-slip');
-    Route::get('/salaries/{salary}/download', [SalaryController::class, 'downloadSalarySlip'])->middleware('permission:salaries.view')->name('salaries.download-slip');
-    Route::resource('salaries', SalaryController::class)->only(['index', 'show'])->middleware('permission:salaries.view');
 
 
 });
 
-Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified', 'active.erp'])->name('dashboard');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -272,7 +300,7 @@ Route::middleware('auth')->group(function () {
 use App\Http\Controllers\ExcelController;
 
 
-Route::middleware(['auth', 'permission:projects.manage'])->group(function () {
+Route::middleware(['auth', 'permission:projects.manage', 'active.erp'])->group(function () {
     Route::get('/excel/import', [ExcelController::class, 'importView'])->name('import.view');
     Route::post('/excel/import', [ExcelController::class, 'import'])->name('import');
     Route::get('/excel/export', [ExcelController::class, 'export'])->name('export');
@@ -281,7 +309,7 @@ Route::middleware(['auth', 'permission:projects.manage'])->group(function () {
 
 use App\Http\Controllers\WorkLogExcelController;
 
-Route::middleware(['auth', 'permission:worklogs.manage'])->prefix('worklog')->group(function () {
+Route::middleware(['auth', 'permission:worklogs.manage', 'active.erp'])->prefix('worklog')->group(function () {
     Route::get('/import', [WorkLogExcelController::class, 'importView'])->name('worklog.import.view');
     Route::post('/import', [WorkLogExcelController::class, 'import'])->name('worklog.import');
     Route::get('/export', [WorkLogExcelController::class, 'export'])->name('worklog.export');
@@ -289,3 +317,4 @@ Route::middleware(['auth', 'permission:worklogs.manage'])->prefix('worklog')->gr
 });
 
 require __DIR__ . '/auth.php';
+require __DIR__ . '/crm.php';

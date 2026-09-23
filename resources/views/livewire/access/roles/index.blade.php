@@ -54,12 +54,20 @@
                         </td>
                         <td>{{ number_format($role->users_count) }}</td>
                         <td>
-                            <div class="d-grid d-sm-flex gap-2">
-                                <a href="{{ route('access.roles.edit', $role) }}" class="erp-action-btn erp-action-edit text-center">ویرایش کامل</a>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action icon="edit" label="ویرایش کامل" :href="route('access.roles.edit', $role)" />
                                 @unless($role->is_system)
-                                    <button type="button" wire:click="delete({{ $role->id }})" wire:confirm="نقش حذف شود؟" wire:loading.attr="disabled" wire:target="delete({{ $role->id }})" class="erp-action-btn erp-action-delete">حذف</button>
+                                    <x-erp.ui.row-action
+                                        icon="delete"
+                                        label="حذف"
+                                        tone="danger"
+                                        wire:click="delete({{ $role->id }})"
+                                        wire:confirm="نقش حذف شود؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="delete({{ $role->id }})"
+                                    />
                                 @endunless
-                            </div>
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty

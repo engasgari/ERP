@@ -12,11 +12,13 @@ use App\Models\FinancialTransaction;
 use App\Models\CostCenter;
 use App\Models\FiscalYear;
 use App\Models\Invoice;
+use App\Models\PaymentVoucher;
 use App\Models\PayrollCalculation;
-use App\Models\Salary;
+use App\Models\ReceiptVoucher;
 use App\Models\OrganizationUnit;
 use App\Models\Party;
 use App\Models\Project;
+use App\Models\TreasuryTransaction;
 use App\Repositories\FinancialReportRepository;
 use App\Support\FinancialReportContext;
 use App\Support\FinancialReportRegistry;
@@ -30,6 +32,29 @@ use Illuminate\Support\Facades\Schema;
 
 class FinancialReportService
 {
+    /** @var list<string> */
+    private const GENERIC_BANK_LINE_DESCRIPTIONS = [
+        'پرداخت خزانه',
+        'دریافت خزانه',
+        'طرف حساب پرداخت',
+        'طرف حساب دریافت',
+        'انتقال ورودی خزانه',
+        'انتقال خروجی خزانه',
+        'پرداخت بانکی',
+        'دریافت بانکی',
+        'واریز شریک',
+        'برداشت شریک',
+    ];
+
+    /** @var list<string> */
+    private const GENERIC_INVOICE_LINE_DESCRIPTIONS = [
+        'حساب پرداختنی فروشنده',
+        'حساب دریافتنی مشتری',
+        'خرید کالا',
+        'هزینه خدمات',
+        'درآمد فروش',
+    ];
+
     public function __construct(
         private FinancialReportRepository $reports,
         private FinancialReportRegistry $registry
@@ -62,6 +87,7 @@ class FinancialReportService
             'outstanding-invoices' => $this->outstandingInvoicesReport($filters, $context),
             'overdue-invoices' => $this->overdueInvoicesReport($filters, $context),
             'cash-book' => $this->cashBookReport($filters, $context),
+            'cash-statement' => $this->cashStatementReport($filters, $context),
             'bank-book' => $this->bankBookReport($filters, $context),
             'bank-statement' => $this->bankBookReport($filters, $context),
             'bank-reconciliation' => $this->bankReconciliationReport($filters, $context),
@@ -70,6 +96,7 @@ class FinancialReportService
             'purchase-tax' => $this->purchaseTaxReport($filters, $context),
             'vat-summary' => $this->vatSummaryReport($filters, $context),
             'tax-transactions' => $this->taxTransactionsReport($filters, $context),
+            'tax-electronic-books' => $this->taxElectronicBooksReport($filters, $context),
             'expense-analysis-by-account' => $this->expenseAnalysisReport($filters, $context),
             'revenue-analysis-by-account' => $this->revenueAnalysisReport($filters, $context),
             'profitability-by-project' => $this->profitabilityByProjectReport($filters, $context),
@@ -97,23 +124,57 @@ class FinancialReportService
 
     public function accountStatementSummary(ChartAccount $account, array $filters = []): array
     {
-        $statement = $this->partyStatementByAccount($account->id, null, $filters);
+        $filters = $this->normalizeFilters($filters);
+        $filters['account_id'] = $account->id;
+
+        $running = 0.0;
+        $lines = $this->postedLines($filters)->map(function ($line) use (&$running) {
+            $running += (float) $line->debit - (float) $line->credit;
+            $row = $this->lineRow($line);
+            $row['document'] = $line->document;
+            $row['party'] = $line->party;
+            $row['project'] = $line->project;
+            $row['account'] = $line->account;
+            $row['running_balance'] = $running;
+
+            return $row;
+        });
+
+        $balance = (float) $lines->sum(fn (array $row) => $row['debit'] - $row['credit']);
 
         return [
             'account' => $account,
-            'lines' => collect($statement['sections'][0]['rows'] ?? []),
-            'debit' => $statement['summary']['debit'] ?? 0,
-            'credit' => $statement['summary']['credit'] ?? 0,
-            'balance' => $statement['summary']['balance'] ?? 0,
-            'balance_type' => $this->balanceType(($statement['summary']['balance'] ?? 0)),
+            'lines' => $lines,
+            'debit' => (float) $lines->sum('debit'),
+            'credit' => (float) $lines->sum('credit'),
+            'balance' => $balance,
+            'balance_type' => $this->balanceType($balance),
         ];
     }
 
-    public function partyStatementSummaries(?int $accountId = null, ?int $partyId = null, array $filters = []): Collection
+    public function partyStatementSummaries(?int $accountId = null, ?int $partyId = null, array $filters = [], ?string $side = null): Collection
     {
+        unset($filters['side'], $side);
+
         $report = $this->partyStatementByAccount($accountId, $partyId, $filters);
 
-        return collect($report['sections'][0]['rows'] ?? []);
+        return $this->filterPartyStatementSummaries(collect($report['sections'][0]['rows'] ?? []), $filters);
+    }
+
+    public function employeeStatementSummaries(?int $partyId = null, array $filters = []): Collection
+    {
+        return $this->partyStatementSummaries(null, $partyId, $filters);
+    }
+
+    private function normalizeStatementSide(?string $side): ?string
+    {
+        if ($side === null || $side === '') {
+            return null;
+        }
+
+        $side = strtolower(trim($side));
+
+        return $side === 'employee' ? 'personnel' : $side;
     }
 
     public function balanceSheet(array $filters = []): array
@@ -133,59 +194,72 @@ class FinancialReportService
         return collect($report['sections'][0]['rows'] ?? []);
     }
 
-    public function bankTransactions(BankAccount $bankAccount, array $filters = []): array
+    /**
+     * مانده بدهی تأمین‌کنندگان از دفتر (حساب پرداختنی)، هم‌راستا با گزارش سن بدهی‌ها.
+     *
+     * @return array{
+     *     total_payables: float,
+     *     overdue: float,
+     *     over_90: float,
+     *     party_count: int,
+     *     invoice_count: int,
+     *     buckets: array<string, float>
+     * }
+     */
+    public function supplierPayableSummary(array $filters = []): array
     {
-        $filters = $this->normalizeFilters($filters);
-        $baseQuery = $this->postedLineQuery($filters)
-            ->where('bank_account_id', $bankAccount->id)
-            ->orderBy('accounting_documents.document_date')
-            ->orderBy('accounting_document_lines.id');
+        $report = $this->report('accounts-payable-aging', $filters);
 
-        if (! empty($filters['date_from'])) {
-            $openingFilters = $filters;
-            $openingFilters['date_to'] = \Carbon\Carbon::parse($openingFilters['date_from'])->subDay()->toDateString();
-            unset($openingFilters['date_from']);
+        return $this->agingBalanceSummary(
+            collect($report['sections'][0]['rows'] ?? []),
+            'total_payables',
+        );
+    }
 
-            $openingLines = $this->postedLineQuery($openingFilters)
-                ->where('bank_account_id', $bankAccount->id)
-                ->orderBy('accounting_documents.document_date')
-                ->orderBy('accounting_document_lines.id')
-                ->get();
-        } else {
-            $openingLines = collect();
+    /**
+     * مانده بدهی یک حساب بدهی (طبیعت بستانکار) از دفتر کل — مثلاً 2102 مالیات ارزش افزوده فروش.
+     */
+    public function liabilityAccountBalance(array $filters, string $accountCode): float
+    {
+        if (! ChartAccount::query()->where('code', $accountCode)->exists()) {
+            return 0.0;
         }
 
-        $startingBalance = (float) $bankAccount->opening_balance + (float) $openingLines->sum(fn ($line) => (float) $line->debit - (float) $line->credit);
-        $periodDebit = (float) $baseQuery->sum('debit');
-        $periodCredit = (float) $baseQuery->sum('credit');
-        $rows = $baseQuery->get()->map(function ($line) use (&$startingBalance) {
-            $startingBalance += (float) $line->debit - (float) $line->credit;
-            $row = $this->lineRow($line);
-            $row['running_balance'] = $startingBalance;
+        $balances = $this->accountBalances($this->postedLines($filters), $this->openingLines($filters));
+        $row = $balances->first(fn ($item) => (string) $item['code'] === $accountCode);
 
-            return $row;
-        })->values();
+        if (! $row) {
+            return 0.0;
+        }
 
-        return $this->reportPayload(
-            key: 'bank-transactions',
-            title: 'تراکنش‌های بانکی',
+        return max((float) $row['closing_credit'] - (float) $row['closing_debit'], 0);
+    }
+
+    public function bankTransactions(BankAccount $bankAccount, array $filters = []): array
+    {
+        return $this->treasuryStatementTransactions(
+            treasuryFilterKey: 'bank_account_id',
+            treasuryId: $bankAccount->id,
+            openingBalance: (float) $bankAccount->opening_balance,
             subtitle: $bankAccount->code . ' - ' . $bankAccount->bank_name,
+            payloadKey: 'bank-transactions',
+            title: 'تراکنش‌های بانکی',
+            sectionTitle: 'گردش حساب بانکی',
             filters: $filters,
-            summary: [
-                'opening_balance' => (float) $bankAccount->opening_balance + (float) $openingLines->sum(fn ($line) => (float) $line->debit - (float) $line->credit),
-                'period_debit' => $periodDebit,
-                'period_credit' => $periodCredit,
-                'closing_balance' => $startingBalance,
-                'line_count' => $rows->count(),
-            ],
-            sections: [
-                [
-                    'title' => 'گردش حساب بانکی',
-                    'headers' => ['تاریخ', 'شماره سند', 'حساب', 'طرف حساب', 'پروژه', 'شرح', 'بدهکار', 'بستانکار', 'مانده جاری'],
-                    'rows' => $rows,
-                    'columns' => ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
-                ],
-            ],
+        );
+    }
+
+    public function cashTransactions(Cashbox $cashbox, array $filters = []): array
+    {
+        return $this->treasuryStatementTransactions(
+            treasuryFilterKey: 'cashbox_id',
+            treasuryId: $cashbox->id,
+            openingBalance: (float) $cashbox->opening_balance,
+            subtitle: $cashbox->code . ' - ' . $cashbox->name,
+            payloadKey: 'cash-transactions',
+            title: 'تراکنش‌های صندوق',
+            sectionTitle: 'گردش صندوق',
+            filters: $filters,
         );
     }
 
@@ -554,15 +628,20 @@ class FinancialReportService
 
     private function agingReport(string $side, array $filters, FinancialReportContext $context): array
     {
-        $accountId = $side === 'supplier' ? $this->accountIdLike('2101') : $this->accountIdLike('1101');
-        $rows = $this->partyBalances($filters, $accountId)->map(function ($row) use ($side) {
+        if ($side === 'supplier') {
+            return $this->supplierUnifiedAgingReport($filters, $context);
+        }
+
+        $accountId = $this->accountIdLike('1101');
+        $rows = $this->partyBalances($filters, $accountId)->map(function ($row) {
             $days = $row['last_date'] ? now()->startOfDay()->diffInDays($row['last_date']) : 0;
+
             return [
                 'party_id' => $row['party']->id,
                 'party' => $row['party'],
                 'code' => $row['party']->code,
                 'name' => $row['party']->name,
-                'balance' => max($side === 'supplier' ? $row['balance_credit'] - $row['balance_debit'] : $row['balance_debit'] - $row['balance_credit'], 0),
+                'balance' => max($row['balance_debit'] - $row['balance_credit'], 0),
                 'days' => $days,
                 'bucket' => $this->agingBucket($days),
             ];
@@ -570,7 +649,7 @@ class FinancialReportService
 
         return $this->reportPayload(
             key: $context->reportKey,
-            title: $side === 'supplier' ? 'سن بدهی‌ها' : 'سن مطالبات',
+            title: 'سن مطالبات',
             subtitle: 'طبقه‌بندی مانده طرف حساب بر اساس تاریخ آخرین گردش',
             filters: $filters,
             summary: [
@@ -579,7 +658,51 @@ class FinancialReportService
             ],
             sections: [
                 [
-                    'title' => $side === 'supplier' ? 'تأمین‌کنندگان' : 'مشتریان',
+                    'title' => 'مشتریان',
+                    'headers' => ['کد', 'عنوان', 'مانده', 'روزهای گذشته', 'بازه سنی'],
+                    'rows' => $rows,
+                ],
+            ],
+        );
+    }
+
+    private function supplierUnifiedAgingReport(array $filters, FinancialReportContext $context): array
+    {
+        $rows = $this->unifiedPartyStatementBalances($filters)
+            ->filter(fn (array $row) => $this->partyQualifiesForSupplierScope($row['party'], $row['lines']))
+            ->map(function (array $row) {
+                $credit = (float) $row['credit'];
+                $debit = (float) $row['debit'];
+                $days = $row['last_date'] ? now()->startOfDay()->diffInDays($row['last_date']) : 0;
+
+                return [
+                    'party_id' => $row['party']->id,
+                    'party' => $row['party'],
+                    'code' => $row['party']->code,
+                    'name' => $row['party']->name,
+                    'balance' => max($credit - $debit, 0.0),
+                    'statement_balance' => (float) $row['balance'],
+                    'balance_type' => $this->balanceType((float) $row['balance']),
+                    'days' => $days,
+                    'bucket' => $this->agingBucket($days),
+                ];
+            })
+            ->filter(fn (array $row) => (float) ($row['balance'] ?? 0) > 0)
+            ->sortBy('name')
+            ->values();
+
+        return $this->reportPayload(
+            key: $context->reportKey,
+            title: 'سن بدهی‌ها',
+            subtitle: 'مانده net تأمین‌کننده/همکار مطابق صورتحساب اشخاص (پرداختنی + حقوق و سایر حساب‌های طرف)',
+            filters: $filters,
+            summary: [
+                'parties' => $rows->count(),
+                'balance' => (float) $rows->sum('balance'),
+            ],
+            sections: [
+                [
+                    'title' => 'تأمین‌کنندگان',
                     'headers' => ['کد', 'عنوان', 'مانده', 'روزهای گذشته', 'بازه سنی'],
                     'rows' => $rows,
                 ],
@@ -589,16 +712,24 @@ class FinancialReportService
 
     private function partyStatementReport(string $side, array $filters, FinancialReportContext $context): array
     {
-        return $this->partyStatementByAccount($side === 'supplier' ? $this->accountIdLike('2101') : $this->accountIdLike('1101'), $filters['party_id'] ?? null, $filters, $context);
+        $accountId = $side === 'supplier'
+            ? null
+            : $this->accountIdLike('1101');
+
+        return $this->partyStatementByAccount(
+            $accountId,
+            $filters['party_id'] ?? null,
+            $filters,
+            $context,
+            $side,
+        );
     }
 
-    private function partyStatementByAccount(?int $accountId, ?int $partyId, array $filters, ?FinancialReportContext $context = null): array
+    private function partyStatementByAccount(?int $accountId, ?int $partyId, array $filters, ?FinancialReportContext $context = null, ?string $side = null): array
     {
-        $accountIds = $accountId ? $this->accountAndDescendantIds($accountId) : null;
-        $lines = $this->postedLines($filters)
-            ->when($accountIds, fn (Collection $lines) => $lines->whereIn('chart_account_id', $accountIds))
-            ->when($partyId, fn (Collection $lines) => $lines->where('party_id', $partyId))
-            ->sortBy(fn ($line) => $line->document?->document_date . '|' . $line->id);
+        $side = $this->normalizeStatementSide($side ?? ($filters['side'] ?? null));
+
+        $lines = $this->reports->partyStatementRows($accountId, $partyId, $filters);
 
         $parties = $lines->groupBy('party_id')->map(function (Collection $group) {
             $running = 0;
@@ -608,9 +739,8 @@ class FinancialReportService
 
                 return [
                     'date' => gregorianToJalaliDate($line->document?->document_date),
-                    'document_number' => $line->document?->number,
-                    'account' => trim(($line->account?->code ?: '') . ' - ' . ($line->account?->title ?: '')),
-                    'description' => $line->description ?: $line->document?->description ?: '-',
+                    'transaction_type' => $this->partyStatementTransactionType($line),
+                    'description' => $this->partyStatementLineDescription($line),
                     'debit' => (float) $line->debit,
                     'credit' => (float) $line->credit,
                     'running_balance' => $running,
@@ -631,11 +761,34 @@ class FinancialReportService
                 'balance_type' => $this->balanceType($balance),
                 'lines' => $rows,
             ];
-        })->sortBy('party_name')->values();
+        })
+            ->when($side === 'supplier' && ! $partyId, function (Collection $collection) {
+                return $collection->filter(function (array $row) {
+                    $party = Party::query()
+                        ->with(['types:id,name', 'employees:id,party_id'])
+                        ->find($row['party_id']);
+
+                    return $party && $this->partyQualifiesForSupplierScope($party, collect());
+                });
+            })
+            ->sortBy('party_name')
+            ->values();
 
         $payload = [
-            'title' => $partyId ? ($parties->first()['party_name'] ?? 'صورتحساب') : 'صورتحساب اشخاص و شرکت‌ها',
-            'subtitle' => 'گردش بدهکار و بستانکار طرف حساب‌ها',
+            'title' => match (true) {
+                $side === 'personnel' && $partyId => ($parties->first()['party_name'] ?? 'صورتحساب پرسنل'),
+                $side === 'personnel' => 'صورتحساب پرسنل',
+                (bool) $partyId => ($parties->first()['party_name'] ?? 'صورتحساب'),
+                default => 'صورتحساب اشخاص',
+            },
+            'subtitle' => match ($side) {
+                'personnel' => 'فیلتر لیست: پرسنل — ریز گردش شامل همه حساب‌ها',
+                'customer' => 'فیلتر لیست: مشتری — ریز گردش شامل همه حساب‌ها',
+                'supplier' => 'فیلتر لیست: تأمین‌کننده — مانده و گردش مطابق صورتحساب اشخاص (2101، حقوق و …)',
+                'vendor' => 'فیلتر لیست: فروشنده — ریز گردش شامل همه حساب‌ها',
+                'colleague' => 'فیلتر لیست: همکار — ریز گردش شامل همه حساب‌ها',
+                default => 'گردش بدهکار و بستانکار طرف حساب‌ها',
+            },
             'filters' => $filters,
             'summary' => [
                 'debit' => (float) $parties->sum('debit'),
@@ -659,6 +812,99 @@ class FinancialReportService
             summary: $payload['summary'],
             sections: $payload['sections'],
         ) : $payload;
+    }
+
+    private function statementScopeAccountId(string $scope): ?int
+    {
+        return $scope === 'supplier' ? $this->accountIdLike('2101') : $this->accountIdLike('1101');
+    }
+
+    private function partyStatementTransactionType($line): string
+    {
+        $type = (string) ($line->document?->type ?? '');
+
+        return match ($type) {
+            AccountingDocument::TYPE_SALE_INVOICE => 'فاکتور فروش',
+            AccountingDocument::TYPE_PURCHASE_INVOICE => 'فاکتور خرید',
+            AccountingDocument::TYPE_PAYMENT => 'پرداخت',
+            AccountingDocument::TYPE_RECEIPT => 'دریافت',
+            AccountingDocument::TYPE_INVENTORY => 'انبار',
+            AccountingDocument::TYPE_OPENING => 'افتتاحیه',
+            AccountingDocument::TYPE_CLOSING => 'اختتامیه',
+            AccountingDocument::TYPE_PARTNER_CURRENT => 'جاری شریک',
+            AccountingDocument::TYPE_PAYROLL => 'ثبت حقوق',
+            AccountingDocument::TYPE_MANUAL => 'دستی',
+            default => $type !== '' ? $type : '-',
+        };
+    }
+
+    private function partyStatementLineDescription($line): string
+    {
+        $document = $line->document;
+        $documentType = (string) ($document?->type ?? '');
+        $lineDescription = trim((string) ($line->description ?? ''));
+
+        if (in_array($documentType, [AccountingDocument::TYPE_SALE_INVOICE, AccountingDocument::TYPE_PURCHASE_INVOICE], true)) {
+            $invoiceDescription = $this->partyStatementInvoiceDescription($document, $documentType);
+
+            if ($invoiceDescription !== null) {
+                if ($lineDescription === '' || in_array($lineDescription, self::GENERIC_INVOICE_LINE_DESCRIPTIONS, true)) {
+                    return $invoiceDescription;
+                }
+
+                return $invoiceDescription.' — '.$lineDescription;
+            }
+        }
+
+        if ($lineDescription !== '') {
+            return $lineDescription;
+        }
+
+        $documentDescription = trim((string) ($document?->description ?? ''));
+
+        return $documentDescription !== '' ? $documentDescription : '-';
+    }
+
+    private function partyStatementInvoiceDescription(?AccountingDocument $document, string $documentType): ?string
+    {
+        if (! $document) {
+            return null;
+        }
+
+        $invoice = $document->source instanceof Invoice ? $document->source : null;
+
+        if (! $invoice && $document->source_type === Invoice::class && $document->source_id) {
+            $invoice = Invoice::query()->find($document->source_id);
+        }
+
+        $prefix = $documentType === AccountingDocument::TYPE_SALE_INVOICE ? 'فاکتور فروش' : 'فاکتور خرید';
+        $number = trim((string) ($invoice?->number ?? ''));
+
+        if ($number === '') {
+            return null;
+        }
+
+        return $prefix.' شماره '.$number;
+    }
+
+    private function filterPartyStatementSummaries(Collection $parties, array $filters): Collection
+    {
+        $balanceNature = (string) ($filters['balance_nature'] ?? '');
+
+        if ($balanceNature === '') {
+            return $parties->values();
+        }
+
+        return $parties->filter(function (array $row) use ($balanceNature) {
+            $balance = (float) ($row['balance'] ?? 0);
+
+            return match ($balanceNature) {
+                'debit' => $balance > 0,
+                'credit' => $balance < 0,
+                'settled' => abs($balance) < 0.00001,
+                default => true,
+            };
+        })->values();
     }
 
     private function outstandingInvoicesReport(array $filters, FinancialReportContext $context): array
@@ -724,8 +970,41 @@ class FinancialReportService
         return $this->cashOrBankReport('cashbox_id', 'دفتر صندوق', 'گردش صندوق‌های نقدی', $filters, $context);
     }
 
+    private function cashStatementReport(array $filters, FinancialReportContext $context): array
+    {
+        if (! empty($filters['cashbox_id'])) {
+            $cashbox = Cashbox::query()->findOrFail((int) $filters['cashbox_id']);
+            $detail = $this->cashTransactions($cashbox, $filters);
+
+            return $this->reportPayload(
+                key: $context->reportKey,
+                title: 'صورتحساب صندوق',
+                subtitle: $cashbox->code . ' - ' . $cashbox->name,
+                filters: $filters,
+                summary: $detail['summary'],
+                sections: $detail['sections'],
+            );
+        }
+
+        return $this->cashboxesSummaryReport('صورتحساب صندوق', 'موجودی و گردش صندوق‌های نقدی', $filters, $context);
+    }
+
     private function bankBookReport(array $filters, FinancialReportContext $context): array
     {
+        if (! empty($filters['bank_account_id'])) {
+            $bankAccount = BankAccount::query()->findOrFail((int) $filters['bank_account_id']);
+            $detail = $this->bankTransactions($bankAccount, $filters);
+
+            return $this->reportPayload(
+                key: $context->reportKey,
+                title: 'صورتحساب بانک',
+                subtitle: $bankAccount->code . ' - ' . $bankAccount->bank_name,
+                filters: $filters,
+                summary: $detail['summary'],
+                sections: $detail['sections'],
+            );
+        }
+
         return $this->cashOrBankReport('bank_account_id', 'دفتر بانک', 'گردش حساب‌های بانکی', $filters, $context);
     }
 
@@ -736,7 +1015,8 @@ class FinancialReportService
             ->when(! empty($filters['bank_account_id']), fn ($query) => $query->whereKey($filters['bank_account_id']))
             ->get()
             ->map(function (BankAccount $bankAccount) use ($filters) {
-            $query = $this->postedLines($filters)->where('bank_account_id', $bankAccount->id);
+            $lineFilters = $filters + ['bank_account_id' => $bankAccount->id];
+            $query = $this->postedLines($lineFilters, excludeReversalDocuments: true);
             $journalDebit = (float) $query->sum('debit');
             $journalCredit = (float) $query->sum('credit');
             $statementBalance = (float) $bankAccount->opening_balance + $journalDebit - $journalCredit;
@@ -904,6 +1184,34 @@ class FinancialReportService
                 ],
             ],
         );
+    }
+
+    private function taxElectronicBooksReport(array $filters, FinancialReportContext $context): array
+    {
+        $workbook = app(TaxElectronicBooksWorkbookService::class)->build($filters);
+        $analysis = $workbook['analysis'];
+
+        $payload = $this->reportPayload(
+            key: $context->reportKey,
+            title: 'دفاتر الکترونیک مالیاتی',
+            subtitle: 'گزارش مالیاتی دوره ' . TaxElectronicBooksWorkbookService::PERIOD_FROM . ' تا ' . TaxElectronicBooksWorkbookService::PERIOD_TO,
+            filters: $workbook['filters'],
+            summary: [
+                'lines' => $analysis['line_count'],
+                'debit' => $analysis['total_debit'],
+                'credit' => $analysis['total_credit'],
+                'balance_difference' => $analysis['balance_difference'],
+                'documents' => $analysis['document_count'],
+            ],
+            sections: $workbook['sections'],
+        );
+
+        $payload['analysis'] = $analysis;
+        $payload['tax_export_rows'] = $workbook['tax_export_rows'];
+        $payload['summary']['export_status'] = $analysis['export_status'] ?? null;
+        $payload['summary']['export_ready'] = $analysis['export_ready'] ?? false;
+
+        return $payload;
     }
 
     private function expenseAnalysisReport(array $filters, FinancialReportContext $context): array
@@ -1234,27 +1542,135 @@ class FinancialReportService
 
     private function cashOrBankReport(string $field, string $title, string $subtitle, array $filters, FinancialReportContext $context): array
     {
-        $rows = $this->postedLines($filters)->filter(fn ($line) => filled(data_get($line, $field)))->groupBy($field)->map(function (Collection $group, $key) use ($field, $filters) {
-            $entity = $field === 'cashbox_id' ? Cashbox::find($key) : BankAccount::find($key);
-            $reportKey = $field === 'bank_account_id' ? 'bank-statement' : 'cash-book';
+        $filters = $this->normalizeFilters($filters);
+
+        // Bank/cash list must use the same balance engine as detail views
+        // (opening + posted lines via applyBankAccountFilter / applyCashboxFilter).
+        if ($field === 'bank_account_id') {
+            return $this->bankAccountsSummaryReport($title, $subtitle, $filters, $context);
+        }
+
+        if ($field === 'cashbox_id' && $context->reportKey === 'cash-statement') {
+            return $this->cashboxesSummaryReport($title, $subtitle, $filters, $context);
+        }
+
+        $rows = $this->postedLines($filters, excludeReversalDocuments: true)->filter(fn ($line) => filled(data_get($line, $field)))->groupBy($field)->map(function (Collection $group, $key) use ($field, $filters) {
+            $entity = Cashbox::find($key);
             $detailUrl = route('financial-reports.show', array_merge([
-                'report' => $reportKey,
-                'bank_account_id' => $field === 'bank_account_id' ? (int) $key : null,
-                'cashbox_id' => $field === 'cashbox_id' ? (int) $key : null,
+                'report' => 'cash-book',
+                'cashbox_id' => (int) $key,
             ], $filters));
 
             return [
                 'id' => (int) $key,
                 'code' => $entity?->code ?: (string) $key,
-                'name' => $entity?->name ?? $entity?->bank_name ?? '-',
+                'name' => $entity?->name ?? '-',
                 'opening' => (float) ($entity?->opening_balance ?? 0),
                 'debit' => (float) $group->sum('debit'),
                 'credit' => (float) $group->sum('credit'),
                 'closing' => (float) ($entity?->opening_balance ?? 0) + (float) $group->sum('debit') - (float) $group->sum('credit'),
-                'bank_account_id' => $field === 'bank_account_id' ? (int) $key : null,
-                'cashbox_id' => $field === 'cashbox_id' ? (int) $key : null,
+                'bank_account_id' => null,
+                'cashbox_id' => (int) $key,
                 'detail_url' => $detailUrl,
             ];
+        })->values();
+
+        return $this->reportPayload(
+            key: $context->reportKey,
+            title: $title,
+            subtitle: $subtitle,
+            filters: $filters,
+            summary: ['accounts' => $rows->count()],
+            sections: [
+                [
+                    'title' => $title,
+                    'headers' => ['کد', 'عنوان', 'افتتاحیه', 'بدهکار', 'بستانکار', 'پایان دوره'],
+                    'rows' => $rows,
+                ],
+            ],
+        );
+    }
+
+    private function bankAccountsSummaryReport(string $title, string $subtitle, array $filters, FinancialReportContext $context): array
+    {
+        $banks = BankAccount::query()
+            ->when(! empty($filters['bank_account_id']), fn ($query) => $query->whereKey((int) $filters['bank_account_id']))
+            ->orderBy('code')
+            ->get();
+
+        $rows = $banks->map(function (BankAccount $bankAccount) use ($filters) {
+            $summary = $this->bankTransactions($bankAccount, $filters)['summary'];
+            $detailUrl = route('financial-reports.show', array_merge([
+                'report' => 'bank-statement',
+                'bank_account_id' => $bankAccount->id,
+            ], $filters));
+
+            return [
+                'id' => $bankAccount->id,
+                'code' => $bankAccount->code,
+                'name' => $bankAccount->bank_name,
+                'opening' => (float) ($summary['opening_balance'] ?? 0),
+                'debit' => (float) ($summary['period_debit'] ?? 0),
+                'credit' => (float) ($summary['period_credit'] ?? 0),
+                'closing' => (float) ($summary['closing_balance'] ?? 0),
+                'bank_account_id' => $bankAccount->id,
+                'cashbox_id' => null,
+                'detail_url' => $detailUrl,
+            ];
+        })->filter(function (array $row) {
+            return abs($row['opening']) > 0.00001
+                || abs($row['debit']) > 0.00001
+                || abs($row['credit']) > 0.00001
+                || abs($row['closing']) > 0.00001;
+        })->values();
+
+        return $this->reportPayload(
+            key: $context->reportKey,
+            title: $title,
+            subtitle: $subtitle,
+            filters: $filters,
+            summary: ['accounts' => $rows->count()],
+            sections: [
+                [
+                    'title' => $title,
+                    'headers' => ['کد', 'عنوان', 'افتتاحیه', 'بدهکار', 'بستانکار', 'پایان دوره'],
+                    'rows' => $rows,
+                ],
+            ],
+        );
+    }
+
+    private function cashboxesSummaryReport(string $title, string $subtitle, array $filters, FinancialReportContext $context): array
+    {
+        $cashboxes = Cashbox::query()
+            ->when(! empty($filters['cashbox_id']), fn ($query) => $query->whereKey((int) $filters['cashbox_id']))
+            ->orderBy('code')
+            ->get();
+
+        $rows = $cashboxes->map(function (Cashbox $cashbox) use ($filters) {
+            $summary = $this->cashTransactions($cashbox, $filters)['summary'];
+            $detailUrl = route('financial-reports.show', array_merge([
+                'report' => 'cash-statement',
+                'cashbox_id' => $cashbox->id,
+            ], $filters));
+
+            return [
+                'id' => $cashbox->id,
+                'code' => $cashbox->code,
+                'name' => $cashbox->name,
+                'opening' => (float) ($summary['opening_balance'] ?? 0),
+                'debit' => (float) ($summary['period_debit'] ?? 0),
+                'credit' => (float) ($summary['period_credit'] ?? 0),
+                'closing' => (float) ($summary['closing_balance'] ?? 0),
+                'bank_account_id' => null,
+                'cashbox_id' => $cashbox->id,
+                'detail_url' => $detailUrl,
+            ];
+        })->filter(function (array $row) {
+            return abs($row['opening']) > 0.00001
+                || abs($row['debit']) > 0.00001
+                || abs($row['credit']) > 0.00001
+                || abs($row['closing']) > 0.00001;
         })->values();
 
         return $this->reportPayload(
@@ -1356,12 +1772,13 @@ class FinancialReportService
             'customer-statement', 'supplier-statement' => ['code', 'name', 'debit', 'credit', 'balance', 'balance_type'],
             'outstanding-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
             'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'days_overdue', 'outstanding_balance'],
-            'cash-book', 'bank-book', 'bank-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
-            'bank-transactions' => ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
+            'cash-book', 'bank-book', 'bank-statement', 'cash-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+            'bank-transactions', 'cash-transactions' => ['date', 'document_number', 'account', 'detail_account', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
             'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
             'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
             'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],
             'tax-transactions' => ['date', 'document_number', 'account', 'description', 'debit', 'credit'],
+            'tax-electronic-books' => ['row_number', 'date', 'ledger_code', 'ledger_title', 'subsidiary_code', 'subsidiary_title', 'description', 'debit', 'credit'],
             'profitability-by-project' => ['project', 'revenue', 'cost', 'profit'],
             'profitability-by-customer' => ['party', 'revenue', 'cost', 'profit'],
             'cost-center-report' => ['cost_center', 'debit', 'credit', 'balance'],
@@ -1383,7 +1800,7 @@ class FinancialReportService
             }
         }
 
-        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'bank_account_id', 'per_page'] as $key) {
+        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'bank_account_id', 'cashbox_id', 'per_page', 'fiscal_period_id'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $filters[$key] = (int) $filters[$key];
             }
@@ -1394,15 +1811,15 @@ class FinancialReportService
         return $filters;
     }
 
-    private function postedLines(array $filters): Collection
+    private function postedLines(array $filters, bool $excludeReversalDocuments = false): Collection
     {
-        return $this->postedLineQuery($filters)
+        return $this->postedLineQuery($filters, $excludeReversalDocuments)
             ->orderBy('accounting_documents.document_date')
             ->orderBy('accounting_document_lines.id')
             ->get();
     }
 
-    private function openingLines(array $filters): Collection
+    private function openingLines(array $filters, bool $excludeReversalDocuments = false): Collection
     {
         if (empty($filters['date_from'])) {
             return collect();
@@ -1411,15 +1828,21 @@ class FinancialReportService
         $openingFilters = $filters;
         $openingFilters['date_to'] = \Carbon\Carbon::parse($filters['date_from'])->subDay()->toDateString();
 
-        return $this->postedLineQuery($openingFilters)
+        return $this->postedLineQuery($openingFilters, $excludeReversalDocuments)
             ->orderBy('accounting_documents.document_date')
             ->orderBy('accounting_document_lines.id')
             ->get();
     }
 
-    private function postedLineQuery(array $filters): Builder
+    private function postedLineQuery(array $filters, bool $excludeReversalDocuments = false): Builder
     {
-        return $this->reports->postedLineQuery($filters);
+        $query = $this->reports->postedLineQuery($filters, $excludeReversalDocuments);
+
+        if (! empty($filters['fiscal_period_id'])) {
+            $query->where('accounting_documents.fiscal_period_id', $filters['fiscal_period_id']);
+        }
+
+        return $query;
     }
 
     private function accountBalances(Collection $currentLines, Collection $openingLines): Collection
@@ -1580,6 +2003,388 @@ class FinancialReportService
         ];
     }
 
+    private function bankStatementLineRow($line, Collection $linesByDocument, Collection $documentSources): array
+    {
+        $row = $this->lineRow($line);
+        $documentId = (int) ($line->accounting_document_id ?? 0);
+        $siblings = $linesByDocument->get($documentId, collect());
+        $document = $documentSources->get($documentId) ?? $line->document;
+
+        $party = $this->resolveBankStatementParty($line, $siblings, $document);
+        if ($party) {
+            $row['party'] = $party['name'];
+            $row['party_id'] = $party['id'];
+        } else {
+            $row['party_id'] = $line->party_id ? (int) $line->party_id : null;
+        }
+
+        $project = $this->resolveBankStatementProject($line, $siblings, $document);
+        if ($project) {
+            $row['project'] = $project['name'];
+            $row['project_id'] = $project['id'];
+        } else {
+            $row['project_id'] = $line->project_id ? (int) $line->project_id : null;
+        }
+
+        $row['description_parts'] = $this->resolveBankStatementDescriptionParts($line, $siblings, $document, $party, $project);
+        $row['description'] = $row['description_parts']['full'];
+        $row['description_primary'] = $row['description_parts']['primary'];
+        $row['description_secondary'] = $row['description_parts']['secondary'];
+
+        return $row;
+    }
+
+    private function treasuryStatementTransactions(
+        string $treasuryFilterKey,
+        int $treasuryId,
+        float $openingBalance,
+        string $subtitle,
+        string $payloadKey,
+        string $title,
+        string $sectionTitle,
+        array $filters,
+    ): array {
+        $filters = $this->normalizeFilters($filters);
+        $filters[$treasuryFilterKey] = $treasuryId;
+
+        $partyFilterId = ! empty($filters['party_id']) ? (int) $filters['party_id'] : null;
+        $projectFilterId = ! empty($filters['project_id']) ? (int) $filters['project_id'] : null;
+        $scopedByCounterparty = $partyFilterId || $projectFilterId;
+
+        $lineFilters = $filters;
+        if ($scopedByCounterparty) {
+            unset($lineFilters['party_id'], $lineFilters['project_id']);
+        }
+
+        $baseQuery = $this->postedLineQuery($lineFilters, excludeReversalDocuments: true)
+            ->orderBy('accounting_documents.document_date')
+            ->orderBy('accounting_document_lines.id');
+
+        $openingLines = collect();
+        if (! empty($filters['date_from'])) {
+            $openingFilters = $lineFilters;
+            $openingFilters['date_to'] = Carbon::parse($openingFilters['date_from'])->subDay()->toDateString();
+            unset($openingFilters['date_from']);
+
+            $openingLines = $this->postedLineQuery($openingFilters, excludeReversalDocuments: true)
+                ->orderBy('accounting_documents.document_date')
+                ->orderBy('accounting_document_lines.id')
+                ->get();
+        }
+
+        $periodLines = $baseQuery->get();
+        [$linesByDocument, $documentSources] = $this->bankStatementLineContext(
+            $openingLines->concat($periodLines)->unique('id'),
+        );
+
+        $openingRows = $this->mapBankStatementRows($openingLines, $linesByDocument, $documentSources);
+        if ($scopedByCounterparty) {
+            $openingRows = $this->filterBankStatementRowsByCounterparty($openingRows, $partyFilterId, $projectFilterId);
+        }
+
+        $treasuryOpening = $scopedByCounterparty ? 0.0 : $openingBalance;
+        $startingBalance = $treasuryOpening + (float) $openingRows->sum(
+            fn (array $row) => (float) $row['debit'] - (float) $row['credit'],
+        );
+        $computedOpeningBalance = $startingBalance;
+
+        $periodRows = $this->mapBankStatementRows($periodLines, $linesByDocument, $documentSources);
+        if ($scopedByCounterparty) {
+            $periodRows = $this->filterBankStatementRowsByCounterparty($periodRows, $partyFilterId, $projectFilterId);
+        }
+
+        $runningBalance = $startingBalance;
+        $rows = $periodRows->map(function (array $row) use (&$runningBalance) {
+            $runningBalance += (float) $row['debit'] - (float) $row['credit'];
+            $row['running_balance'] = $runningBalance;
+
+            return $row;
+        })->values();
+
+        return $this->reportPayload(
+            key: $payloadKey,
+            title: $title,
+            subtitle: $subtitle,
+            filters: $filters,
+            summary: [
+                'opening_balance' => $computedOpeningBalance,
+                'period_debit' => (float) $periodRows->sum('debit'),
+                'period_credit' => (float) $periodRows->sum('credit'),
+                'closing_balance' => $runningBalance,
+                'line_count' => $rows->count(),
+            ],
+            sections: [
+                [
+                    'title' => $sectionTitle,
+                    'headers' => ['تاریخ', 'شماره سند', 'طرف حساب', 'پروژه', 'شرح', 'بدهکار', 'بستانکار', 'مانده جاری'],
+                    'rows' => $rows,
+                    'columns' => ['date', 'document_number', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'],
+                ],
+            ],
+        );
+    }
+
+    private function bankStatementLineContext(Collection $lines): array
+    {
+        $documentIds = $lines->pluck('accounting_document_id')->unique()->filter()->all();
+
+        $linesByDocument = AccountingDocumentLine::query()
+            ->whereIn('accounting_document_id', $documentIds)
+            ->with(['party', 'project'])
+            ->get()
+            ->groupBy('accounting_document_id');
+
+        $documentSources = AccountingDocument::query()
+            ->whereIn('id', $documentIds)
+            ->with(['source'])
+            ->get()
+            ->keyBy('id');
+
+        return [$linesByDocument, $documentSources];
+    }
+
+    private function mapBankStatementRows(Collection $lines, Collection $linesByDocument, Collection $documentSources): Collection
+    {
+        return $lines
+            ->map(fn ($line) => $this->bankStatementLineRow($line, $linesByDocument, $documentSources))
+            ->values();
+    }
+
+    private function filterBankStatementRowsByCounterparty(Collection $rows, ?int $partyFilterId, ?int $projectFilterId): Collection
+    {
+        return $rows->filter(function (array $row) use ($partyFilterId, $projectFilterId) {
+            if ($partyFilterId && (int) ($row['party_id'] ?? 0) !== $partyFilterId) {
+                return false;
+            }
+
+            if ($projectFilterId && (int) ($row['project_id'] ?? 0) !== $projectFilterId) {
+                return false;
+            }
+
+            return true;
+        })->values();
+    }
+
+    /**
+     * @param  array{id:int,name:string}|null  $party
+     * @param  array{id:int,name:string}|null  $project
+     * @return array{primary: string, secondary: ?string, full: string}
+     */
+    private function resolveBankStatementDescriptionParts($line, Collection $siblings, ?AccountingDocument $document, ?array $party, ?array $project): array
+    {
+        $lineDescription = trim((string) ($line->description ?? ''));
+        $documentDescription = trim((string) ($document?->description ?? ''));
+        $isGeneric = $lineDescription === '' || in_array($lineDescription, self::GENERIC_BANK_LINE_DESCRIPTIONS, true);
+        $source = $document?->source;
+        $sourceNote = $this->bankStatementSourceNote($source);
+        $categoryDetail = $this->bankStatementCategoryDetail($source, $siblings, $line, $documentDescription);
+
+        if ($isGeneric) {
+            $primaryParts = array_values(array_filter([
+                $this->bankStatementActionLabel($lineDescription, $line),
+                $party['name'] ?? null,
+                $categoryDetail,
+            ], fn ($part) => is_string($part) && trim($part) !== ''));
+
+            $primary = $primaryParts !== [] ? implode(' — ', $primaryParts) : ($documentDescription ?: '-');
+        } else {
+            $primary = $lineDescription;
+        }
+
+        if (($project['name'] ?? null) && ! str_contains($primary, $project['name'])) {
+            $primary .= ' — پروژه: ' . $project['name'];
+        }
+
+        $secondary = $this->bankStatementSecondaryDescription(
+            $primary,
+            $sourceNote,
+            $documentDescription,
+            $categoryDetail,
+        );
+
+        return [
+            'primary' => $primary,
+            'secondary' => $secondary,
+            'full' => $secondary ? $primary . ' — ' . $secondary : $primary,
+        ];
+    }
+
+    private function bankStatementSourceNote(mixed $source): ?string
+    {
+        if ($source instanceof TreasuryTransaction || $source instanceof PaymentVoucher || $source instanceof ReceiptVoucher || $source instanceof FinancialTransaction) {
+            $note = trim((string) ($source->description ?? ''));
+
+            return $note !== '' ? $note : null;
+        }
+
+        if ($source instanceof Invoice) {
+            $note = trim((string) ($source->description ?? ''));
+
+            return $note !== '' ? $note : null;
+        }
+
+        return null;
+    }
+
+    private function bankStatementCategoryDetail(mixed $source, Collection $siblings, $line, string $documentDescription): ?string
+    {
+        if ($source instanceof FinancialTransaction) {
+            $source->loadMissing(['detailAccount', 'chartAccount']);
+            $category = trim((string) ($source->detailAccount?->title ?: $source->category ?: $source->chartAccount?->title ?: ''));
+            if ($category !== '') {
+                $kind = $source->type === 'income' ? 'سند درآمد مالی' : 'سند هزینه مالی';
+
+                return $kind . ' - ' . $category;
+            }
+        }
+
+        if ($source instanceof Invoice) {
+            return 'فاکتور ' . $source->number;
+        }
+
+        $sibling = $this->bankStatementMeaningfulSibling($siblings, $line);
+        if ($sibling) {
+            return $sibling;
+        }
+
+        return $documentDescription !== '' ? $documentDescription : null;
+    }
+
+    private function bankStatementMeaningfulSibling(Collection $siblings, $line): ?string
+    {
+        $sibling = $siblings->first(function ($sibling) use ($line) {
+            if ((int) $sibling->id === (int) $line->id) {
+                return false;
+            }
+
+            $description = trim((string) ($sibling->description ?? ''));
+
+            return $description !== '' && ! in_array($description, self::GENERIC_BANK_LINE_DESCRIPTIONS, true);
+        });
+
+        return $sibling ? trim((string) $sibling->description) : null;
+    }
+
+    private function bankStatementSecondaryDescription(string $primary, ?string $sourceNote, string $documentDescription, ?string $categoryDetail): ?string
+    {
+        $candidates = array_values(array_filter([
+            $sourceNote,
+            $documentDescription !== '' && $documentDescription !== $categoryDetail ? $documentDescription : null,
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if ($this->isDistinctBankStatementDescription($candidate, $primary)) {
+                return trim($candidate);
+            }
+        }
+
+        return null;
+    }
+
+    private function isDistinctBankStatementDescription(string $candidate, string ...$existing): bool
+    {
+        $normalizedCandidate = $this->normalizeBankStatementDescription($candidate);
+
+        if ($normalizedCandidate === '') {
+            return false;
+        }
+
+        foreach ($existing as $item) {
+            $normalizedExisting = $this->normalizeBankStatementDescription($item);
+
+            if ($normalizedExisting === '') {
+                continue;
+            }
+
+            if ($normalizedCandidate === $normalizedExisting) {
+                return false;
+            }
+
+            if (str_contains($normalizedExisting, $normalizedCandidate) || str_contains($normalizedCandidate, $normalizedExisting)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function normalizeBankStatementDescription(?string $text): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', (string) $text) ?? '');
+    }
+
+    private function bankStatementActionLabel(string $lineDescription, $line): string
+    {
+        return match ($lineDescription) {
+            'پرداخت خزانه', 'انتقال خروجی خزانه', 'پرداخت بانکی', 'برداشت شریک' => 'پرداخت',
+            'دریافت خزانه', 'انتقال ورودی خزانه', 'دریافت بانکی', 'واریز شریک' => 'دریافت',
+            default => (float) $line->debit > 0
+                ? 'دریافت'
+                : ((float) $line->credit > 0 ? 'پرداخت' : 'تراکنش'),
+        };
+    }
+
+    private function resolveBankStatementParty($line, Collection $siblings, ?AccountingDocument $document): ?array
+    {
+        if ($line->party_id && $line->party?->name) {
+            return ['id' => (int) $line->party_id, 'name' => $line->party->name];
+        }
+
+        $source = $document?->source;
+
+        if ($source instanceof TreasuryTransaction) {
+            $source->loadMissing('party');
+
+            if ($source->party_id && $source->party?->name) {
+                return ['id' => (int) $source->party_id, 'name' => $source->party->name];
+            }
+        }
+
+        if ($source instanceof Invoice) {
+            $source->loadMissing('party');
+
+            if ($source->party_id && $source->party?->name) {
+                return ['id' => (int) $source->party_id, 'name' => $source->party->name];
+            }
+        }
+
+        $sibling = $siblings
+            ->first(fn ($sibling) => (int) $sibling->id !== (int) $line->id && $sibling->party_id);
+
+        if ($sibling?->party_id && $sibling->party?->name) {
+            return ['id' => (int) $sibling->party_id, 'name' => $sibling->party->name];
+        }
+
+        return null;
+    }
+
+    private function resolveBankStatementProject($line, Collection $siblings, ?AccountingDocument $document): ?array
+    {
+        if ($line->project_id && $line->project?->name) {
+            return ['id' => (int) $line->project_id, 'name' => $line->project->name];
+        }
+
+        $source = $document?->source;
+
+        if ($source instanceof TreasuryTransaction && $source->project_id) {
+            $source->loadMissing('project');
+            $project = $source->project ?: Project::query()->find($source->project_id);
+
+            if ($project?->name) {
+                return ['id' => (int) $project->id, 'name' => $project->name];
+            }
+        }
+
+        $sibling = $siblings
+            ->first(fn ($sibling) => (int) $sibling->id !== (int) $line->id && $sibling->project_id);
+
+        if ($sibling?->project_id && $sibling->project?->name) {
+            return ['id' => (int) $sibling->project_id, 'name' => $sibling->project->name];
+        }
+
+        return null;
+    }
+
     private function invoiceRows(array $filters): Collection
     {
         return $this->reports->invoiceQuery($filters)->orderBy('invoice_date')->get();
@@ -1611,6 +2416,64 @@ class FinancialReportService
             ->withCount('lines as line_count')
             ->orderByDesc('accounting_documents.document_date')
             ->orderByDesc('accounting_documents.id');
+    }
+
+    /**
+     * @return Collection<int, array{party: Party, debit: float, credit: float, balance: float, last_date: ?Carbon, lines: Collection}>
+     */
+    private function unifiedPartyStatementBalances(array $filters): Collection
+    {
+        $lines = $this->reports->partyStatementRows(null, null, $filters);
+
+        return $lines->groupBy('party_id')->map(function (Collection $group) {
+            $party = $group->first()?->party;
+            if (! $party) {
+                return null;
+            }
+
+            $debit = (float) $group->sum('debit');
+            $credit = (float) $group->sum('credit');
+            $lastDate = $group->max(fn ($line) => $line->document?->document_date);
+
+            return [
+                'party' => $party,
+                'debit' => $debit,
+                'credit' => $credit,
+                'balance' => $debit - $credit,
+                'last_date' => $lastDate ? Carbon::parse($lastDate) : null,
+                'lines' => $group,
+            ];
+        })->filter()->values();
+    }
+
+    private function partyQualifiesForSupplierScope(?Party $party, Collection $lines): bool
+    {
+        if (! $party) {
+            return false;
+        }
+
+        $party->loadMissing(['types:id,name', 'employees:id,party_id']);
+
+        if ($party->types->whereIn('name', ['vendor', 'supplier', 'colleague'])->isNotEmpty()) {
+            return true;
+        }
+
+        if ($party->employees->isNotEmpty()) {
+            return true;
+        }
+
+        if ($lines->contains(function ($line) {
+            $code = (string) ($line->account?->code ?? '');
+
+            return $code !== '' && str_starts_with($code, '2101');
+        })) {
+            return true;
+        }
+
+        return AccountingDocumentLine::query()
+            ->where('party_id', $party->id)
+            ->whereHas('account', fn (Builder $query) => $query->where('code', 'like', '2101%'))
+            ->exists();
     }
 
     private function partyBalances(array $filters, ?int $accountId): Collection
@@ -1680,6 +2543,63 @@ class FinancialReportService
             $days <= 90 => '61-90 روز',
             default => 'بیش از 90 روز',
         };
+    }
+
+    /**
+     * @param  Collection<int, array{balance?: float|int, days?: int}>  $rows
+     * @return array{
+     *     total_payables: float,
+     *     overdue: float,
+     *     over_90: float,
+     *     party_count: int,
+     *     invoice_count: int,
+     *     buckets: array<string, float>
+     * }
+     */
+    private function agingBalanceSummary(Collection $rows, string $totalKey): array
+    {
+        $buckets = [
+            'current' => 0.0,
+            'days_1_30' => 0.0,
+            'days_31_60' => 0.0,
+            'days_61_90' => 0.0,
+            'over_90' => 0.0,
+        ];
+
+        $partyCount = 0;
+
+        foreach ($rows as $row) {
+            $amount = (float) ($row['balance'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $partyCount++;
+            $days = (int) ($row['days'] ?? 0);
+
+            if ($days <= 0) {
+                $buckets['current'] += $amount;
+            } elseif ($days <= 30) {
+                $buckets['days_1_30'] += $amount;
+            } elseif ($days <= 60) {
+                $buckets['days_31_60'] += $amount;
+            } elseif ($days <= 90) {
+                $buckets['days_61_90'] += $amount;
+            } else {
+                $buckets['over_90'] += $amount;
+            }
+        }
+
+        $total = array_sum($buckets);
+
+        return [
+            $totalKey => $total,
+            'overdue' => $total - $buckets['current'],
+            'over_90' => $buckets['over_90'],
+            'party_count' => $partyCount,
+            'invoice_count' => $partyCount,
+            'buckets' => $buckets,
+        ];
     }
 
     private function paginateCollection(Collection $rows, int $perPage): Paginator

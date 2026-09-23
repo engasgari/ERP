@@ -20,6 +20,7 @@ class Index extends Component
     public string $search = '';
     public string $is_active = '';
     public ?int $editingId = null;
+    public bool $showFormModal = false;
 
     public array $form = [
         'code' => '',
@@ -62,12 +63,27 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function openCreate(): void
+    {
+        $this->cancel();
+        $this->showFormModal = true;
+    }
+
     public function edit(int $id): void
     {
         $bank = BankAccount::with(['account', 'detailAccount'])->findOrFail($id);
         $this->editingId = $bank->id;
         $this->form = $bank->only(['code', 'bank_name', 'branch', 'account_number', 'iban', 'card_number', 'currency', 'opening_balance', 'chart_account_id', 'is_active']);
+        $this->form['opening_balance'] = (float) $bank->opening_balance;
         $this->form['chart_account_id'] = $this->form['chart_account_id'] ?: '';
+        $this->form['is_active'] = $bank->is_active ? '1' : '0';
+        $this->showFormModal = true;
+    }
+
+    public function closeFormModal(): void
+    {
+        $this->showFormModal = false;
+        $this->cancel();
     }
 
     public function cancel(): void
@@ -91,14 +107,14 @@ class Index extends Component
     {
         $data = $this->validate()['form'];
         $data['chart_account_id'] = $data['chart_account_id'] ?: null;
-        $data['opening_balance'] = (float) $data['opening_balance'];
+        $data['opening_balance'] = normalizeMoneyValue($data['opening_balance']) ?? 0;
         $data['is_active'] = (string) $data['is_active'] === '1' || $data['is_active'] === true;
 
         $bank = BankAccount::updateOrCreate(['id' => $this->editingId], $data);
         app(BankAccountCodingService::class)->syncDetailAccount($bank);
 
         session()->flash('success', 'حساب بانکی ذخیره شد.');
-        $this->cancel();
+        $this->closeFormModal();
     }
 
     public function delete(int $id): void

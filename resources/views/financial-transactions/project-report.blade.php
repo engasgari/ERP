@@ -30,21 +30,21 @@
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div class="text-green-600 text-sm">کل درآمدها</div>
-                <div class="text-2xl font-bold text-green-700">{{ number_format($totalIncome) }} ریال</div>
+                <div class="text-2xl font-bold text-green-700">{{ formatMoney($totalIncome) }} ریال</div>
                 <div class="text-xs text-green-600 mt-1">
-                    {{ $project->financialTransactions()->where('type', 'income')->count() }} تراکنش
+                    {{ $transactions->where('type', 'income')->count() }} تراکنش
                 </div>
             </div>
             <div class="bg-red-50 border border-red-200 rounded-lg p-4">
                 <div class="text-red-600 text-sm">کل هزینه‌ها</div>
-                <div class="text-2xl font-bold text-red-700">{{ number_format($totalExpense) }} ریال</div>
+                <div class="text-2xl font-bold text-red-700">{{ formatMoney($totalExpense) }} ریال</div>
                 <div class="text-xs text-red-600 mt-1">
-                    {{ $project->financialTransactions()->where('type', 'expense')->count() }} تراکنش
+                    {{ $transactions->where('type', 'expense')->count() }} تراکنش / سند
                 </div>
             </div>
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div class="text-blue-600 text-sm">هزینه حقوق</div>
-                <div class="text-2xl font-bold text-blue-700">{{ number_format($totalLaborCost) }} ریال</div>
+                <div class="text-2xl font-bold text-blue-700">{{ formatMoney($totalLaborCost) }} ریال</div>
                 <div class="text-xs text-blue-600 mt-1">
                     {{ $project->workLogs()->count() }} کارکرد
                 </div>
@@ -52,7 +52,7 @@
             <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <div class="text-orange-600 text-sm">هزینه قطعات</div>
                 <div class="text-2xl font-bold text-orange-600">
-                    {{ number_format($WareHouseOutTotalAmount) }} ریال
+                    {{ formatMoney($WareHouseOutTotalAmount) }} ریال
                 </div>
                 <div class="text-xs text-orange-600 mt-1">
                     قبل از کسر حقوق
@@ -61,10 +61,10 @@
             <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <div class="text-purple-600 text-sm">سود خالص</div>
                 <div class="text-2xl font-bold {{ $netProfit >= 0 ? 'text-green-700' : 'text-red-700' }}">
-                    {{ number_format($netProfit) }} ریال
+                    {{ formatMoney($netProfit) }} ریال
                 </div>
                 <div class="text-xs {{ $netProfit >= 0 ? 'text-green-600' : 'text-red-600' }} mt-1">
-                    {{ number_format($profitPercentage, 1) }}%
+                    {{ formatMoney($profitPercentage, 1) }}%
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
                                     <span class="text-gray-600">{{ $category->category }}</span>
-                                    <span class="font-semibold">{{ number_format($category->total) }} ریال</span>
+                                    <span class="font-semibold">{{ formatMoney($category->total) }} ریال</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-2">
                                     @php
@@ -88,7 +88,7 @@
                                     @endphp
                                     <div class="bg-green-600 h-2 rounded-full" style="width: {{ $percentage }}%"></div>
                                 </div>
-                                <div class="text-xs text-gray-500 text-left mt-1">{{ number_format($percentage, 1) }}%</div>
+                                <div class="text-xs text-gray-500 text-left mt-1">{{ formatMoney($percentage, 1) }}%</div>
                             </div>
                         @endforeach
                     </div>
@@ -106,7 +106,7 @@
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
                                     <span class="text-gray-600">{{ $category->category }}</span>
-                                    <span class="font-semibold">{{ number_format($category->total) }} ریال</span>
+                                    <span class="font-semibold">{{ formatMoney($category->total) }} ریال</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-2">
                                     @php
@@ -114,7 +114,7 @@
                                     @endphp
                                     <div class="bg-red-600 h-2 rounded-full" style="width: {{ $percentage }}%"></div>
                                 </div>
-                                <div class="text-xs text-gray-500 text-left mt-1">{{ number_format($percentage, 1) }}%</div>
+                                <div class="text-xs text-gray-500 text-left mt-1">{{ formatMoney($percentage, 1) }}%</div>
                             </div>
                         @endforeach
                     </div>
@@ -153,19 +153,19 @@
                                         {{ $employee->full_name }}
                                     </a>
                                 </td>
-                                <td class="border border-gray-300 p-3">{{ number_format($totalHours, 1) }} ساعت</td>
-                                <td class="border border-gray-300 p-3">{{ number_format($avgHourlyRate) }} ریال</td>
+                                <td class="border border-gray-300 p-3">{{ formatMoney($totalHours, 1) }} ساعت</td>
+                                <td class="border border-gray-300 p-3">{{ formatMoney($avgHourlyRate) }} ریال</td>
                                 <td class="border border-gray-300 p-3 font-semibold text-green-600">
-                                    {{ number_format($totalAmount) }} ریال
+                                    {{ formatMoney($totalAmount) }} ریال
                                 </td>
                             </tr>
                         @endforeach
                         <tr class="bg-gray-50 font-semibold">
                             <td class="border border-gray-300 p-3">جمع کل</td>
-                            <td class="border border-gray-300 p-3">{{ number_format($project->total_work_hours, 1) }} ساعت</td>
+                            <td class="border border-gray-300 p-3">{{ formatMoney($project->total_work_hours, 1) }} ساعت</td>
                             <td class="border border-gray-300 p-3">-</td>
                             <td class="border border-gray-300 p-3 text-green-600">
-                                {{ number_format($totalLaborCost) }} ریال
+                                {{ formatMoney($totalLaborCost) }} ریال
                             </td>
                         </tr>
                         </tbody>
@@ -195,20 +195,28 @@
                         </thead>
                         <tbody>
                         @foreach($transactions as $transaction)
+                            @php
+                                $isIncome = ($transaction->type ?? '') === 'income';
+                                $typeColor = $isIncome ? 'text-green-600' : 'text-red-600';
+                                $signedAmount = ($isIncome ? '+' : '-') . formatMoney((float) $transaction->amount) . ' ریال';
+                            @endphp
                             <tr class="hover:bg-gray-50">
                                 <td class="border border-gray-300 p-3">
-                                    {{ verta($transaction->transaction_date)->format('Y/m/d') }}
+                                    {{ gregorianToJalaliDate($transaction->transaction_date) }}
                                 </td>
                                 <td class="border border-gray-300 p-3">
-                                <span class="{{ $transaction->type_color }} font-semibold">
-                                    {{ $transaction->type_icon }} {{ $transaction->type_label }}
+                                <span class="{{ $typeColor }} font-semibold">
+                                    {{ $isIncome ? 'درآمد' : 'هزینه' }}
+                                    @if(($transaction->row_source ?? '') === 'ledger_expense')
+                                        <span class="text-xs text-slate-500">(سند)</span>
+                                    @endif
                                 </span>
                                 </td>
                                 <td class="border border-gray-300 p-3">
-                                    {{ $transaction->category }}
+                                    {{ $transaction->category ?: '-' }}
                                 </td>
-                                <td class="border border-gray-300 p-3 font-semibold {{ $transaction->type_color }}">
-                                    {{ $transaction->signed_amount }}
+                                <td class="border border-gray-300 p-3 font-semibold {{ $typeColor }}">
+                                    {{ $signedAmount }}
                                 </td>
                                 <td class="border border-gray-300 p-3">
                                     {{ $transaction->description ?: '-' }}
@@ -248,7 +256,7 @@
                         @foreach($transactionsWarehouse as $transaction)
                             <tr class="hover:bg-gray-50">
                                 <td class="border border-gray-300 p-3">
-                                    {{ verta($transaction->transaction_date)->format('Y/m/d') }}
+                                    {{ gregorianToJalaliDate($transaction->transaction_date) }}
                                 </td>
                                 <td class="border border-gray-300 p-3">
                                 <span class="{{ $transaction->type_color }} font-semibold">
@@ -289,28 +297,28 @@
                 <div class="space-y-3">
                     <div class="flex justify-between">
                         <span class="text-gray-600">کل درآمدها:</span>
-                        <span class="font-semibold text-green-600">{{ number_format($totalIncome) }} ریال</span>
+                        <span class="font-semibold text-green-600">{{ formatMoney($totalIncome) }} ریال</span>
                     </div>
                     <div class="flex justify-between  border-t border-gray-300 pt-2 mt-2">
                         <span class="text-gray-600">کل هزینه‌ها (بدون حقوق):</span>
-                        <span class="font-semibold text-red-600">{{ number_format($totalExpense) }} ریال</span>
+                        <span class="font-semibold text-red-600">{{ formatMoney($totalExpense) }} ریال</span>
                     </div>
 
                     <div class="flex justify-between  border-t border-gray-300 pt-2 mt-2">
                         <span class="text-gray-600">هزینه حقوق پرسنل:</span>
-                        <span class="font-semibold text-blue-600">{{ number_format($totalLaborCost) }} ریال</span>
+                        <span class="font-semibold text-blue-600">{{ formatMoney($totalLaborCost) }} ریال</span>
                     </div>
                     <div class="flex justify-between border-t border-gray-300 pt-2 mt-2">
                         <span class="text-gray-600">هزینه خرید قطعات:</span>
-                        <span class="font-semibold text-blue-600">{{ number_format($WareHouseOutTotalAmount) }} ریال</span>
+                        <span class="font-semibold text-blue-600">{{ formatMoney($WareHouseOutTotalAmount) }} ریال</span>
                     </div>
 
                     <div class="border-t border-gray-300 pt-2 mt-2">
                         <div class="flex justify-between text-lg font-bold">
                             <span>سود خالص:</span>
                             <span class="{{ $netProfit >= 0 ? 'text-green-600' : 'text-red-600' }}">
-                            {{ number_format($netProfit) }} ریال
-                            <span class="text-sm font-normal">({{ number_format($profitPercentage, 1) }}%)</span>
+                            {{ formatMoney($netProfit) }} ریال
+                            <span class="text-sm font-normal">({{ formatMoney($profitPercentage, 1) }}%)</span>
                         </span>
                         </div>
                     </div>
@@ -333,7 +341,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-600">کل ساعت کار:</span>
-                        <span class="font-semibold">{{ number_format($project->total_work_hours, 1) }} ساعت</span>
+                        <span class="font-semibold">{{ formatMoney($project->total_work_hours, 1) }} ساعت</span>
                     </div>
                 </div>
             </div>

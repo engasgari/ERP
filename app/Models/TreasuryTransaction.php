@@ -13,6 +13,7 @@ class TreasuryTransaction extends Model
 
     protected $fillable = [
         'number',
+        'fiscal_year_id',
         'type',
         'transaction_date',
         'amount',
@@ -58,6 +59,11 @@ class TreasuryTransaction extends Model
     public function party(): BelongsTo
     {
         return $this->belongsTo(Party::class);
+    }
+
+    public function expenseAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartAccount::class, 'expense_account_id');
     }
 
     public function accountingDocument(): BelongsTo

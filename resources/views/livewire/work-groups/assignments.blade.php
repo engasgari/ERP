@@ -77,12 +77,18 @@
                         <td>{{ formatJalaliDateSafe($assignment->start_date) }}</td>
                         <td>{{ $assignment->end_date ? formatJalaliDateSafe($assignment->end_date) : 'فعال' }}</td>
                         <td>
-                            <div class="flex flex-col gap-2 sm:flex-row">
+                            <x-erp.ui.row-actions>
                                 @if(! $assignment->end_date)
-                                    <button type="button" wire:click="closeAssignment({{ $assignment->id }})" class="erp-action-btn erp-action-edit">بستن</button>
+                                    <x-erp.ui.row-action icon="close" label="بستن" wire:click="closeAssignment({{ $assignment->id }})" />
                                 @endif
-                                <button type="button" wire:click="delete({{ $assignment->id }})" wire:confirm="تخصیص حذف شود؟" class="erp-action-btn erp-action-delete">حذف</button>
-                            </div>
+                                <x-erp.ui.row-action
+                                    icon="delete"
+                                    label="حذف"
+                                    tone="danger"
+                                    wire:click="delete({{ $assignment->id }})"
+                                    wire:confirm="تخصیص حذف شود؟"
+                                />
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty

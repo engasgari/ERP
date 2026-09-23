@@ -13,13 +13,8 @@ class ReportCenterService
                 'description' => 'گزارش‌های فروش، خرید، مانده اشخاص و پیگیری وصول و پرداخت.',
                 'reports' => [
                     [
-                        'title' => 'خلاصه تراکنش‌های مالی',
-                        'description' => 'جمع‌بندی درآمدها و هزینه‌های ثبت‌شده در سیستم',
-                        'route' => route('financial-transactions.summary'),
-                    ],
-                    [
                         'title' => 'صورتحساب اشخاص',
-                        'description' => 'ریز گردش حساب مشتریان و تأمین‌کنندگان',
+                        'description' => 'ریز گردش مشتری، تأمین‌کننده، همکار، فروشنده و پرسنل با فیلتر نوع',
                         'route' => route('financial-reports.statement'),
                     ],
                     [
@@ -82,9 +77,9 @@ class ReportCenterService
                         'route' => route('management-reports.tax-summary'),
                     ],
                     [
-                        'title' => 'گزارش مالی پرسنل',
-                        'description' => 'جمع‌بندی مالی کارکنان در یک نمای خلاصه',
-                        'route' => route('salaries.financial-report'),
+                        'title' => 'لیست و پرداخت حقوق',
+                        'description' => 'ریز محاسبات حقوق و ثبت پرداخت با حساب بانکی',
+                        'route' => route('payroll.payments.index'),
                     ],
                 ],
             ],
@@ -97,6 +92,11 @@ class ReportCenterService
                         'title' => 'کارکرد ماهانه',
                         'description' => 'خلاصه کارکرد، اضافه‌کاری و غیبت هر دوره',
                         'route' => route('management-reports.attendance-monthly'),
+                    ],
+                    [
+                        'title' => 'ریز کارکرد روزانه',
+                        'description' => 'لیست روزانه با بازه ساعت تأخیر، تعجیل و غیبت',
+                        'route' => route('management-reports.attendance-daily'),
                     ],
                     [
                         'title' => 'اضافه‌کاری و تاخیر',
@@ -148,6 +148,38 @@ class ReportCenterService
                 ],
             ],
             [
+                'key' => 'tax',
+                'title' => 'گزارش‌های مالیاتی',
+                'description' => 'دفاتر الکترونیک و گزارش‌های مالیاتی مورد نیاز سامانه مودیان.',
+                'reports' => [
+                    [
+                        'title' => 'دفاتر الکترونیک مالیاتی',
+                        'description' => 'خروجی اکسل مطابق قالب رسمی سامانه مالیاتی بر اساس اسناد حسابداری ثبت‌شده',
+                        'route' => route('financial-reports.show', ['report' => 'tax-electronic-books']),
+                    ],
+                    [
+                        'title' => 'گزارش مالیات فروش',
+                        'description' => 'مالیات فروش فاکتورهای فروش',
+                        'route' => route('financial-reports.show', ['report' => 'sales-tax']),
+                    ],
+                    [
+                        'title' => 'گزارش مالیات خرید',
+                        'description' => 'مالیات خرید فاکتورهای خرید',
+                        'route' => route('financial-reports.show', ['report' => 'purchase-tax']),
+                    ],
+                    [
+                        'title' => 'خلاصه VAT',
+                        'description' => 'جمع فروش، خرید، مالیات و مانده قابل پرداخت',
+                        'route' => route('financial-reports.show', ['report' => 'vat-summary']),
+                    ],
+                    [
+                        'title' => 'گردش مالیاتی',
+                        'description' => 'سطرهای سند مرتبط با حساب‌های مالیاتی',
+                        'route' => route('financial-reports.show', ['report' => 'tax-transactions']),
+                    ],
+                ],
+            ],
+            [
                 'key' => 'financial',
                 'title' => 'مالی',
                 'description' => 'گزارش‌های استاندارد مالی، دفتر کل، تراز و تحلیل سود و زیان.',
@@ -186,6 +218,11 @@ class ReportCenterService
                         'title' => 'گردش بانک',
                         'description' => 'صورت‌حساب و گردش حساب‌های بانکی',
                         'route' => route('financial-reports.show', ['report' => 'bank-statement']),
+                    ],
+                    [
+                        'title' => 'گردش صندوق',
+                        'description' => 'صورت‌حساب و گردش صندوق‌های نقدی',
+                        'route' => route('financial-reports.show', ['report' => 'cash-statement']),
                     ],
                     [
                         'title' => 'مغایرت بانکی',

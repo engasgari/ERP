@@ -31,26 +31,6 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updateField(int $projectId, string $field, mixed $value): void
-    {
-        abort_unless(in_array($field, ['name', 'status', 'budget'], true), 403);
-
-        $project = Project::findOrFail($projectId);
-        $data = match ($field) {
-            'name' => ['name' => trim((string) $value)],
-            'status' => ['status' => array_key_exists((string) $value, Project::STATUSES) ? (string) $value : $project->status],
-            'budget' => ['budget' => $value !== '' ? max(0, (float) $value) : null],
-        };
-
-        if (($data['name'] ?? $project->name) === '') {
-            session()->flash('error', 'نام پروژه الزامی است.');
-            return;
-        }
-
-        $project->update($data);
-        session()->flash('success', 'تغییرات پروژه ذخیره شد.');
-    }
-
     public function render()
     {
         $query = Project::with('party', 'manager');

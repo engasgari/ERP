@@ -14,7 +14,7 @@
 
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         @foreach($group['reports'] as $report)
-                            <a href="{{ route('financial-reports.show', ['report' => $report['key']]) }}" wire:navigate class="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-white hover:shadow-sm">
+                            <a href="{{ erp_report_url('financial-reports.show', ['report' => $report['key']]) }}" wire:navigate class="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-white hover:shadow-sm">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
                                         <div class="text-base font-bold text-slate-900">{{ $report['title'] }}</div>

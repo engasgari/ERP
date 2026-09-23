@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use App\Models\User;
 
@@ -50,6 +51,11 @@ class Invoice extends Model
         return $this->belongsTo(Party::class);
     }
 
+    public function fiscalYear(): BelongsTo
+    {
+        return $this->belongsTo(FiscalYear::class);
+    }
+
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
@@ -65,6 +71,16 @@ class Invoice extends Model
         return $this->hasMany(InvoiceLine::class);
     }
 
+    public function contractorAllocation(): HasOne
+    {
+        return $this->hasOne(InvoiceContractorAllocation::class, 'sale_invoice_id');
+    }
+
+    public function contractorPurchaseAllocations(): HasMany
+    {
+        return $this->hasMany(InvoiceContractorAllocation::class, 'purchase_invoice_id');
+    }
+
     public function accountingDocument(): BelongsTo
     {
         return $this->belongsTo(AccountingDocument::class);
@@ -73,6 +89,11 @@ class Invoice extends Model
     public function settledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'settled_by');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function inventoryDocuments(): MorphMany

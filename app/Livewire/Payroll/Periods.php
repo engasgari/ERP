@@ -3,6 +3,8 @@
 namespace App\Livewire\Payroll;
 
 use App\Exceptions\PayrollPrerequisiteException;
+use App\Models\BankAccount;
+use App\Models\Cashbox;
 use App\Models\PayrollItem;
 use App\Models\PayrollPeriod;
 use App\Models\PayrollCalculation;
@@ -20,6 +22,8 @@ class Periods extends Component
     public string $notes = '';
     public int $perPage = 12;
     public array $paymentDrafts = [];
+    public ?int $defaultBankAccountId = null;
+    public ?int $defaultCashboxId = null;
 
     protected $queryString = [
         'year' => ['except' => 0],
@@ -31,15 +35,10 @@ class Periods extends Component
     {
         $requestedYear = (int) request()->integer('year', 0);
         $requestedMonth = (int) request()->integer('month', 0);
-        $todayParts = explode('/', formatJalaliDateSafe(now()));
 
-        $this->year = $requestedYear > 0
-            ? $requestedYear
-            : (int) ($todayParts[0] ?? 1405);
-
-        $this->month = $requestedMonth > 0
-            ? $requestedMonth
-            : (int) ($todayParts[1] ?? 1);
+        $this->year = $requestedYear > 0 ? $requestedYear : (int) getCurrentPersianYear();
+        $this->month = $requestedMonth > 0 ? $requestedMonth : (int) getCurrentPersianMonth();
+        $this->normalizePeriodFilters();
     }
 
     public function updated($name): void
@@ -125,6 +124,21 @@ class Periods extends Component
         session()->flash('success', 'دوره حقوق بسته شد.');
     }
 
+    public function reopen(int $periodId): void
+    {
+        $period = PayrollPeriod::findOrFail($periodId);
+
+        try {
+            app(PayrollCalculationService::class)->reopen($period);
+        } catch (\RuntimeException $exception) {
+            session()->flash('error', $exception->getMessage());
+
+            return;
+        }
+
+        session()->flash('success', 'دوره حقوق باز شد و امکان محاسبه مجدد فعال است.');
+    }
+
     public function registerPayment(int $calculationId): void
     {
         $calculation = PayrollCalculation::with(['period', 'employee.party', 'payments'])->findOrFail($calculationId);
@@ -133,6 +147,8 @@ class Periods extends Component
             "paymentDrafts.$calculationId.payment_date" => ['required', 'string', 'max:20'],
             "paymentDrafts.$calculationId.method" => ['required', 'in:cash,bank'],
             "paymentDrafts.$calculationId.amount" => ['nullable', 'numeric', 'min:1'],
+            "paymentDrafts.$calculationId.bank_account_id" => ['nullable', 'required_if:paymentDrafts.'.$calculationId.'.method,bank', 'exists:bank_accounts,id'],
+            "paymentDrafts.$calculationId.cashbox_id" => ['nullable', 'required_if:paymentDrafts.'.$calculationId.'.method,cash', 'exists:cashboxes,id'],
             "paymentDrafts.$calculationId.reference_number" => ['nullable', 'string', 'max:100'],
             "paymentDrafts.$calculationId.description" => ['nullable', 'string', 'max:500'],
         ]);
@@ -142,6 +158,8 @@ class Periods extends Component
                 'payment_date' => jalaliToGregorianDate($this->paymentDrafts[$calculationId]['payment_date']) ?: now()->toDateString(),
                 'amount' => $this->paymentDrafts[$calculationId]['amount'] ?? null,
                 'method' => $this->paymentDrafts[$calculationId]['method'] ?? 'bank',
+                'bank_account_id' => $this->paymentDrafts[$calculationId]['bank_account_id'] ?? null,
+                'cashbox_id' => $this->paymentDrafts[$calculationId]['cashbox_id'] ?? null,
                 'reference_number' => $this->paymentDrafts[$calculationId]['reference_number'] ?? null,
                 'description' => $this->paymentDrafts[$calculationId]['description'] ?? null,
             ], auth()->id());
@@ -155,15 +173,29 @@ class Periods extends Component
         session()->flash('success', 'پرداخت حقوق ثبت شد و سند حسابداری پرداخت شماره ' . ($payment->accountingDocument?->number ?: '-') . ' ایجاد شد.');
     }
 
+    public function reversePayment(int $calculationId): void
+    {
+        $calculation = PayrollCalculation::with(['period', 'payments'])->findOrFail($calculationId);
+
+        try {
+            app(NewPayrollEngineService::class)->reversePayment($calculation, auth()->id());
+        } catch (\Throwable $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
+
+        session()->flash('success', 'پرداخت حقوق برگشت داده شد. سند پرداخت عطف شد.');
+    }
+
     public function render()
     {
-        $periods = PayrollPeriod::withCount(['attendanceCalculations', 'salaries'])
+        $periods = PayrollPeriod::withCount(['attendanceCalculations'])
             ->withCount(['monthlyAttendances', 'payrollCalculations'])
             ->withCount([
                 'payrollCalculations as failed_payroll_calculations_count' => fn ($query) => $query->where('status', 'failed'),
                 'payrollCalculations as successful_payroll_calculations_count' => fn ($query) => $query->where('status', 'calculated'),
             ])
-            ->withSum('salaries', 'final_salary')
             ->withSum('payrollCalculations', 'net_payable')
             ->orderByDesc('year')
             ->orderByDesc('month')
@@ -187,6 +219,8 @@ class Periods extends Component
             $this->paymentDrafts[$calculation->id] = array_merge([
                 'payment_date' => todayJalaliDate(),
                 'method' => 'bank',
+                'bank_account_id' => $this->defaultBankAccountId,
+                'cashbox_id' => $this->defaultCashboxId,
                 'amount' => $remaining,
                 'reference_number' => '',
                 'description' => 'پرداخت حقوق',
@@ -197,11 +231,23 @@ class Periods extends Component
             ->orderBy('sort_order')
             ->get();
 
-        return view('livewire.payroll.periods', compact('periods', 'items', 'calculations'));
+        $bankAccounts = BankAccount::query()->where('is_active', true)->orderBy('bank_name')->get();
+        $cashboxes = Cashbox::query()->where('is_active', true)->orderBy('name')->get();
+
+        if ($this->defaultBankAccountId === null) {
+            $this->defaultBankAccountId = $bankAccounts->first()?->id;
+        }
+        if ($this->defaultCashboxId === null) {
+            $this->defaultCashboxId = $cashboxes->first()?->id;
+        }
+
+        return view('livewire.payroll.periods', compact('periods', 'items', 'calculations', 'bankAccounts', 'cashboxes'));
     }
 
     private function validatePeriod(): void
     {
+        $this->normalizePeriodFilters();
+
         $this->validate([
             'year' => ['required', 'integer', 'min:1400', 'max:1500'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
@@ -211,5 +257,16 @@ class Periods extends Component
             'month' => 'ماه',
             'notes' => 'توضیحات',
         ]);
+    }
+
+    private function normalizePeriodFilters(): void
+    {
+        if ($this->year < 1400 || $this->year > 1500) {
+            $this->year = (int) getCurrentPersianYear();
+        }
+
+        if ($this->month < 1 || $this->month > 12) {
+            $this->month = (int) getCurrentPersianMonth();
+        }
     }
 }

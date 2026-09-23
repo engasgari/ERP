@@ -10,6 +10,7 @@ use App\Models\ProductionOrder;
 use App\Models\Project;
 use App\Models\Warehouse;
 use App\Services\AccountingPostingService;
+use App\Services\FiscalPeriodService;
 use App\Services\InventoryPostingService;
 use App\Services\NumberingService;
 use App\Services\ProjectCostingService;
@@ -179,10 +180,14 @@ class ProductionOrderController extends Controller
                         }
                     }
 
+                    $consumptionDate = now()->toDateString();
+                    $fiscalYear = app(FiscalPeriodService::class)->fiscalYearForDate($consumptionDate);
+
                     $document = InventoryDocument::create([
-                        'number' => $numbering->next('inventory_consumption', 'IC-'),
+                        'fiscal_year_id' => $fiscalYear?->id,
+                        'number' => $numbering->next('inventory_consumption', 'IC-', $fiscalYear?->id),
                         'type' => 'consumption',
-                        'document_date' => now()->toDateString(),
+                        'document_date' => $consumptionDate,
                         'document_time' => now()->format('H:i:s'),
                         'warehouse_id' => (int) $warehouseId,
                         'project_id' => $productionOrder->project_id,

@@ -14,6 +14,8 @@ class FiscalPeriodPolicy
 
     public function reopen(User $user, FiscalPeriod $period): bool
     {
-        return $user->hasPermission('fiscal-periods.reopen');
+        return $user->hasPermission('fiscal-years.manage')
+            || $user->hasPermission('fiscal-periods.reopen')
+            || $user->hasPermission('fiscal.reopen');
     }
 }

@@ -77,6 +77,11 @@ class InventoryDocument extends Model
 
     public function getIsAutomaticAttribute(): bool
     {
-        return $this->entry_mode === 'automatic' || $this->source_type !== null;
+        return $this->entry_mode === 'automatic';
+    }
+
+    public function getIsInitialStockAttribute(): bool
+    {
+        return $this->source_type === Item::class && $this->entry_mode === 'manual';
     }
 }

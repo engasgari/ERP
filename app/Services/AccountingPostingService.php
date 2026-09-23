@@ -4,15 +4,17 @@ namespace App\Services;
 
 use App\Models\AccountingAudit;
 use App\Models\AccountingDocument;
+use App\Models\BankAccount;
 use App\Models\ChartAccount;
 use App\Models\FinancialTransaction;
 use App\Models\InventoryDocument;
 use App\Models\Invoice;
+use App\Models\Party;
 use App\Models\PayrollAccountingSetting;
+use App\Models\InsurancePayment;
 use App\Models\PayrollPayment;
 use App\Models\PaymentVoucher;
 use App\Models\ReceiptVoucher;
-use App\Models\Salary;
 use App\Models\TreasuryTransaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +41,7 @@ class AccountingPostingService
             $document = AccountingDocument::create([
                 'fiscal_year_id' => $year?->id,
                 'fiscal_period_id' => $period?->id,
-                'number' => $data['number'] ?? $this->numbering->next('accounting_document', 'ACC-'),
+                'number' => $data['number'] ?? $this->numbering->next('accounting_document', 'ACC-', $year?->id),
                 'document_date' => $date,
                 'type' => $data['type'] ?? 'manual',
                 'status' => $data['status'] ?? 'draft',
@@ -56,6 +58,52 @@ class AccountingPostingService
 
             return $document;
         });
+    }
+
+    public function createPostedMaintenance(array $data, array $lines, ?Model $source = null, ?int $userId = null): AccountingDocument
+    {
+        return DB::transaction(function () use ($data, $lines, $source, $userId) {
+            $date = $data['document_date'];
+            $this->assertBalanced($lines);
+
+            $period = $this->periods->periodForDate($date);
+            $year = $period?->fiscalYear ?: $this->periods->fiscalYearForDate($date);
+
+            $document = AccountingDocument::create([
+                'fiscal_year_id' => $year?->id,
+                'fiscal_period_id' => $period?->id,
+                'number' => $data['number'] ?? $this->numbering->next('accounting_document', 'ACC-', $year?->id),
+                'document_date' => $date,
+                'type' => $data['type'] ?? 'manual',
+                'status' => 'posted',
+                'currency' => $data['currency'] ?? 'IRR',
+                'description' => $data['description'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'source_type' => $source ? $source::class : null,
+                'source_id' => $source?->id,
+                'created_by' => $userId,
+                'posted_at' => now(),
+                'posted_by' => $userId,
+            ]);
+
+            $this->replaceLines($document, $lines);
+            $this->audit($document, 'create', null, $document->load('lines')->toArray(), $userId);
+
+            return $document;
+        });
+    }
+
+    public function voidMaintenanceDocument(AccountingDocument $document, ?int $userId = null): AccountingDocument
+    {
+        $old = $document->toArray();
+        $document->update([
+            'status' => 'void',
+            'voided_at' => now(),
+            'voided_by' => $userId,
+        ]);
+        $this->audit($document, 'void', $old, $document->fresh()->toArray(), $userId);
+
+        return $document->refresh();
     }
 
     public function updateManual(AccountingDocument $document, array $data, array $lines, ?int $userId = null): AccountingDocument
@@ -114,12 +162,83 @@ class AccountingPostingService
         });
     }
 
+    public function reverse(AccountingDocument $document, ?int $userId = null): AccountingDocument
+    {
+        return DB::transaction(function () use ($document, $userId) {
+            $document->loadMissing('lines', 'source');
+
+            if ($document->status !== 'posted') {
+                throw new RuntimeException('Only posted accounting documents can be reversed.');
+            }
+
+            if ($document->voided_at) {
+                throw new RuntimeException('This accounting document has already been voided.');
+            }
+
+            $reversalLines = $document->lines->map(function ($line): array {
+                return [
+                    'chart_account_id' => $line->chart_account_id,
+                    'detail_account_id' => $line->detail_account_id,
+                    'party_id' => $line->party_id,
+                    'project_id' => $line->project_id,
+                    'cost_center' => $line->cost_center,
+                    'description' => $line->description,
+                    'debit' => (float) $line->credit,
+                    'credit' => (float) $line->debit,
+                    'currency' => $line->currency,
+                    'exchange_rate' => $line->exchange_rate,
+                    'bank_account_id' => $line->bank_account_id,
+                    'cashbox_id' => $line->cashbox_id,
+                ];
+            })->all();
+
+            $reversal = $this->createManual([
+                'document_date' => $this->reversalDocumentDate($document),
+                'type' => $document->type,
+                'status' => 'posted',
+                'currency' => $document->currency,
+                'description' => 'عطف سند ' . $document->number,
+                'notes' => $document->notes,
+            ], $reversalLines, $userId);
+
+            $reversal->update([
+                'branch_id' => $document->branch_id,
+            ]);
+
+            $old = $document->toArray();
+            $document->update([
+                'status' => 'void',
+                'voided_at' => now(),
+                'voided_by' => $userId,
+            ]);
+            $this->audit($document, 'reverse', $old, $document->toArray(), $userId);
+
+            return $reversal->refresh();
+        });
+    }
+
+    public function isReversalDocument(AccountingDocument $document): bool
+    {
+        return str_starts_with((string) $document->description, 'عطف سند');
+    }
+
+    public function isActiveSourceAccountingDocument(AccountingDocument $document): bool
+    {
+        return $document->status === 'posted'
+            && $document->voided_at === null
+            && ! $this->isReversalDocument($document);
+    }
+
     public function fromInvoice(Invoice $invoice, ?int $userId = null): AccountingDocument
     {
         $invoice->loadMissing('lines.item', 'party');
 
         if ($invoice->accounting_document_id) {
-            return $invoice->accountingDocument;
+            $document = $invoice->accountingDocument;
+
+            if ($document && $this->isActiveSourceAccountingDocument($document)) {
+                return $document;
+            }
         }
 
         $lines = [];
@@ -132,6 +251,12 @@ class AccountingPostingService
             $lines[] = $this->line($this->invoiceSalesRevenueCode(), 0, $net, 'درآمد فروش', partyId: $partyId, projectId: $projectId);
             if ((float) $invoice->tax_amount > 0) {
                 $lines[] = $this->line($this->invoiceSalesVatCode(), 0, $invoice->tax_amount, 'مالیات ارزش افزوده فروش', partyId: $partyId, projectId: $projectId);
+            }
+
+            $cogsAmount = $this->invoiceSaleCogsAmount($invoice);
+            if ($cogsAmount > 0) {
+                $lines[] = $this->line($this->invoiceCogsCode(), $cogsAmount, 0, 'بهای تمام‌شده کالای فروش‌رفته', partyId: $partyId, projectId: $projectId);
+                $lines[] = $this->line($this->invoiceInventoryCode(), 0, $cogsAmount, 'حواله انبار', partyId: $partyId, projectId: $projectId);
             }
         } else {
             $purchaseBreakdown = $this->invoicePurchaseBreakdown($invoice);
@@ -274,6 +399,7 @@ class AccountingPostingService
 
     public function fromTreasuryTransaction(TreasuryTransaction $transaction, ?int $userId = null): AccountingDocument
     {
+        $transaction->loadMissing('expenseAccount');
         $amount = (float) $transaction->amount;
         $bankOrCashTo = $transaction->to_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
         $bankOrCashFrom = $transaction->from_treasury_type === \App\Models\Cashbox::class ? '1201' : '1202';
@@ -294,7 +420,15 @@ class AccountingPostingService
                 $this->line($transaction->party_id ? '1101' : '4102', 0, $amount, 'طرف حساب دریافت', partyId: $transaction->party_id),
             ],
             'withdrawal', 'cash_payment', 'bank_payment' => [
-                $this->line($transaction->party_id ? '2101' : '5201', $amount, 0, 'طرف حساب پرداخت', partyId: $transaction->party_id),
+                $this->line(
+                    $transaction->expense_account_id ? ($transaction->expenseAccount?->code ?: '5201') : ($transaction->party_id ? '2101' : '5201'),
+                    $amount,
+                    0,
+                    $transaction->description ?: 'طرف حساب پرداخت',
+                    partyId: $transaction->party_id,
+                    projectId: $transaction->project_id ? (int) $transaction->project_id : null,
+                    accountId: $transaction->expense_account_id ?: null,
+                ),
                 $this->line($bankOrCashFrom, 0, $amount, 'پرداخت خزانه', bankAccountId: $fromBankAccountId, cashboxId: $fromCashboxId, detailAccountId: $fromBankDetailAccountId),
             ],
             default => [
@@ -313,6 +447,48 @@ class AccountingPostingService
         );
     }
 
+    public function fromPartnerCurrentAccountTransfer(
+        Party $party,
+        BankAccount $bankAccount,
+        string $direction,
+        float $amount,
+        string $date,
+        ChartAccount $partnerAccount,
+        ?string $description = null,
+        ?int $userId = null
+    ): AccountingDocument {
+        if (! in_array($direction, ['deposit', 'withdraw'], true)) {
+            throw new RuntimeException('نوع انتقال حساب جاری شریک معتبر نیست.');
+        }
+
+        if ($amount <= 0) {
+            throw new RuntimeException('مبلغ انتقال باید بزرگ‌تر از صفر باشد.');
+        }
+
+        $bankAccount->loadMissing('detailAccount');
+        $bankDetailAccountId = $bankAccount->detail_account_id;
+        $label = $description ?: ($direction === 'deposit' ? 'برداشت شریک' : 'واریز شریک');
+
+        $lines = $direction === 'deposit'
+            ? [
+                $this->line('3201', $amount, 0, $label, partyId: $party->id, accountId: $partnerAccount->id),
+                $this->line('1202', 0, $amount, 'پرداخت بانکی', bankAccountId: $bankAccount->id, detailAccountId: $bankDetailAccountId),
+            ]
+            : [
+                $this->line('1202', $amount, 0, 'دریافت بانکی', bankAccountId: $bankAccount->id, detailAccountId: $bankDetailAccountId),
+                $this->line('3201', 0, $amount, $label, partyId: $party->id, accountId: $partnerAccount->id),
+            ];
+
+        return $this->automatic(
+            source: $party,
+            type: AccountingDocument::TYPE_PARTNER_CURRENT,
+            date: $date,
+            description: ($direction === 'deposit' ? 'برداشت از حساب جاری ' : 'واریز به حساب جاری ') . $party->name,
+            lines: $lines,
+            userId: $userId
+        );
+    }
+
     public function fromFinancialTransaction(FinancialTransaction $transaction, ?int $userId = null): AccountingDocument
     {
         $transaction->loadMissing(['bankAccount', 'cashbox', 'chartAccount', 'detailAccount', 'accountingDocument']);
@@ -328,6 +504,7 @@ class AccountingPostingService
         $offsetDescription = trim((string) ($transaction->detailAccount?->title ?: $transaction->category ?: $transaction->chartAccount?->title));
         $documentDescription = $this->financialTransactionDocumentDescription($transaction->type, $offsetDescription);
         $projectId = $transaction->project_id ? (int) $transaction->project_id : null;
+        $counterAccountCode = $transaction->chartAccount?->code ?: $offsetCode;
 
         $lines = $transaction->type === 'income'
             ? [
@@ -341,7 +518,7 @@ class AccountingPostingService
                     detailAccountId: $bankDetailAccountId
                 ),
                 $this->line(
-                    $offsetCode,
+                    $counterAccountCode,
                     0,
                     $amount,
                     $documentDescription,
@@ -352,13 +529,13 @@ class AccountingPostingService
             ]
             : [
                 $this->line(
-                    $offsetCode,
+                    $counterAccountCode,
                     $amount,
                     0,
                     $documentDescription,
                     projectId: $projectId,
                     accountId: $transaction->chart_account_id ?: null,
-                    detailAccountId: $transaction->detail_account_id ?: null
+                    detailAccountId: $transaction->detail_account_id ?: null,
                 ),
                 $this->line(
                     $treasuryCode,
@@ -385,12 +562,36 @@ class AccountingPostingService
         return $document;
     }
 
-    public function deleteFinancialTransactionDocument(FinancialTransaction $transaction): void
+    public function deleteFinancialTransactionDocument(FinancialTransaction $transaction, ?int $userId = null): void
     {
-        $ids = collect([$transaction->accounting_document_id])
+        $this->deleteSourceAccountingDocuments(
+            FinancialTransaction::class,
+            $transaction->id,
+            $transaction->accounting_document_id,
+            $userId ?? $transaction->created_by
+        );
+    }
+
+    public function deleteTreasuryTransactionDocument(TreasuryTransaction $transaction, ?int $userId = null): void
+    {
+        $this->deleteSourceAccountingDocuments(
+            TreasuryTransaction::class,
+            $transaction->id,
+            $transaction->accounting_document_id,
+            $userId ?? $transaction->created_by
+        );
+    }
+
+    public function deleteSourceAccountingDocuments(
+        string $sourceType,
+        int $sourceId,
+        ?int $primaryDocumentId = null,
+        ?int $userId = null
+    ): void {
+        $ids = collect([$primaryDocumentId])
             ->merge(AccountingDocument::withTrashed()
-                ->where('source_type', FinancialTransaction::class)
-                ->where('source_id', $transaction->id)
+                ->where('source_type', $sourceType)
+                ->where('source_id', $sourceId)
                 ->pluck('id'))
             ->filter()
             ->unique()
@@ -403,77 +604,21 @@ class AccountingPostingService
                 continue;
             }
 
-            $document->lines()->delete();
-            $document->forceDelete();
+            if ($document->status === 'posted' && $document->voided_at === null) {
+                $this->reverse($document, $userId);
+                $document->refresh();
+            }
+
+            if (in_array($document->status, ['draft', 'void'], true)) {
+                $document->lines()->delete();
+                $document->forceDelete();
+            }
         }
-    }
-
-    public function fromSalary(Salary $salary, ?int $userId = null): AccountingDocument
-    {
-        $salary->loadMissing('employee', 'payments');
-
-        if ($salary->accounting_document_id) {
-            return $salary->accountingDocument;
-        }
-
-        $gross = (float) ($salary->gross_salary ?: ($salary->base_salary + $salary->overtime_salary + $salary->bonus + $salary->benefits));
-        $payable = (float) $salary->final_salary;
-        $deductions = max(0, $gross - $payable);
-
-        if ($gross <= 0 || $payable < 0) {
-            throw new RuntimeException('مبلغ حقوق برای ثبت سند حسابداری معتبر نیست.');
-        }
-
-        $period = getPersianMonthName($salary->month) . ' ' . $salary->year;
-        $employeeName = $salary->employee?->full_name ?: 'پرسنل #' . $salary->employee_id;
-
-        $lines = [
-            $this->line(
-                $this->payrollAccountCode('salary_expense', '5202'),
-                $gross,
-                0,
-                'هزینه حقوق و دستمزد ' . $employeeName . ' - ' . $period,
-                projectId: $salary->employee?->default_project_id,
-            ),
-            $this->line(
-                $this->payrollAccountCode('salary_payable', '2104'),
-                0,
-                $payable,
-                'حقوق پرداختنی ' . $employeeName . ' - ' . $period,
-                projectId: $salary->employee?->default_project_id,
-            ),
-        ];
-
-        if ($deductions > 0) {
-            $lines[] = $this->line(
-                $this->payrollAccountCode('deduction_payable', '2104'),
-                0,
-                $deductions,
-                'کسورات، مساعده و تعهدات حقوق ' . $employeeName . ' - ' . $period,
-                projectId: $salary->employee?->default_project_id,
-            );
-        }
-
-        $document = $this->automatic(
-            source: $salary,
-            type: 'manual',
-            date: now()->toDateString(),
-            description: 'ثبت خودکار حقوق و دستمزد ' . $employeeName . ' - ' . $period,
-            lines: $lines,
-            userId: $userId
-        );
-
-        $salary->update([
-            'accounting_document_id' => $document->id,
-            'posted_at' => now(),
-        ]);
-
-        return $document;
     }
 
     public function fromPayrollPayment(PayrollPayment $payment, ?int $userId = null): AccountingDocument
     {
-        $payment->loadMissing('calculation.employee.party');
+        $payment->loadMissing(['calculation.employee.party', 'bankAccount', 'cashbox', 'employee']);
 
         if ($payment->accounting_document_id) {
             return $payment->accountingDocument;
@@ -487,6 +632,15 @@ class AccountingPostingService
         $treasuryCode = $method === 'cash' ? '1201' : '1202';
         $salaryPayableCode = $this->payrollAccountCode('salary_payable', '2104');
         $amount = (float) $payment->amount;
+        $bankAccount = $payment->bankAccount;
+        $cashbox = $payment->cashbox;
+        $treasuryAccountId = $method === 'cash'
+            ? ($cashbox?->chart_account_id)
+            : ($bankAccount?->chart_account_id);
+        $treasuryDetailAccountId = $method === 'bank' ? ($bankAccount?->detail_account_id) : null;
+        $treasuryLabel = $method === 'cash'
+            ? ('پرداخت از صندوق ' . ($cashbox?->name ?: ''))
+            : ('پرداخت از حساب بانکی ' . trim(($bankAccount?->bank_name ?: '') . ' ' . ($bankAccount?->account_number ?: '')));
 
         $document = $this->automatic(
             source: $payment,
@@ -505,10 +659,104 @@ class AccountingPostingService
                     $treasuryCode,
                     0,
                     $amount,
-                    $method === 'cash' ? 'پرداخت از صندوق' : 'پرداخت از بانک'
+                    trim($treasuryLabel) ?: ($method === 'cash' ? 'پرداخت از صندوق' : 'پرداخت از بانک'),
+                    bankAccountId: $method === 'bank' ? $payment->bank_account_id : null,
+                    cashboxId: $method === 'cash' ? $payment->cashbox_id : null,
+                    accountId: $treasuryAccountId,
+                    detailAccountId: $treasuryDetailAccountId
                 ),
             ],
             userId: $userId ?? $payment->calculation?->approved_by
+        );
+
+        $payment->update(['accounting_document_id' => $document->id]);
+
+        return $document;
+    }
+
+    public function fromInsurancePayment(InsurancePayment $payment, ?int $userId = null): AccountingDocument
+    {
+        $payment->loadMissing(['lines.period', 'bankAccount', 'cashbox']);
+
+        if ($payment->accounting_document_id) {
+            return $payment->accountingDocument;
+        }
+
+        $method = $payment->method ?: 'bank';
+        $treasuryCode = $method === 'cash' ? '1201' : '1202';
+        $payableCode = $this->payrollAccountCode('insurance_payable', '2104');
+        $penaltyCode = $this->payrollAccountCode('insurance_penalty_expense', '520115');
+        $otherCode = $this->payrollAccountCode('insurance_other_expense', '520115');
+        $principal = round((float) $payment->principal_amount, 2);
+        $penalty = round((float) $payment->penalty_amount, 2);
+        $other = round((float) $payment->other_amount, 2);
+        $total = round((float) $payment->total_amount, 2);
+        $bankAccount = $payment->bankAccount;
+        $cashbox = $payment->cashbox;
+        $treasuryAccountId = $method === 'cash'
+            ? ($cashbox?->chart_account_id)
+            : ($bankAccount?->chart_account_id);
+        $treasuryDetailAccountId = $method === 'bank' ? ($bankAccount?->detail_account_id) : null;
+        $treasuryLabel = $method === 'cash'
+            ? ('پرداخت از صندوق ' . ($cashbox?->name ?: ''))
+            : ('پرداخت از حساب بانکی ' . trim(($bankAccount?->bank_name ?: '') . ' ' . ($bankAccount?->account_number ?: '')));
+        $periodTitles = $payment->lines
+            ->map(fn ($line) => $line->period?->persian_title)
+            ->filter()
+            ->unique()
+            ->implode('، ');
+
+        $lines = [];
+
+        if ($principal > 0) {
+            $lines[] = $this->line(
+                $payableCode,
+                $principal,
+                0,
+                'تسویه بیمه تأمین اجتماعی' . ($periodTitles ? ' - ' . $periodTitles : '')
+            );
+        }
+
+        if ($penalty > 0) {
+            $lines[] = $this->line(
+                $penaltyCode,
+                $penalty,
+                0,
+                'جریمه تأخیر بیمه' . ($periodTitles ? ' - ' . $periodTitles : '')
+            );
+        }
+
+        if ($other > 0) {
+            $lines[] = $this->line(
+                $otherCode,
+                $other,
+                0,
+                'سایر هزینه‌های بیمه' . ($periodTitles ? ' - ' . $periodTitles : '')
+            );
+        }
+
+        if ($total <= 0) {
+            throw new RuntimeException('مبلغ پرداخت بیمه باید بیشتر از صفر باشد.');
+        }
+
+        $lines[] = $this->line(
+            $treasuryCode,
+            0,
+            $total,
+            trim($treasuryLabel) ?: ($method === 'cash' ? 'پرداخت از صندوق' : 'پرداخت از بانک'),
+            bankAccountId: $method === 'bank' ? $payment->bank_account_id : null,
+            cashboxId: $method === 'cash' ? $payment->cashbox_id : null,
+            accountId: $treasuryAccountId,
+            detailAccountId: $treasuryDetailAccountId
+        );
+
+        $document = $this->automatic(
+            source: $payment,
+            type: 'payment',
+            date: $payment->payment_date->toDateString(),
+            description: 'پرداخت بیمه تأمین اجتماعی' . ($payment->number ? ' - ' . $payment->number : ''),
+            lines: $lines,
+            userId: $userId ?? $payment->created_by
         );
 
         $payment->update(['accounting_document_id' => $document->id]);
@@ -609,6 +857,21 @@ class AccountingPostingService
         return $this->resolveChartAccountCode(['2101'], ['حساب‌های پرداختنی تجاری', 'حساب پرداختنی فروشنده']);
     }
 
+    private function invoiceSaleCogsAmount(Invoice $invoice): float
+    {
+        return app(SalesProfitCalculationService::class)->invoiceCogs($invoice);
+    }
+
+    private function invoiceCogsCode(): string
+    {
+        return $this->resolveChartAccountCode(['5103'], ['بهای تمام‌شده کالای فروش‌رفته']);
+    }
+
+    private function invoiceInventoryCode(): string
+    {
+        return $this->resolveChartAccountCode(['1103'], ['موجودی کالا', 'موجودی کالا']);
+    }
+
     private function resolveChartAccountCode(array $codes, array $titles = []): string
     {
         foreach ($codes as $code) {
@@ -663,6 +926,23 @@ class AccountingPostingService
         $kind = $type === 'income' ? 'سند درآمد مالی' : 'سند هزینه مالی';
 
         return trim($kind . ' - ' . $title);
+    }
+
+    private function reversalDocumentDate(AccountingDocument $document): string
+    {
+        $candidates = array_values(array_filter([
+            now()->toDateString(),
+            $document->document_date?->toDateString(),
+            $this->periods->getActiveFiscalPeriod()?->start_date?->toDateString(),
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if ($this->periods->isDateAllowed($candidate)) {
+                return $candidate;
+            }
+        }
+
+        throw new RuntimeException('No open fiscal period is available for reversing the accounting document.');
     }
 
     private function replaceLines(AccountingDocument $document, array $lines): void

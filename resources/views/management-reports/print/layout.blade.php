@@ -4,15 +4,22 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $reportTitle ?? 'گزارش' }} - {{ config('app.name', 'ERP') }}</title>
+    @include('components.pdf-persian-font-styles', [
+        'forPdf' => $forPdf ?? false,
+        'pdfFontRegular' => $pdfFontRegular ?? null,
+        'pdfFontBold' => $pdfFontBold ?? null,
+    ])
     <style>
         * { box-sizing: border-box; }
         body {
             margin: 0;
             background: #f3f4f6;
             color: #111827;
-            font-family: Tahoma, Arial, sans-serif;
+            font-family: {{ ($forPdf ?? false) ? 'vazirmatn, DejaVu Sans, sans-serif' : 'Tahoma, Arial, sans-serif' }};
             font-size: 12px;
             line-height: 1.7;
+            direction: rtl;
+            text-align: right;
         }
         .print-toolbar {
             display: flex;
@@ -123,13 +130,15 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ ($forPdf ?? false) ? 'pdf-document' : '' }}">
+@if(! ($forPdf ?? false))
 <div class="print-toolbar">
     <button type="button" onclick="window.print()">چاپ</button>
     @isset($backRoute)
         <a href="{{ $backRoute }}">بازگشت</a>
     @endisset
 </div>
+@endif
 
 <main class="print-page">
     <header class="print-header">

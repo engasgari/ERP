@@ -16,9 +16,9 @@
             <table class="w-full border-collapse border border-gray-300">
                 <tbody>
                     <tr><th class="border border-gray-300 p-3">پروژه</th><td class="border border-gray-300 p-3">{{ $workLog->project?->name ?: '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">تاریخ</th><td class="border border-gray-300 p-3">{{ verta($workLog->work_date)->format('Y/m/d') }}</td></tr>
+                    <tr><th class="border border-gray-300 p-3">تاریخ</th><td class="border border-gray-300 p-3">{{ gregorianToJalaliDate($workLog->work_date) }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">زمان</th><td class="border border-gray-300 p-3">{{ $workLog->time_range }}</td></tr>
-                    <tr><th class="border border-gray-300 p-3">ساعت</th><td class="border border-gray-300 p-3">{{ number_format($workLog->hours, 1) }}</td></tr>
+                    <tr><th class="border border-gray-300 p-3">ساعت</th><td class="border border-gray-300 p-3">{{ formatMoney($workLog->hours, 1) }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">نرخ</th><td class="border border-gray-300 p-3">{{ $workLog->formatted_hourly_rate }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">مبلغ (ریال)</th><td class="border border-gray-300 p-3">{{ $workLog->formatted_total_amount }}</td></tr>
                     <tr><th class="border border-gray-300 p-3">شرح</th><td class="border border-gray-300 p-3">{{ $workLog->description ?: '-' }}</td></tr>

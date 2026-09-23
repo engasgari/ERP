@@ -11,8 +11,8 @@
                     <td>{{ chartAccountDisplayLabel($row->account) }}</td>
                     <td>{{ $row->party?->name ?: '-' }}</td>
                     <td>{{ $row->description }}</td>
-                    <td>{{ number_format($row->debit) }}</td>
-                    <td>{{ number_format($row->credit) }}</td>
+                    <td>{{ formatMoney($row->debit) }}</td>
+                    <td>{{ formatMoney($row->credit) }}</td>
                 </tr>
             @empty
                 <tr><td colspan="7" class="text-center text-slate-500 py-6">ردیفی برای نمایش وجود ندارد.</td></tr>

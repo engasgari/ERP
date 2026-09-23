@@ -70,7 +70,7 @@
                 @forelse($balances as $balance)
                     <div class="mb-3 rounded-md border border-slate-200 p-3">
                         <div class="font-semibold text-slate-900">{{ $balance->year }}</div>
-                        <div class="mt-1 text-sm text-slate-600">مانده: {{ number_format((float) $balance->remaining_days, 2) }} روز</div>
+                        <div class="mt-1 text-sm text-slate-600">مانده: {{ formatMoney((float) $balance->remaining_days, 2) }} روز</div>
                     </div>
                 @empty
                     <p class="text-sm text-slate-500">مانده‌ای ثبت نشده است.</p>
@@ -82,8 +82,8 @@
                 @forelse($summaries as $summary)
                     <div class="mb-3 rounded-md border border-slate-200 p-3 text-sm">
                         <div class="font-semibold text-slate-900">{{ getPersianMonthName($summary->month) }} {{ $summary->year }}</div>
-                        <div class="mt-1 text-slate-600">کارکرد: {{ number_format($summary->worked_minutes / 60, 2) }} ساعت</div>
-                        <div class="text-slate-600">غیبت: {{ number_format($summary->absence_minutes / 60, 2) }} ساعت</div>
+                        <div class="mt-1 text-slate-600">کارکرد: {{ formatMoney($summary->worked_minutes / 60, 2) }} ساعت</div>
+                        <div class="text-slate-600">غیبت: {{ formatMoney($summary->absence_minutes / 60, 2) }} ساعت</div>
                     </div>
                 @empty
                     <p class="text-sm text-slate-500">کارکردی ثبت نشده است.</p>
@@ -95,7 +95,7 @@
                 @forelse($payslips as $calculation)
                     <div class="mb-3 rounded-md border border-slate-200 p-3 text-sm">
                         <div class="font-semibold text-slate-900">{{ $calculation->period?->persian_title ?: '-' }}</div>
-                        <div class="mt-1 text-slate-600">خالص: {{ number_format((float) $calculation->net_payable) }}</div>
+                        <div class="mt-1 text-slate-600">خالص: {{ formatMoney((float) $calculation->net_payable) }}</div>
                         @if($calculation->payslip)
                             <a class="mt-2 inline-block text-blue-600" href="{{ route('payslips.print', $calculation->payslip) }}" target="_blank">مشاهده فیش</a>
                         @endif

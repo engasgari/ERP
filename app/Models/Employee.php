@@ -103,19 +103,14 @@ class Employee extends Model
         return $this->hasMany(EmployeeHistory::class);
     }
 
-    public function salaries(): HasMany
+    public function payrollCalculations(): HasMany
     {
-        return $this->hasMany(Salary::class);
+        return $this->hasMany(PayrollCalculation::class);
     }
 
-    public function payments(): HasMany
+    public function payrollPayments(): HasMany
     {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function transactions(): HasMany
-    {
-        return $this->hasMany(EmployeeTransaction::class);
+        return $this->hasMany(PayrollPayment::class);
     }
 
     public function defaultProject(): BelongsTo
@@ -247,18 +242,5 @@ class Employee extends Model
     public function getIsCurrentlyEmployedAttribute(): bool
     {
         return $this->employment_status === 'فعال';
-    }
-
-    public function getFinancialBalanceAttribute(): float
-    {
-        $debit = $this->transactions()->where('type', 'debit')->sum('amount');
-        $credit = $this->transactions()->where('type', 'credit')->sum('amount');
-
-        return (float) $credit - (float) $debit;
-    }
-
-    public function getRecentTransactionsAttribute()
-    {
-        return $this->transactions()->orderBy('transaction_date', 'desc')->take(10)->get();
     }
 }

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Exceptions\PayrollPrerequisiteException;
 use App\Models\AccountingDocument;
 use App\Models\AttendanceSummary;
+use App\Models\BankAccount;
+use App\Models\Cashbox;
 use App\Models\Employee;
 use App\Models\EmploymentOrder;
 use App\Models\InsuranceRecord;
@@ -21,6 +23,9 @@ use App\Models\Project;
 use App\Models\ProjectCostSnapshot;
 use App\Models\TaxRecord;
 use App\Models\WorkLog;
+use App\Services\Payroll\PayrollLineBasisCalculator;
+use App\Support\Hr\InsuranceExemptionResolver;
+use App\Support\Hr\IranLaborEmploymentOrderCatalog;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -29,8 +34,11 @@ class NewPayrollEngineService
     public function __construct(
         private readonly NewAttendanceEngineService $attendanceEngine,
         private readonly AccountingPostingService $accountingPosting,
+        private readonly InsuranceLiabilityService $insuranceLiabilities,
         private readonly ProjectCostingService $projectCosting,
         private readonly EmploymentContractResolver $contractResolver,
+        private readonly PayslipSnapshotService $payslipSnapshot,
+        private readonly PayrollLineBasisCalculator $lineBasis,
     ) {
     }
 
@@ -46,6 +54,7 @@ class NewPayrollEngineService
                 ->map(fn (MonthlyAttendance $attendance) => $this->calculateEmployee($period, $attendance));
 
             $this->postAccountingDocuments($period, $calculations);
+            $this->insuranceLiabilities->syncFromPayrollPeriod($period);
             $this->syncProjectCostSnapshots($period);
 
             $period->update([
@@ -116,7 +125,7 @@ class NewPayrollEngineService
 
             $lines->push(...collect([
                 ['code' => 'overtime', 'title' => 'اضافه کاری', 'type' => 'earning', 'hours' => (float) $attendance->overtime_hours, 'rate' => $overtimeRate, 'amount' => (float) $attendance->overtime_hours * $overtimeRate],
-                ['code' => 'mission', 'title' => 'ماموریت', 'type' => 'earning', 'hours' => (float) $attendance->mission_hours, 'rate' => $hourlyRate, 'amount' => (float) $attendance->mission_hours * $hourlyRate],
+                ['code' => 'mission', 'title' => 'حق مأموریت', 'type' => 'earning', 'hours' => (float) $attendance->mission_hours, 'rate' => $hourlyRate, 'amount' => (float) $attendance->mission_hours * $hourlyRate],
                 ['code' => 'holiday_work', 'title' => 'تعطیل کاری', 'type' => 'earning', 'hours' => (float) $attendance->holiday_hours, 'rate' => $holidayRate, 'amount' => (float) $attendance->holiday_hours * $holidayRate],
             ])->filter(fn ($line) => (float) $line['amount'] > 0)->all());
 
@@ -188,21 +197,11 @@ class NewPayrollEngineService
                 ]
             );
 
-            Payslip::updateOrCreate(
-                ['payroll_calculation_id' => $calculation->id],
-                [
-                    'employee_id' => $employee->id,
-                    'payroll_period_id' => $period->id,
-                    'number' => 'PS-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
-                    'issued_at' => now(),
-                    'status' => 'issued',
-                    'snapshot' => [
-                        'employee' => $employee->full_name,
-                        'period' => $period->persian_title,
-                        'net_payable' => $netPayable,
-                    ],
-                ]
-            );
+            $this->issuePayslip($calculation, $employee, $period, $order, [
+                'net_payable' => $netPayable,
+                'gross_salary' => $gross,
+                'total_deductions' => $totalDeductions,
+            ]);
 
             PayrollAccountingEntry::updateOrCreate(
                 ['payroll_calculation_id' => $calculation->id],
@@ -224,63 +223,90 @@ class NewPayrollEngineService
         }
 
         $lines = collect([
-            ['code' => 'base_salary', 'title' => 'حقوق پایه', 'type' => 'earning', 'hours' => $netPayableHours, 'rate' => $hourlyRate, 'amount' => $baseSalary],
+            [
+                'code' => 'base_salary',
+                'title' => 'حقوق پایه',
+                'type' => 'earning',
+                'hours' => $isHourly ? $netPayableHours : 0,
+                'rate' => $isHourly ? $hourlyRate : 0,
+                'amount' => $baseSalary,
+            ],
             ['code' => 'overtime', 'title' => 'اضافه‌کاری', 'type' => 'earning', 'hours' => (float) $attendance->overtime_hours, 'rate' => $overtimeRate, 'amount' => (float) $attendance->overtime_hours * $overtimeRate],
-            ['code' => 'mission', 'title' => 'ماموریت', 'type' => 'earning', 'hours' => (float) $attendance->mission_hours, 'rate' => $hourlyRate, 'amount' => (float) $attendance->mission_hours * $hourlyRate],
+            ['code' => 'mission', 'title' => 'حق مأموریت', 'type' => 'earning', 'hours' => (float) $attendance->mission_hours, 'rate' => $hourlyRate, 'amount' => (float) $attendance->mission_hours * $hourlyRate],
             ['code' => 'night_shift', 'title' => 'شب‌کاری', 'type' => 'earning', 'hours' => (float) $attendance->night_hours, 'rate' => $nightRate, 'amount' => (float) $attendance->night_hours * $nightRate],
             ['code' => 'holiday_work', 'title' => 'تعطیل‌کاری', 'type' => 'earning', 'hours' => (float) $attendance->holiday_hours, 'rate' => $holidayRate, 'amount' => (float) $attendance->holiday_hours * $holidayRate],
-            ['code' => 'housing_allowance', 'title' => 'حق مسکن', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->housing_allowance ?: $this->itemAmount('housing_allowance'))],
-            ['code' => 'food_allowance', 'title' => 'بن کارگری', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->food_allowance ?: $this->itemAmount('food_allowance'))],
-            ['code' => 'child_allowance', 'title' => 'حق اولاد', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->child_allowance ?: 0)],
-            ['code' => 'transportation_allowance', 'title' => 'ایاب و ذهاب', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->transportation_allowance ?: 0)],
             ['code' => 'attendance_deduction', 'title' => 'کسر کارکرد', 'type' => 'deduction', 'hours' => $this->attendanceDeductionHours($attendance), 'rate' => $hourlyRate, 'amount' => $this->attendanceDeductionHours($attendance) * $hourlyRate],
-        ])->filter(fn ($line) => (float) $line['amount'] > 0)->values();
+        ]);
 
-        collect([
-            ['code' => 'children_allowance', 'title' => 'حق اولاد حکم', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => max(0, (float) ($order?->children_allowance ?? 0) - (float) ($order?->child_allowance ?? 0))],
-            ['code' => 'seniority_monthly', 'title' => 'پایه سنوات', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->seniority_pay ?: 0)],
-            ['code' => 'marriage_allowance', 'title' => 'حق تاهل', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->marriage_allowance ?: 0)],
-        ])->filter(fn ($line) => (float) $line['amount'] > 0)->each(fn ($line) => $lines->push($line));
-
-        foreach ((array) ($order?->fixed_benefits ?? []) as $title => $amount) {
-            if ((float) $amount > 0) {
-                $lines->push(['code' => 'custom_benefit', 'title' => (string) $title, 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) $amount]);
-            }
+        if ($order) {
+            $order->loadMissing('lines');
         }
 
-        foreach ((array) ($order?->fixed_deductions ?? []) as $title => $amount) {
-            if ((float) $amount > 0) {
-                $lines->push(['code' => 'custom_deduction', 'title' => (string) $title, 'type' => 'deduction', 'hours' => 0, 'rate' => 0, 'amount' => (float) $amount]);
-            }
-        }
-
-        $gross = (float) $lines->where('type', 'earning')->sum('amount');
-        $insuranceEmployee = $insuranceEnabled ? round($gross * ($this->itemRate('employee_insurance') / 100), 2) : 0.0;
-        $insuranceEmployer = $insuranceEnabled ? round($gross * (($this->itemRate('employer_insurance') + $this->itemRate('unemployment_insurance')) / 100), 2) : 0.0;
-        $tax = $this->taxAmount($gross);
-
-        if ($insuranceEnabled && $insuranceEmployee > 0) {
-            $lines->push(['code' => 'insurance', 'title' => 'بیمه سهم کارمند', 'type' => 'deduction', 'hours' => 0, 'rate' => 7, 'amount' => $insuranceEmployee]);
-        }
-        $lines->push(['code' => 'tax', 'title' => 'مالیات حقوق', 'type' => 'deduction', 'hours' => 0, 'rate' => 0, 'amount' => $tax]);
-
-        $totalDeductions = (float) $lines->where('type', 'deduction')->sum('amount');
-        if ($totalDeductions > $gross) {
-            $excess = $totalDeductions - $gross;
-            $lines = $lines->map(function (array $line) use (&$excess): array {
-                if ($excess <= 0 || $line['code'] !== 'attendance_deduction') {
-                    return $line;
+        if ($order && $order->lines->isNotEmpty()) {
+            foreach ($order->lines as $orderLine) {
+                if ($orderLine->type === 'earning' && $orderLine->code === 'base_salary') {
+                    continue;
                 }
 
-                $reduction = min((float) $line['amount'], $excess);
-                $line['amount'] = round((float) $line['amount'] - $reduction, 2);
-                $excess -= $reduction;
+                if ((float) $orderLine->amount <= 0) {
+                    continue;
+                }
 
-                return $line;
-            });
-            $totalDeductions = (float) $lines->where('type', 'deduction')->sum('amount');
+                $lines->push([
+                    'code' => (string) ($orderLine->code ?: 'custom_'.$orderLine->type),
+                    'title' => (string) $orderLine->title,
+                    'type' => $orderLine->type === 'deduction' ? 'deduction' : 'earning',
+                    'hours' => 0,
+                    'rate' => 0,
+                    'amount' => (float) $orderLine->amount,
+                    'is_insurable' => (bool) $orderLine->is_insurable,
+                    'is_taxable' => (bool) $orderLine->is_taxable,
+                ]);
+            }
+        } else {
+            $lines->push(
+                ['code' => 'housing_allowance', 'title' => 'حق مسکن', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->housing_allowance ?: $this->itemAmount('housing_allowance'))],
+                ['code' => 'food_allowance', 'title' => 'بن کارگری', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->food_allowance ?: $this->itemAmount('food_allowance'))],
+                ['code' => 'child_allowance', 'title' => 'حق اولاد', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->child_allowance ?: 0)],
+                ['code' => 'transportation_allowance', 'title' => 'ایاب و ذهاب', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->transportation_allowance ?: 0)],
+            );
+
+            collect([
+                ['code' => 'children_allowance', 'title' => 'حق اولاد حکم', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => max(0, (float) ($order?->children_allowance ?? 0) - (float) ($order?->child_allowance ?? 0))],
+                ['code' => 'seniority_monthly', 'title' => 'پایه سنوات', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->seniority_pay ?: 0)],
+                ['code' => 'marriage_allowance', 'title' => 'حق تاهل', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->marriage_allowance ?: 0)],
+                ['code' => 'job_allowance', 'title' => 'فوق‌العاده شغل', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->job_allowance ?: 0)],
+                ['code' => 'hardship_allowance', 'title' => 'فوق‌العاده سختی کار', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->hardship_allowance ?: 0)],
+                ['code' => 'shift_allowance', 'title' => 'فوق‌العاده نوبت‌کاری', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->shift_allowance ?: 0)],
+                ['code' => 'other_insurable_benefits', 'title' => 'سایر مزایای مشمول بیمه', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->other_insurable_benefits ?: 0)],
+                ['code' => 'other_non_insurable_benefits', 'title' => 'سایر مزایای غیرمشمول بیمه', 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) ($order?->other_non_insurable_benefits ?: 0)],
+            ])->filter(fn ($line) => (float) $line['amount'] > 0)->each(fn ($line) => $lines->push($line));
+
+            foreach ((array) ($order?->fixed_benefits ?? []) as $title => $amount) {
+                if ((float) $amount > 0) {
+                    $lines->push(['code' => 'custom_benefit', 'title' => (string) $title, 'type' => 'earning', 'hours' => 0, 'rate' => 0, 'amount' => (float) $amount]);
+                }
+            }
+
+            foreach ((array) ($order?->fixed_deductions ?? []) as $title => $amount) {
+                if ((float) $amount > 0) {
+                    $lines->push(['code' => 'custom_deduction', 'title' => (string) $title, 'type' => 'deduction', 'hours' => 0, 'rate' => 0, 'amount' => (float) $amount]);
+                }
+            }
         }
-        $netPayable = $gross - $totalDeductions;
+
+        $lines = $lines->filter(fn ($line) => (float) $line['amount'] > 0)->values();
+
+        $finalized = $this->finalizePayrollLines($lines, $employee, $order, $attendance, $insuranceEnabled, $baseSalary);
+        $lines = $finalized['lines'];
+        $gross = $finalized['gross'];
+        $insurableWage = $finalized['insurance_base'];
+        $taxableWage = $finalized['tax_base'];
+        $insuranceEmployee = $finalized['insurance_employee'];
+        $insuranceEmployer = $finalized['insurance_employer'];
+        $tax = $finalized['tax_amount'];
+        $totalDeductions = $finalized['total_deductions'];
+        $netPayable = $finalized['net_payable'];
 
         $calculation = PayrollCalculation::updateOrCreate(
             ['payroll_period_id' => $period->id, 'employee_id' => $employee->id],
@@ -311,10 +337,10 @@ class NewPayrollEngineService
                 'employee_id' => $employee->id,
                 'payroll_period_id' => $period->id,
                 'insurance_days' => $insuranceEnabled ? min(30, (int) $attendance->present_days + (int) floor((float) $attendance->leave_hours / 8)) : 0,
-                'insurance_wage' => $insuranceEnabled ? $gross : 0,
+                'insurance_wage' => $insuranceEnabled ? $insurableWage : 0,
                 'employee_share' => $insuranceEmployee,
-                'employer_share' => $insuranceEnabled ? round($gross * ($this->itemRate('employer_insurance') / 100), 2) : 0,
-                'unemployment_share' => $insuranceEnabled ? round($gross * ($this->itemRate('unemployment_insurance') / 100), 2) : 0,
+                'employer_share' => $insuranceEnabled ? $finalized['employer_insurance_share'] : 0,
+                'unemployment_share' => $insuranceEnabled ? $finalized['unemployment_share'] : 0,
             ]
         );
 
@@ -323,28 +349,14 @@ class NewPayrollEngineService
             [
                 'employee_id' => $employee->id,
                 'payroll_period_id' => $period->id,
-                'taxable_income' => $gross,
+                'taxable_income' => $taxableWage,
                 'exemption_amount' => 0,
                 'tax_amount' => $tax,
                 'brackets' => [['title' => 'نرخ تستی قابل تنظیم', 'rate' => $tax > 0 ? 10 : 0]],
             ]
         );
 
-        Payslip::updateOrCreate(
-            ['payroll_calculation_id' => $calculation->id],
-            [
-                'employee_id' => $employee->id,
-                'payroll_period_id' => $period->id,
-                'number' => 'PS-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
-                'issued_at' => now(),
-                'status' => 'issued',
-                'snapshot' => [
-                    'employee' => $employee->full_name,
-                    'period' => $period->persian_title,
-                    'net_payable' => $netPayable,
-                ],
-            ]
-        );
+        $this->issuePayslip($calculation, $employee, $period, $order, $this->payslipTotalsPayload($finalized));
 
         PayrollAccountingEntry::updateOrCreate(
             ['payroll_calculation_id' => $calculation->id],
@@ -439,21 +451,11 @@ class NewPayrollEngineService
             ]
         );
 
-        Payslip::updateOrCreate(
-            ['payroll_calculation_id' => $calculation->id],
-            [
-                'employee_id' => $employee->id,
-                'payroll_period_id' => $period->id,
-                'number' => 'PS-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
-                'issued_at' => now(),
-                'status' => 'issued',
-                'snapshot' => [
-                    'employee' => $employee->full_name,
-                    'period' => $period->persian_title,
-                    'net_payable' => $gross,
-                ],
-            ]
-        );
+        $this->issuePayslip($calculation, $employee, $period, $order, [
+            'net_payable' => $gross,
+            'gross_salary' => $gross,
+            'total_deductions' => 0,
+        ]);
 
         PayrollAccountingEntry::updateOrCreate(
             ['payroll_calculation_id' => $calculation->id],
@@ -474,12 +476,40 @@ class NewPayrollEngineService
         return $calculation->refresh();
     }
 
+    /**
+     * @param  array{net_payable: float|int, gross_salary?: float|int|null, total_deductions?: float|int|null}  $totals
+     */
+    private function issuePayslip(
+        PayrollCalculation $calculation,
+        Employee $employee,
+        PayrollPeriod $period,
+        ?EmploymentOrder $order,
+        array $totals,
+    ): Payslip {
+        return Payslip::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $period->id,
+                'number' => 'PS-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
+                'issued_at' => now(),
+                'status' => 'issued',
+                'snapshot' => $this->payslipSnapshot->build($employee, $period, $order, $totals),
+            ]
+        );
+    }
+
     public function pay(PayrollCalculation $calculation, ?string $reference = null): PayrollPayment
     {
+        $bankAccountId = BankAccount::query()->where('is_active', true)->value('id');
+        $cashboxId = Cashbox::query()->where('is_active', true)->value('id');
+
         return $this->payWithDetails($calculation, [
             'payment_date' => now()->toDateString(),
             'amount' => $calculation->net_payable,
-            'method' => 'bank',
+            'method' => $bankAccountId ? 'bank' : 'cash',
+            'bank_account_id' => $bankAccountId,
+            'cashbox_id' => $bankAccountId ? null : $cashboxId,
             'reference_number' => $reference ?: 'PAY-' . $calculation->id,
             'description' => 'پرداخت حقوق از موتور جدید',
         ]);
@@ -496,6 +526,13 @@ class NewPayrollEngineService
         $alreadyPaid = (float) $calculation->payments->sum('amount');
         $remaining = round((float) $calculation->net_payable - $alreadyPaid, 2);
         $amount = round((float) ($data['amount'] ?? $remaining), 2);
+        $method = (string) ($data['method'] ?? 'bank');
+        $bankAccountId = isset($data['bank_account_id']) && $data['bank_account_id'] !== ''
+            ? (int) $data['bank_account_id']
+            : null;
+        $cashboxId = isset($data['cashbox_id']) && $data['cashbox_id'] !== ''
+            ? (int) $data['cashbox_id']
+            : null;
 
         if ($amount <= 0) {
             throw new \RuntimeException('مبلغ پرداخت باید بیشتر از صفر باشد.');
@@ -505,13 +542,23 @@ class NewPayrollEngineService
             throw new \RuntimeException('مبلغ پرداخت نمی‌تواند بیشتر از مانده حقوق باشد.');
         }
 
+        if ($method === 'bank' && ! $bankAccountId) {
+            throw new \RuntimeException('برای پرداخت بانکی، انتخاب حساب بانکی الزامی است.');
+        }
+
+        if ($method === 'cash' && ! $cashboxId) {
+            throw new \RuntimeException('برای پرداخت نقدی، انتخاب صندوق الزامی است.');
+        }
+
         $payment = PayrollPayment::updateOrCreate(
             ['payroll_calculation_id' => $calculation->id],
             [
                 'employee_id' => $calculation->employee_id,
                 'payment_date' => $data['payment_date'] ?? now()->toDateString(),
                 'amount' => $amount,
-                'method' => $data['method'] ?? 'bank',
+                'method' => $method,
+                'bank_account_id' => $method === 'bank' ? $bankAccountId : null,
+                'cashbox_id' => $method === 'cash' ? $cashboxId : null,
                 'reference_number' => $data['reference_number'] ?? ('PAY-' . $calculation->id),
                 'status' => 'paid',
                 'description' => $data['description'] ?? 'پرداخت حقوق از موتور جدید',
@@ -531,6 +578,54 @@ class NewPayrollEngineService
         return $payment->refresh();
     }
 
+    public function reversePayment(PayrollCalculation $calculation, ?int $userId = null): void
+    {
+        DB::transaction(function () use ($calculation, $userId): void {
+            $calculation->loadMissing('period', 'payments.accountingDocument');
+
+            if ($calculation->period?->status === 'closed') {
+                throw new \RuntimeException('دوره حقوق بسته شده است. ابتدا دوره را باز کنید.');
+            }
+
+            $payment = $calculation->payments()->first();
+
+            if (! $payment) {
+                throw new \RuntimeException('پرداختی برای برگشت وجود ندارد.');
+            }
+
+            $this->accountingPosting->deleteSourceAccountingDocuments(
+                PayrollPayment::class,
+                $payment->id,
+                $payment->accounting_document_id,
+                $userId
+            );
+
+            $payment->delete();
+
+            $remainingPaid = round((float) $calculation->payments()->sum('amount'), 2);
+            $netPayable = round((float) $calculation->net_payable, 2);
+
+            if ($remainingPaid <= 0.01) {
+                $calculation->update(['status' => 'calculated']);
+            } elseif ($remainingPaid + 0.01 < $netPayable) {
+                $calculation->update(['status' => 'partial']);
+            } else {
+                $calculation->update(['status' => 'paid']);
+            }
+        });
+    }
+
+    public function repostAccountingForCalculation(PayrollCalculation $calculation): void
+    {
+        $calculation->loadMissing('period', 'employee');
+
+        if (! $calculation->period) {
+            return;
+        }
+
+        $this->postAccountingDocuments($calculation->period, collect([$calculation]));
+    }
+
     private function postAccountingDocuments(PayrollPeriod $period, Collection $calculations): void
     {
         $calculations->each(function (PayrollCalculation $calculation) use ($period): void {
@@ -542,6 +637,12 @@ class NewPayrollEngineService
             if (! $employee) {
                 return;
             }
+
+            if (! $employee->party_id) {
+                throw new \RuntimeException('برای ثبت سند حقوق، پرسنل «' . $employee->full_name . '» باید طرف حساب (Party) داشته باشد.');
+            }
+
+            $userId = auth()->id() ?? $calculation->approved_by ?? $period->created_by;
 
             $workLogs = WorkLog::query()
                 ->where('employee_id', $employee->id)
@@ -629,31 +730,36 @@ class NewPayrollEngineService
 
             $this->balanceAccountingLines($lines);
 
+            $documentData = [
+                'document_date' => $period->ends_at->toDateString(),
+                'type' => AccountingDocument::TYPE_PAYROLL,
+                'description' => 'ثبت حقوق ' . $employee->full_name . ' - ' . $period->persian_title,
+                'number' => 'PRL-' . $period->year . '-' . str_pad((string) $period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT),
+            ];
+
             $document = AccountingDocument::query()
                 ->where('source_type', PayrollCalculation::class)
                 ->where('source_id', $calculation->id)
                 ->first();
 
-            $data = [
-                'document_date' => $period->ends_at->toDateString(),
-                'type' => 'manual',
-                'status' => 'posted',
-                'description' => 'ثبت خودکار حقوق ' . $employee->full_name . ' - ' . $period->persian_title,
-            ];
-
             if ($document) {
-                $document = $this->accountingPosting->updateManual($document, $data, $lines, auth()->id());
+                $document = $this->accountingPosting->updateManual($document, $documentData, $lines, $userId);
+                $document->update([
+                    'type' => AccountingDocument::TYPE_PAYROLL,
+                    'status' => 'posted',
+                    'source_type' => PayrollCalculation::class,
+                    'source_id' => $calculation->id,
+                    'posted_at' => $document->posted_at ?: now(),
+                    'posted_by' => $document->posted_by ?: $userId,
+                ]);
             } else {
-                $document = $this->accountingPosting->createManual($data, $lines, auth()->id());
+                $document = $this->accountingPosting->createPostedMaintenance($documentData, $lines, $calculation, $userId);
+                $document->update(['type' => AccountingDocument::TYPE_PAYROLL]);
             }
 
-            $document->update([
-                'source_type' => PayrollCalculation::class,
-                'source_id' => $calculation->id,
-            ]);
-
             PayrollAccountingEntry::where('payroll_calculation_id', $calculation->id)->update([
-                'status' => 'generated',
+                'accounting_document_id' => $document->id,
+                'status' => 'posted',
                 'lines' => $document->lines->map(fn ($line) => [
                     'account' => $line->account?->code ?: null,
                     'debit' => (float) $line->debit,
@@ -768,7 +874,7 @@ class NewPayrollEngineService
     {
         $count = AttendanceSummary::query()
             ->where('payroll_period_id', $period->id)
-            ->where('status', 'calculated')
+            ->whereIn('status', ['calculated', 'adjusted'])
             ->count();
 
         if ($count === 0) {
@@ -778,7 +884,7 @@ class NewPayrollEngineService
 
     private function payrollFailureReason(Employee $employee, PayrollPeriod $period, MonthlyAttendance $attendance, ?EmploymentOrder $order, mixed $attendanceSummaryId): ?string
     {
-        if (! $attendanceSummaryId || ! AttendanceSummary::whereKey($attendanceSummaryId)->where('status', 'calculated')->exists()) {
+        if (! $attendanceSummaryId || ! AttendanceSummary::whereKey($attendanceSummaryId)->whereIn('status', ['calculated', 'adjusted'])->exists()) {
             return 'خلاصه کارکرد تایید/محاسبه شده برای پرسنل وجود ندارد.';
         }
 
@@ -865,9 +971,240 @@ class NewPayrollEngineService
         return ! in_array($status, ['not_insured', 'exempt'], true);
     }
 
-    private function taxAmount(float $gross): float
+    private function unemploymentInsuranceEnabled(Employee $employee, ?EmploymentOrder $order): bool
     {
-        return round($gross * ($this->itemRate('salary_tax') / 100), 2);
+        if (! $this->insuranceEnabled($order)) {
+            return false;
+        }
+
+        return ! InsuranceExemptionResolver::isExemptFromUnemployment($employee, $order);
+    }
+
+    public function recalculateAfterManualLineChanges(PayrollCalculation $calculation): PayrollCalculation
+    {
+        $calculation->loadMissing(['lines', 'employee', 'personnelDecree', 'attendance', 'period']);
+
+        $lockedCodes = ['insurance', 'tax', 'employee_insurance', 'employer_insurance', 'salary_tax'];
+        $lines = $calculation->lines
+            ->reject(fn (PayrollCalculationLine $line): bool => in_array((string) $line->code, $lockedCodes, true))
+            ->map(fn (PayrollCalculationLine $line): array => [
+                'code' => (string) $line->code,
+                'title' => (string) $line->title,
+                'type' => (string) $line->type,
+                'hours' => (float) $line->hours,
+                'rate' => (float) $line->rate,
+                'amount' => (float) $line->amount,
+                'payroll_item_id' => $line->payroll_item_id,
+                'meta' => $line->meta ?? [],
+            ])
+            ->values();
+
+        $order = $calculation->personnelDecree;
+        $employee = $calculation->employee;
+        $attendance = $calculation->attendance;
+        $insuranceEnabled = $this->insuranceEnabled($order);
+        $baseSalary = round((float) $lines->where('code', 'base_salary')->sum('amount'), 2);
+
+        $finalized = $this->finalizePayrollLines(
+            $lines,
+            $employee,
+            $order,
+            $attendance ?? new MonthlyAttendance(),
+            $insuranceEnabled,
+            $baseSalary,
+        );
+
+        $calculation->lines()->whereIn('code', $lockedCodes)->delete();
+        $calculation->lines()->delete();
+
+        $itemsByCode = PayrollItem::whereIn('code', $finalized['lines']->pluck('code'))->get()->keyBy('code');
+        $finalized['lines']->each(function (array $line) use ($calculation, $itemsByCode): void {
+            $calculation->lines()->create($line + [
+                'payroll_item_id' => $line['payroll_item_id'] ?? $itemsByCode->get($line['code'])?->id,
+            ]);
+        });
+
+        $calculation->update([
+            'gross_salary' => $finalized['gross'],
+            'total_benefits' => max(0, $finalized['gross'] - $baseSalary),
+            'insurance_employee' => $finalized['insurance_employee'],
+            'insurance_employer' => $finalized['insurance_employer'],
+            'tax_amount' => $finalized['tax_amount'],
+            'total_deductions' => $finalized['total_deductions'],
+            'net_payable' => $finalized['net_payable'],
+        ]);
+
+        InsuranceRecord::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $calculation->payroll_period_id,
+                'insurance_days' => $insuranceEnabled && $attendance
+                    ? min(30, (int) $attendance->present_days + (int) floor((float) $attendance->leave_hours / 8))
+                    : 0,
+                'insurance_wage' => $insuranceEnabled ? $finalized['insurance_base'] : 0,
+                'employee_share' => $finalized['insurance_employee'],
+                'employer_share' => $finalized['employer_insurance_share'],
+                'unemployment_share' => $finalized['unemployment_share'],
+            ]
+        );
+
+        TaxRecord::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $calculation->payroll_period_id,
+                'taxable_income' => $finalized['tax_base'],
+                'exemption_amount' => 0,
+                'tax_amount' => $finalized['tax_amount'],
+                'brackets' => [['title' => 'نرخ تستی قابل تنظیم', 'rate' => $finalized['tax_amount'] > 0 ? 10 : 0]],
+            ]
+        );
+
+        PayrollAccountingEntry::updateOrCreate(
+            ['payroll_calculation_id' => $calculation->id],
+            [
+                'employee_id' => $employee->id,
+                'payroll_period_id' => $calculation->payroll_period_id,
+                'entry_number' => $calculation->accountingEntry?->entry_number
+                    ?: ('PA-' . $calculation->period->year . '-' . str_pad((string) $calculation->period->month, 2, '0', STR_PAD_LEFT) . '-' . str_pad((string) $employee->id, 5, '0', STR_PAD_LEFT)),
+                'salary_expense_debit' => $finalized['gross'],
+                'insurance_expense_debit' => $finalized['insurance_employer'],
+                'salary_payable_credit' => $finalized['net_payable'],
+                'insurance_payable_credit' => $finalized['insurance_employee'] + $finalized['insurance_employer'],
+                'tax_payable_credit' => $finalized['tax_amount'],
+                'status' => $finalized['gross'] > 0 ? 'generated' : 'skipped',
+                'lines' => [],
+            ]
+        );
+
+        if ($calculation->payslip) {
+            $this->issuePayslip(
+                $calculation,
+                $employee,
+                $calculation->period,
+                $order,
+                $this->payslipTotalsPayload($finalized),
+            );
+        }
+
+        return $calculation->fresh(['lines', 'payslip', 'accountingEntry']);
+    }
+
+    private function taxAmount(float $taxableBase): float
+    {
+        return round($taxableBase * ($this->itemRate('salary_tax') / 100), 2);
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $lines
+     * @return array{
+     *   lines: Collection<int, array<string, mixed>>,
+     *   gross: float,
+     *   insurance_base: float,
+     *   tax_base: float,
+     *   non_insurance_earnings: float,
+     *   non_tax_earnings: float,
+     *   insurance_employee: float,
+     *   insurance_employer: float,
+     *   employer_insurance_share: float,
+     *   unemployment_share: float,
+     *   tax_amount: float,
+     *   total_deductions: float,
+     *   net_payable: float
+     * }
+     */
+    private function finalizePayrollLines(
+        Collection $lines,
+        Employee $employee,
+        ?EmploymentOrder $order,
+        MonthlyAttendance $attendance,
+        bool $insuranceEnabled,
+        float $baseSalary,
+    ): array {
+        $basis = $this->lineBasis->summarize($lines);
+        $gross = $basis['gross'];
+        $insurableWage = $basis['insurance_base'];
+        $taxableWage = $basis['tax_base'];
+
+        $employerInsuranceRate = $this->itemRate('employer_insurance');
+        $unemploymentRate = $this->unemploymentInsuranceEnabled($employee, $order)
+            ? $this->itemRate('unemployment_insurance')
+            : 0.0;
+
+        $insuranceEmployee = $insuranceEnabled
+            ? round($insurableWage * ($this->itemRate('employee_insurance') / 100), 2)
+            : 0.0;
+        $employerShare = $insuranceEnabled
+            ? round($insurableWage * ($employerInsuranceRate / 100), 2)
+            : 0.0;
+        $unemploymentShare = $insuranceEnabled && $unemploymentRate > 0
+            ? round($insurableWage * ($unemploymentRate / 100), 2)
+            : 0.0;
+        $insuranceEmployer = round($employerShare + $unemploymentShare, 2);
+        $tax = $this->taxAmount($taxableWage);
+
+        $lines = $lines->values();
+        if ($insuranceEnabled && $insuranceEmployee > 0) {
+            $lines->push(['code' => 'insurance', 'title' => 'بیمه سهم کارمند', 'type' => 'deduction', 'hours' => 0, 'rate' => 7, 'amount' => $insuranceEmployee]);
+        }
+        if ($tax > 0 || $this->itemRate('salary_tax') >= 0) {
+            $lines->push(['code' => 'tax', 'title' => 'مالیات حقوق', 'type' => 'deduction', 'hours' => 0, 'rate' => 0, 'amount' => $tax]);
+        }
+
+        $totalDeductions = (float) $lines->where('type', 'deduction')->sum('amount');
+        if ($totalDeductions > $gross) {
+            $excess = $totalDeductions - $gross;
+            $lines = $lines->map(function (array $line) use (&$excess): array {
+                if ($excess <= 0 || $line['code'] !== 'attendance_deduction') {
+                    return $line;
+                }
+
+                $reduction = min((float) $line['amount'], $excess);
+                $line['amount'] = round((float) $line['amount'] - $reduction, 2);
+                $excess -= $reduction;
+
+                return $line;
+            });
+            $totalDeductions = (float) $lines->where('type', 'deduction')->sum('amount');
+        }
+
+        $netPayable = round($gross - $totalDeductions, 2);
+
+        return [
+            'lines' => $lines,
+            'gross' => $gross,
+            'insurance_base' => $insurableWage,
+            'tax_base' => $taxableWage,
+            'non_insurance_earnings' => $basis['non_insurance_earnings'],
+            'non_tax_earnings' => $basis['non_tax_earnings'],
+            'insurance_employee' => $insuranceEmployee,
+            'insurance_employer' => $insuranceEmployer,
+            'employer_insurance_share' => $employerShare,
+            'unemployment_share' => $unemploymentShare,
+            'tax_amount' => $tax,
+            'total_deductions' => $totalDeductions,
+            'net_payable' => $netPayable,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $finalized
+     * @return array<string, mixed>
+     */
+    private function payslipTotalsPayload(array $finalized): array
+    {
+        return [
+            'net_payable' => $finalized['net_payable'],
+            'gross_salary' => $finalized['gross'],
+            'total_deductions' => $finalized['total_deductions'],
+            'insurance_base' => $finalized['insurance_base'],
+            'tax_base' => $finalized['tax_base'],
+            'non_insurance_earnings' => $finalized['non_insurance_earnings'],
+            'non_tax_earnings' => $finalized['non_tax_earnings'],
+            'insurance_employee' => $finalized['insurance_employee'],
+            'insurance_employer' => $finalized['insurance_employer'],
+        ];
     }
 
     private function accountCode(string $key, string $fallback): string

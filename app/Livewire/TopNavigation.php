@@ -26,7 +26,7 @@ class TopNavigation extends Component
             ['label' => 'پروژه‌ها', 'route' => 'projects.index', 'active' => 'projects.*'],
             ['label' => 'پرسنل', 'route' => 'employees.index', 'active' => 'employees.*'],
             ['label' => 'کارکرد', 'route' => 'work-logs.index', 'active' => 'work-logs.*'],
-            ['label' => 'حقوق', 'route' => 'salaries.index', 'active' => 'salaries.*'],
+            ['label' => 'حقوق', 'route' => 'payroll.payments.index', 'active' => 'payroll.*'],
             ['label' => 'انبار', 'route' => 'inventory-documents.index', 'active' => 'inventory-documents.*'],
             ['label' => 'مالی', 'route' => 'financial-transactions.index', 'active' => 'financial-transactions.*'],
         ];

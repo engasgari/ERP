@@ -49,7 +49,8 @@
             </div>
         @endif
 
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+            <a href="{{ route('numbering-settings.index') }}" class="rounded-md border border-slate-300 px-4 py-2 text-slate-700">شماره‌گذاری اسناد</a>
             <button class="bg-blue-500 text-white px-4 py-2 rounded">ذخیره اطلاعات شرکت</button>
         </div>
     </form>

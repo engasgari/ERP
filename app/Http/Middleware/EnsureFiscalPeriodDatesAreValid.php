@@ -39,6 +39,10 @@ class EnsureFiscalPeriodDatesAreValid
 
     public function handle(Request $request, Closure $next)
     {
+        if ($this->shouldSkip($request)) {
+            return $next($request);
+        }
+
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             foreach ($this->collectDates($request) as $value) {
                 $this->assertAllowed($value);
@@ -87,6 +91,17 @@ class EnsureFiscalPeriodDatesAreValid
         }
 
         return $values;
+    }
+
+    private function shouldSkip(Request $request): bool
+    {
+        return in_array($request->route()?->getName(), [
+            'fiscal-periods.store',
+            'fiscal-periods.update',
+            'fiscal-periods.destroy',
+            'fiscal-periods.close',
+            'fiscal-periods.reopen',
+        ], true);
     }
 
     private function assertAllowed(Carbon|string $value): void

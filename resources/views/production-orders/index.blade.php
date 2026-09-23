@@ -68,9 +68,9 @@
                                 <td class="font-bold">{{ $order->number }}</td>
                                 <td>{{ $order->project?->name ?: '-' }}</td>
                                 <td>{{ $order->item?->name ?: '-' }}</td>
-                                <td>{{ number_format((float) $order->quantity, 3) }}</td>
+                                <td>{{ formatQuantity((float) $order->quantity) }}</td>
                                 <td>{{ $order->status_label }}</td>
-                                <td>{{ number_format($order->consumed_materials_count) }} از {{ number_format($order->material_consumptions_count) }}</td>
+                                <td>{{ formatMoney($order->consumed_materials_count) }} از {{ formatMoney($order->material_consumptions_count) }}</td>
                                 <td>
                                     <div class="flex flex-wrap gap-1">
                                         <a href="{{ route('production-orders.show', $order) }}" class="erp-action-btn erp-action-detail">جزئیات</a>

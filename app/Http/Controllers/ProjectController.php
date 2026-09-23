@@ -13,42 +13,7 @@ class ProjectController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Project::with('party', 'manager');
-
-        if ($request->filled('name')) {
-            $query->where(function ($projectQuery) use ($request) {
-                $projectQuery->where('name', 'like', '%' . $request->name . '%')
-                    ->orWhere('project_number', 'like', '%' . $request->name . '%')
-                    ->orWhere('description', 'like', '%' . $request->name . '%');
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('start_date')) {
-            $startDate = jalaliToGregorianDate($request->start_date);
-            if ($startDate) {
-                $query->whereDate('start_date', '>=', $startDate);
-            }
-        }
-
-        if ($request->filled('end_date')) {
-            $endDate = jalaliToGregorianDate($request->end_date);
-            if ($endDate) {
-                $query->whereDate('end_date', '<=', $endDate);
-            }
-        }
-
-        $projects = $query->latest()->paginate(12)->withQueryString();
-
-        $dateErrors = [
-            'start_date' => $request->filled('start_date') && ! jalaliToGregorianDate($request->start_date) ? 'تاریخ شروع معتبر نیست.' : null,
-            'end_date' => $request->filled('end_date') && ! jalaliToGregorianDate($request->end_date) ? 'تاریخ پایان معتبر نیست.' : null,
-        ];
-
-        return view('projects.index', compact('projects', 'dateErrors'));
+        return view('projects.index');
     }
 
     public function create()
@@ -58,7 +23,7 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
-        $project->load(['party', 'manager', 'financialTransactions', 'workLogs.employee', 'productionOrders.item']);
+        $project->load(['party', 'manager', 'financialTransactions', 'workLogs.employee']);
 
         return view('projects.show', compact('project'));
     }

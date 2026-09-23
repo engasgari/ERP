@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Models\Permission;
 use App\Policies\FinancialReportPolicy;
+use App\Services\NavigationBreadcrumbService;
 use App\Support\FinancialReportContext;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,12 +26,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        App::setLocale('fa');
+
         Gate::before(fn ($user) => $user->isAdmin() ? true : null);
         Gate::policy(FinancialReportContext::class, FinancialReportPolicy::class);
 
         foreach ($this->permissionKeys() as $permissionKey) {
             Gate::define($permissionKey, fn ($user) => $user->hasPermission($permissionKey));
         }
+
+        View::composer('layouts.app', function ($view): void {
+            if (($view->getData()['hideBreadcrumb'] ?? false) === true) {
+                return;
+            }
+
+            if (! empty($view->getData()['breadcrumbTrail'])) {
+                return;
+            }
+
+            $service = app(NavigationBreadcrumbService::class);
+            $view->with('breadcrumbTrail', $service->trailForRequest(request()));
+            $view->with('breadcrumbBack', $service->backLink(request()));
+        });
     }
 
     private function permissionKeys(): array

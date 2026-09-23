@@ -69,6 +69,7 @@ class NewAttendanceEngineService
         $calendarDays = $period->starts_at->daysInMonth;
         $workingDays = 0;
         $presentDays = 0;
+        $absenceDays = 0.0;
         $plannedMinutes = 0;
         $workedMinutes = 0;
         $breakMinutes = 0;
@@ -106,28 +107,41 @@ class NewAttendanceEngineService
                 $dayMissions,
             );
 
-            if ((int) $metrics['planned_minutes'] > 0) {
+            $dayPlanned = (int) $metrics['planned_minutes'];
+            $dayAbsence = (int) $metrics['absence_minutes'];
+            $dayWorked = (int) $metrics['worked_minutes'];
+            $dayLeave = (int) $metrics['leave_minutes'];
+            $dayMission = (int) $metrics['mission_minutes'];
+            $dayHoliday = (int) $metrics['holiday_minutes'];
+
+            if ($dayPlanned > 0) {
                 $workingDays++;
-                $plannedMinutes += (int) $metrics['planned_minutes'];
+                $plannedMinutes += $dayPlanned;
+
+                if ($dayWorked > 0 || $dayLeave > 0 || $dayMission > 0) {
+                    $presentDays++;
+                }
+
+                if ($dayAbsence > 0) {
+                    $absenceDays += min(1, $dayAbsence / $dayPlanned);
+                }
+            } elseif ($dayWorked > 0 || $dayLeave > 0 || $dayMission > 0 || $dayHoliday > 0) {
+                $presentDays++;
             }
 
-            $workedMinutes += (int) $metrics['worked_minutes'];
+            $workedMinutes += $dayWorked;
             $breakMinutes += (int) $metrics['break_minutes'];
             $delayMinutes += (int) $metrics['delay_minutes'];
             $earlyLeaveMinutes += (int) $metrics['early_leave_minutes'];
-            $leaveMinutes += (int) $metrics['leave_minutes'];
-            $missionMinutes += (int) $metrics['mission_minutes'];
-            $absenceMinutes += (int) $metrics['absence_minutes'];
+            $leaveMinutes += $dayLeave;
+            $missionMinutes += $dayMission;
+            $absenceMinutes += $dayAbsence;
             $overtimeMinutes += (int) $metrics['overtime_minutes'];
-            $holidayMinutes += (int) $metrics['holiday_minutes'];
+            $holidayMinutes += $dayHoliday;
             $netPayableMinutes += (int) $metrics['net_payable_minutes'];
             $payableMinutes += (int) $metrics['payable_minutes'];
             $dailyLeaveDays += (float) $metrics['leave_days'];
             $dailyMissionDays += (float) $metrics['mission_days'];
-
-            if ((int) $metrics['worked_minutes'] > 0 || (int) $metrics['leave_minutes'] > 0 || (int) $metrics['mission_minutes'] > 0 || (int) $metrics['holiday_minutes'] > 0) {
-                $presentDays++;
-            }
 
             $nightMinutes += $this->nightMinutesForLogs($date, $dayLogs);
 
@@ -135,21 +149,26 @@ class NewAttendanceEngineService
                 'work_group_id' => $metrics['work_group_id'],
                 'shift_id' => $metrics['shift_id'],
                 'work_date' => $dateKey,
-                'worked_hours' => round(((int) $metrics['worked_minutes']) / 60, 2),
+                'worked_hours' => round($dayWorked / 60, 2),
                 'break_hours' => round(((int) $metrics['break_minutes']) / 60, 2),
                 'delay_hours' => round(((int) $metrics['delay_minutes']) / 60, 2),
                 'early_leave_hours' => round(((int) $metrics['early_leave_minutes']) / 60, 2),
-                'leave_hours' => round(((int) $metrics['leave_minutes']) / 60, 2),
-                'mission_hours' => round(((int) $metrics['mission_minutes']) / 60, 2),
-                'absence_hours' => round(((int) $metrics['absence_minutes']) / 60, 2),
+                'leave_hours' => round($dayLeave / 60, 2),
+                'mission_hours' => round($dayMission / 60, 2),
+                'absence_hours' => round($dayAbsence / 60, 2),
                 'overtime_hours' => round(((int) $metrics['overtime_minutes']) / 60, 2),
-                'holiday_hours' => round(((int) $metrics['holiday_minutes']) / 60, 2),
+                'holiday_hours' => round($dayHoliday / 60, 2),
                 'net_payable_hours' => round(((int) $metrics['net_payable_minutes']) / 60, 2),
                 'payable_hours' => round(((int) $metrics['payable_minutes']) / 60, 2),
+                'absence_day_fraction' => $dayPlanned > 0 && $dayAbsence > 0
+                    ? round(min(1, $dayAbsence / $dayPlanned), 4)
+                    : 0,
             ];
 
             $date->addDay();
         }
+
+        $absenceDays = round($absenceDays, 2);
 
         $summary = AttendanceSummary::updateOrCreate(
             ['employee_id' => $employee->id, 'year' => $period->year, 'month' => $period->month],
@@ -161,6 +180,7 @@ class NewAttendanceEngineService
                 'required_hours' => $monthRequiredTime['required_hours'],
                 'required_minutes' => $monthRequiredTime['required_minutes'],
                 'worked_days' => $presentDays,
+                'absence_days' => $absenceDays,
                 'worked_hours' => round($workedMinutes / 60, 2),
                 'planned_minutes' => $plannedMinutes,
                 'worked_minutes' => $workedMinutes,
@@ -195,8 +215,9 @@ class NewAttendanceEngineService
             [
                 'calendar_days' => $calendarDays,
                 'working_days' => $workingDays,
-                'work_days' => $workingDays,
+                'work_days' => $presentDays,
                 'present_days' => $presentDays,
+                'absence_days' => $absenceDays,
                 'required_hours' => round($plannedMinutes / 60, 2),
                 'normal_hours' => round($workedMinutes / 60, 2),
                 'worked_hours' => round($workedMinutes / 60, 2),
@@ -311,6 +332,7 @@ class NewAttendanceEngineService
                 'required_hours' => $monthRequiredTime['required_hours'],
                 'required_minutes' => $monthRequiredTime['required_minutes'],
                 'worked_days' => $workingDays,
+                'absence_days' => 0,
                 'worked_hours' => round($workedMinutes / 60, 2),
                 'planned_minutes' => 0,
                 'worked_minutes' => $workedMinutes,
@@ -347,6 +369,7 @@ class NewAttendanceEngineService
                 'working_days' => $workingDays,
                 'work_days' => $workingDays,
                 'present_days' => $workingDays,
+                'absence_days' => 0,
                 'required_hours' => $monthRequiredTime['required_hours'],
                 'worked_hours' => round($workedMinutes / 60, 2),
                 'normal_hours' => round($workedMinutes / 60, 2),

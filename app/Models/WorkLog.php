@@ -21,6 +21,7 @@ class WorkLog extends Model
         'start_time',
         'end_time',
         'hours',
+        'is_incomplete',
         'overtime_hours',
         'delay_hours',
         'early_leave_hours',
@@ -37,6 +38,7 @@ class WorkLog extends Model
     protected $casts = [
         'work_date' => 'date',
         'hours' => 'decimal:2',
+        'is_incomplete' => 'boolean',
         'overtime_hours' => 'decimal:2',
         'delay_hours' => 'decimal:2',
         'early_leave_hours' => 'decimal:2',
@@ -76,16 +78,19 @@ class WorkLog extends Model
 
     public function getTimeRangeAttribute(): string
     {
-        return $this->start_time . ' - ' . $this->end_time;
+        $start = $this->start_time ? substr((string) $this->start_time, 0, 5) : '—';
+        $end = $this->end_time ? substr((string) $this->end_time, 0, 5) : '—';
+
+        return $start . ' - ' . $end;
     }
 
     public function getFormattedTotalAmountAttribute(): string
     {
-        return number_format((float) $this->total_amount) . ' ریال';
+        return formatMoney((float) $this->total_amount) . ' ریال';
     }
 
     public function getFormattedHourlyRateAttribute(): string
     {
-        return number_format((float) $this->hourly_rate) . ' ریال';
+        return formatMoney((float) $this->hourly_rate) . ' ریال';
     }
 }

@@ -2,22 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CompanySetting;
 use App\Models\FinancialTransaction;
 use App\Models\Employee;
 use App\Models\EmployeeHistory;
 use App\Models\EmploymentOrder;
-use App\Models\Payment;
+use App\Models\FiscalYear;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollCalculation;
 use App\Models\PayrollCalculationLine;
+use App\Models\PayrollPeriod;
+use App\Models\InsuranceLiability;
 use App\Models\InsuranceRecord;
+use App\Models\Item;
 use App\Models\TaxRecord;
 use App\Models\Payslip;
 use App\Models\Project;
-use App\Models\Salary;
 use App\Models\Warehouse;
 use App\Services\FinancialReportService;
 use App\Services\ManagementReportService;
+use App\Support\Hr\IranLaborEmploymentOrderCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -115,6 +119,36 @@ class ManagementReportController extends Controller
         return view('management-reports.hr-employment-orders', $this->hrEmploymentOrdersData($request));
     }
 
+    public function hrEmploymentOrdersPrint(Request $request): View
+    {
+        $data = $this->hrEmploymentOrdersData($request, paginate: false);
+
+        return view('management-reports.print.hr-employment-orders', [
+            ...$data,
+            'company' => CompanySetting::query()->first(),
+            'reportTitle' => 'گزارش احکام کارگزینی',
+            'backRoute' => route('management-reports.hr-employment-orders', $request->query()),
+        ]);
+    }
+
+    public function hrEmploymentOrderFormPrint(EmploymentOrder $employmentOrder): View
+    {
+        $employmentOrder->loadMissing([
+            'employee.party',
+            'position',
+            'job',
+            'organizationUnit',
+            'project',
+        ]);
+
+        return view('management-reports.print.hr-employment-order-form', [
+            'order' => $employmentOrder,
+            'company' => CompanySetting::query()->first(),
+            'wageComponents' => IranLaborEmploymentOrderCatalog::wageComponents(),
+            'backRoute' => route('management-reports.hr-employment-orders'),
+        ]);
+    }
+
     public function attendanceMonthly(Request $request): View
     {
         return view('management-reports.generic', [
@@ -123,6 +157,13 @@ class ManagementReportController extends Controller
             'rows' => MonthlyAttendance::with(['employee.party', 'period'])->latest()->paginate(100)->withQueryString(),
             'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, $row->normal_hours, $row->overtime_hours, $row->delay_hours, $row->early_leave_hours, $row->absence_hours, $row->leave_hours, $row->mission_hours],
         ]);
+    }
+
+    public function attendanceDaily(Request $request, \App\Services\AttendanceDailyDetailReportService $reportService): View
+    {
+        $report = $reportService->report($request->all());
+
+        return view('management-reports.attendance-daily', $report);
     }
 
     public function attendanceExceptions(Request $request): View
@@ -139,12 +180,7 @@ class ManagementReportController extends Controller
 
     public function payrollSummary(Request $request): View
     {
-        return view('management-reports.generic', [
-            'title' => 'گزارش خلاصه حقوق',
-            'headers' => ['پرسنل', 'دوره', 'ناخالص', 'مزایا', 'بیمه', 'مالیات', 'کسورات', 'خالص پرداختی'],
-            'rows' => PayrollCalculation::with(['employee.party', 'period'])->latest()->paginate(100)->withQueryString(),
-            'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, number_format((float) $row->gross_salary), number_format((float) $row->total_benefits), number_format((float) $row->insurance_employee), number_format((float) $row->tax_amount), number_format((float) $row->total_deductions), number_format((float) $row->net_payable)],
-        ]);
+        return view('management-reports.payroll-summary', $this->payrollSummaryData($request));
     }
 
     public function payrollRegister(Request $request): View
@@ -153,7 +189,7 @@ class ManagementReportController extends Controller
             'title' => 'گزارش ریز حقوق',
             'headers' => ['پرسنل', 'دوره', 'شرح', 'نوع', 'ساعت', 'نرخ', 'مبلغ'],
             'rows' => PayrollCalculationLine::with(['calculation.employee.party', 'calculation.period'])->latest()->paginate(150)->withQueryString(),
-            'mapper' => fn ($row) => [$row->calculation->employee->full_name, $row->calculation->period->persian_title, $row->title, $row->type === 'earning' ? 'مزایا' : 'کسورات', $row->hours, number_format((float) $row->rate), number_format((float) $row->amount)],
+            'mapper' => fn ($row) => [$row->calculation->employee->full_name, $row->calculation->period->persian_title, $row->title, $row->type === 'earning' ? 'مزایا' : 'کسورات', $row->hours, formatMoney((float) $row->rate), formatMoney((float) $row->amount)],
         ]);
     }
 
@@ -170,11 +206,45 @@ class ManagementReportController extends Controller
 
     public function insuranceSummary(Request $request): View
     {
+        $year = (int) $request->integer('year', (int) getCurrentPersianYear());
+
+        $rows = InsuranceLiability::query()
+            ->with('period')
+            ->whereHas('period', fn ($period) => $period->where('year', $year))
+            ->join('insurance_periods', 'insurance_liabilities.insurance_period_id', '=', 'insurance_periods.id')
+            ->orderBy('insurance_periods.year')
+            ->orderBy('insurance_periods.month')
+            ->select('insurance_liabilities.*')
+            ->paginate(100)
+            ->withQueryString();
+
         return view('management-reports.generic', [
-            'title' => 'گزارش بیمه',
+            'title' => 'گزارش بدهی بیمه (دوره‌ای)',
+            'headers' => ['دوره', 'اصل', 'جریمه', 'سایر', 'پرداخت‌شده', 'مانده', 'وضعیت'],
+            'rows' => $rows,
+            'mapper' => function ($row) {
+                $labels = ['unpaid' => 'پرداخت‌نشده', 'partial' => 'پرداخت جزئی', 'settled' => 'تسویه‌شده'];
+
+                return [
+                    $row->period->persian_title,
+                    formatMoney((float) $row->principal_amount),
+                    formatMoney((float) $row->penalty_amount),
+                    formatMoney((float) $row->other_amount),
+                    formatMoney((float) $row->paid_amount),
+                    formatMoney((float) $row->balance_amount),
+                    $labels[$row->status] ?? $row->status,
+                ];
+            },
+        ]);
+    }
+
+    public function insuranceEmployeeSummary(Request $request): View
+    {
+        return view('management-reports.generic', [
+            'title' => 'گزارش بیمه (پرسنلی)',
             'headers' => ['پرسنل', 'دوره', 'روز بیمه', 'مزد مشمول', 'سهم کارمند', 'سهم کارفرما', 'بیمه بیکاری'],
             'rows' => InsuranceRecord::with(['employee.party', 'period'])->latest()->paginate(100)->withQueryString(),
-            'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, $row->insurance_days, number_format((float) $row->insurance_wage), number_format((float) $row->employee_share), number_format((float) $row->employer_share), number_format((float) $row->unemployment_share)],
+            'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, $row->insurance_days, formatMoney((float) $row->insurance_wage), formatMoney((float) $row->employee_share), formatMoney((float) $row->employer_share), formatMoney((float) $row->unemployment_share)],
         ]);
     }
 
@@ -184,7 +254,7 @@ class ManagementReportController extends Controller
             'title' => 'گزارش مالیات',
             'headers' => ['پرسنل', 'دوره', 'درآمد مشمول', 'معافیت', 'مالیات'],
             'rows' => TaxRecord::with(['employee.party', 'period'])->latest()->paginate(100)->withQueryString(),
-            'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, number_format((float) $row->taxable_income), number_format((float) $row->exemption_amount), number_format((float) $row->tax_amount)],
+            'mapper' => fn ($row) => [$row->employee->full_name, $row->period->persian_title, formatMoney((float) $row->taxable_income), formatMoney((float) $row->exemption_amount), formatMoney((float) $row->tax_amount)],
         ]);
     }
 
@@ -196,6 +266,7 @@ class ManagementReportController extends Controller
                 'description' => 'کارکرد ماهانه، اضافه‌کاری، تاخیر، غیبت، مرخصی و ماموریت',
                 'reports' => [
                     ['title' => 'کارکرد ماهانه', 'description' => 'خلاصه پردازش کارکرد ماهانه موتور جدید', 'route' => route('management-reports.attendance-monthly'), 'status' => 'آماده'],
+                    ['title' => 'ریز کارکرد روزانه', 'description' => 'ورود/خروج، تأخیر، تعجیل و غیبت با بازه ساعت هر روز', 'route' => route('management-reports.attendance-daily'), 'status' => 'آماده'],
                     ['title' => 'اضافه‌کاری و تاخیر', 'description' => 'تحلیل اضافه‌کاری، تاخیر، تعجیل و غیبت', 'route' => route('management-reports.attendance-exceptions'), 'status' => 'آماده'],
                 ],
             ],
@@ -212,7 +283,8 @@ class ManagementReportController extends Controller
                 'title' => 'بیمه',
                 'description' => 'مزد مشمول بیمه و سهم کارمند/کارفرما',
                 'reports' => [
-                    ['title' => 'خلاصه بیمه', 'description' => 'سهم بیمه کارمند، کارفرما و بیکاری', 'route' => route('management-reports.insurance-summary'), 'status' => 'آماده'],
+                    ['title' => 'خلاصه بیمه', 'description' => 'بدهی بیمه به تفکیک دوره', 'route' => route('management-reports.insurance-summary'), 'status' => 'آماده'],
+                    ['title' => 'ریز بیمه پرسنل', 'description' => 'سهم بیمه کارمند، کارفرما و بیکاری', 'route' => route('management-reports.insurance-employees'), 'status' => 'آماده'],
                 ],
             ],
             [
@@ -270,15 +342,32 @@ class ManagementReportController extends Controller
                 $line->project_id ?: 'none',
             ]);
 
-            $balances[$balanceKey] ??= ['quantity' => 0, 'value' => 0];
+            $balances[$balanceKey] ??= ['quantity' => 0.0, 'value' => 0.0];
 
-            $quantityIn = $line->type === 'receipt' ? (float) $line->quantity : 0;
-            $quantityOut = in_array($line->type, ['issue', 'consumption'], true) ? (float) $line->quantity : 0;
-            $valueIn = $line->type === 'receipt' ? (float) $line->line_total : 0;
-            $valueOut = in_array($line->type, ['issue', 'consumption'], true) ? (float) $line->line_total : 0;
+            $quantityIn = $line->type === 'receipt' ? (float) $line->quantity : 0.0;
+            $quantityOut = in_array($line->type, ['issue', 'consumption'], true) ? (float) $line->quantity : 0.0;
 
-            $balances[$balanceKey]['quantity'] += $quantityIn - $quantityOut;
-            $balances[$balanceKey]['value'] += $valueIn - $valueOut;
+            $previousQuantity = (float) $balances[$balanceKey]['quantity'];
+            $previousValue = (float) $balances[$balanceKey]['value'];
+            $averageUnitCost = abs($previousQuantity) > 0.000001
+                ? $previousValue / $previousQuantity
+                : (float) $line->unit_price;
+
+            if ($line->type === 'receipt') {
+                $valueIn = (float) $line->line_total;
+                $valueOut = 0.0;
+            } else {
+                $valueIn = 0.0;
+                $valueOut = $quantityOut * $averageUnitCost;
+            }
+
+            $balances[$balanceKey]['quantity'] = $previousQuantity + $quantityIn - $quantityOut;
+            $balances[$balanceKey]['value'] = $previousValue + $valueIn - $valueOut;
+
+            if (abs($balances[$balanceKey]['quantity']) < 0.000001) {
+                $balances[$balanceKey]['quantity'] = 0.0;
+                $balances[$balanceKey]['value'] = 0.0;
+            }
 
             return [
                 'transaction' => $this->inventoryLineAsTransaction($line),
@@ -341,9 +430,51 @@ class ManagementReportController extends Controller
         ];
     }
 
-    private function hrEmploymentOrdersData(Request $request): array
+    private function payrollSummaryData(Request $request): array
     {
-        $query = EmploymentOrder::with(['employee.party'])->latest();
+        $query = PayrollCalculation::with(['employee.party', 'period'])->latest();
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->search);
+            $query->whereHas('employee', function ($employee) use ($search): void {
+                $employee->where('employee_code', 'like', "%{$search}%")
+                    ->orWhere('personnel_code', 'like', "%{$search}%")
+                    ->orWhereHas('party', fn ($party) => $party->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($request->filled('payroll_period_id')) {
+            $query->where('payroll_period_id', (int) $request->payroll_period_id);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        return [
+            'title' => 'گزارش خلاصه حقوق',
+            'headers' => ['پرسنل', 'دوره', 'ناخالص', 'مشمول بیمه', 'غیرمشمول بیمه', 'بیمه کارمند', 'بیمه کارفرما', 'مالیات', 'خالص پرداختی'],
+            'rows' => $query->paginate(100)->withQueryString(),
+            'mapper' => fn ($row) => [
+                $row->employee->full_name,
+                $row->period->persian_title,
+                formatMoney((float) $row->gross_salary),
+                formatMoney((float) ($row->insurance_base ?? 0)),
+                formatMoney(max(0, (float) $row->gross_salary - (float) ($row->insurance_base ?? 0))),
+                formatMoney((float) $row->insurance_employee),
+                formatMoney((float) $row->insurance_employer),
+                formatMoney((float) $row->tax_amount),
+                formatMoney((float) $row->net_payable),
+            ],
+            'filters' => $request->only(['search', 'payroll_period_id', 'status']),
+            'periods' => PayrollPeriod::query()->orderByDesc('year')->orderByDesc('month')->get(),
+        ];
+    }
+
+    private function hrEmploymentOrdersData(Request $request, bool $paginate = true): array
+    {
+        $query = EmploymentOrder::with(['employee.party', 'position', 'job', 'organizationUnit'])
+            ->latest();
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -356,7 +487,9 @@ class ManagementReportController extends Controller
         }
 
         return [
-            'rows' => $query->paginate(50)->withQueryString(),
+            'rows' => $paginate
+                ? $query->paginate(50)->withQueryString()
+                : $query->limit(500)->get(),
             'filters' => $request->only(['search', 'status']),
         ];
     }
@@ -430,7 +563,9 @@ class ManagementReportController extends Controller
             $query->where('d.project_id', $request->project_id);
         }
 
-        if ($request->filled('item_name')) {
+        if ($request->filled('item_id')) {
+            $query->where('i.id', $request->integer('item_id'));
+        } elseif ($request->filled('item_name')) {
             $query->where('i.name', 'like', '%' . $request->item_name . '%');
         }
 
@@ -462,6 +597,13 @@ class ManagementReportController extends Controller
             if ($endDate) {
                 $query->where('d.document_date', '<=', $endDate);
             }
+        }
+
+        if (! $request->filled('start_date') && ! $request->filled('end_date')) {
+            $query->where(function ($scope) {
+                $scope->where('d.entry_mode', '!=', 'automatic')
+                    ->orWhere('d.source_type', '!=', FiscalYear::class);
+            });
         }
 
         return $query;
@@ -503,9 +645,9 @@ class ManagementReportController extends Controller
             'پروژه' => $line->project_name ?: '-',
             'منبع' => $line->source_type ? class_basename($line->source_type) . ' #' . $line->source_id : 'ثبت دستی',
             'کالا' => $line->item_name,
-            'تعداد' => number_format((float) $line->quantity, 3),
-            'فی' => number_format((float) $line->unit_price),
-            'مبلغ' => number_format((float) $line->line_total),
+            'تعداد' => formatQuantity((float) $line->quantity),
+            'فی' => formatMoney((float) $line->unit_price),
+            'مبلغ' => formatMoney((float) $line->line_total),
             'شرح سند' => $line->document_description ?: '-',
             'شرح ردیف' => $line->line_description ?: '-',
         ];
@@ -518,6 +660,7 @@ class ManagementReportController extends Controller
         return [
             'warehouses' => Warehouse::orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
+            'items' => Item::query()->where('is_active', true)->orderBy('name')->get(['id', 'name', 'code', 'category', 'type']),
             'categories' => DB::table('items')
                 ->select('category')
                 ->whereNotNull('category')

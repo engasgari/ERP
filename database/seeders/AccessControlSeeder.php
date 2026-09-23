@@ -41,6 +41,8 @@ class AccessControlSeeder extends Seeder
             ['key' => 'financial.view', 'title' => 'مشاهده مالی', 'group' => 'مالی'],
             ['key' => 'financial.manage', 'title' => 'مدیریت مالی', 'group' => 'مالی'],
             ['key' => 'reports.view', 'title' => 'مشاهده گزارش‌ها', 'group' => 'گزارش‌ها'],
+            ['key' => 'reports.sales.view', 'title' => 'مشاهده گزارش‌های فروش', 'group' => 'گزارش‌ها'],
+            ['key' => 'reports.sales.export', 'title' => 'خروجی گزارش‌های فروش', 'group' => 'گزارش‌ها'],
         ];
 
         foreach ($permissions as $permission) {
@@ -50,14 +52,14 @@ class AccessControlSeeder extends Seeder
         $allPermissions = Permission::pluck('id');
         $roles = [
             'admin' => ['title' => 'مدیر سیستم', 'description' => 'دسترسی کامل به همه بخش‌ها', 'permissions' => $allPermissions],
-            'commercial_manager' => ['title' => 'مدیر بازرگانی', 'description' => 'مدیریت اشخاص، کالاها و فاکتورهای خرید و فروش', 'permissions' => Permission::whereIn('key', ['base-info.view', 'base-info.manage', 'commerce.view', 'commerce.manage', 'inventory.view'])->pluck('id')],
+            'commercial_manager' => ['title' => 'مدیر بازرگانی', 'description' => 'مدیریت اشخاص، کالاها و فاکتورهای خرید و فروش', 'permissions' => Permission::whereIn('key', ['base-info.view', 'base-info.manage', 'commerce.view', 'commerce.manage', 'inventory.view', 'reports.sales.view', 'reports.sales.export'])->pluck('id')],
             'accounting_manager' => ['title' => 'مدیر مالی', 'description' => 'مدیریت حسابداری، کدینگ، اسناد و سال مالی', 'permissions' => Permission::whereIn('key', ['accounting.view', 'accounting.manage', 'financial.view', 'financial.manage', 'reports.view', 'fiscal-years.manage', 'fiscal.view', 'fiscal.close', 'fiscal.open', 'fiscal.reopen', 'fiscal.manage_sequences'])->pluck('id')],
             'hr_manager' => ['title' => 'مدیر منابع انسانی', 'description' => 'مدیریت پرسنل و کارکرد', 'permissions' => Permission::whereIn('key', ['employees.view', 'employees.manage', 'worklogs.view', 'worklogs.manage'])->pluck('id')],
             'payroll_viewer' => ['title' => 'مشاهده‌گر حقوق', 'description' => 'مشاهده حقوق کارمندهای مجاز', 'permissions' => Permission::whereIn('key', ['salaries.view'])->pluck('id')],
             'worklog_manager' => ['title' => 'مدیر کارکرد', 'description' => 'ثبت و مدیریت کارکرد کارمندهای مجاز', 'permissions' => Permission::whereIn('key', ['worklogs.view', 'worklogs.manage'])->pluck('id')],
             'warehouse_manager' => ['title' => 'مدیر انبار', 'description' => 'مدیریت انبار', 'permissions' => Permission::whereIn('key', ['warehouse.view', 'warehouse.manage', 'inventory.view', 'inventory.manage'])->pluck('id')],
             'accountant' => ['title' => 'حسابدار', 'description' => 'مدیریت مالی و مشاهده حقوق', 'permissions' => Permission::whereIn('key', ['accounting.view', 'accounting.manage', 'financial.view', 'financial.manage', 'salaries.view'])->pluck('id')],
-            'report_viewer' => ['title' => 'مشاهده‌گر گزارش‌ها', 'description' => 'مشاهده گزارش‌های مدیریتی', 'permissions' => Permission::whereIn('key', ['reports.view', 'accounting.view'])->pluck('id')],
+            'report_viewer' => ['title' => 'مشاهده‌گر گزارش‌ها', 'description' => 'مشاهده گزارش‌های مدیریتی', 'permissions' => Permission::whereIn('key', ['reports.view', 'reports.sales.view', 'accounting.view'])->pluck('id')],
         ];
 
         foreach ($roles as $name => $data) {
@@ -86,6 +88,9 @@ class AccessControlSeeder extends Seeder
             ['key' => 'payroll.post', 'title' => 'صدور سند حقوق', 'group' => 'حقوق و دستمزد'],
             ['key' => 'salary-payments.view', 'title' => 'مشاهده پرداخت حقوق', 'group' => 'مالی'],
             ['key' => 'salary-payments.manage', 'title' => 'مدیریت پرداخت حقوق', 'group' => 'مالی'],
+            ['key' => 'insurance.view', 'title' => 'مشاهده بیمه تأمین اجتماعی', 'group' => 'حقوق و دستمزد'],
+            ['key' => 'insurance.manage', 'title' => 'مدیریت بدهی بیمه', 'group' => 'حقوق و دستمزد'],
+            ['key' => 'insurance.payment', 'title' => 'ثبت پرداخت بیمه', 'group' => 'حقوق و دستمزد'],
         ];
 
         foreach ($hrPermissions as $permission) {
@@ -94,9 +99,9 @@ class AccessControlSeeder extends Seeder
 
         $hrRoles = [
             'hr_officer' => ['title' => 'کارشناس منابع انسانی', 'description' => 'ثبت و نگهداری پرونده پرسنلی', 'keys' => ['hr.view', 'hr.manage', 'employees.view', 'employees.manage', 'employment-orders.view', 'contracts.view']],
-            'payroll_officer' => ['title' => 'کارشناس حقوق و دستمزد', 'description' => 'محاسبه و آماده‌سازی حقوق', 'keys' => ['payroll.view', 'payroll.manage', 'salaries.view', 'salaries.manage', 'attendance.view']],
-            'payroll_manager' => ['title' => 'مدیر حقوق و دستمزد', 'description' => 'تایید حقوق و صدور سند', 'keys' => ['payroll.view', 'payroll.manage', 'payroll.approve', 'payroll.post', 'salaries.view', 'salaries.manage', 'employment-orders.view', 'employment-orders.approve']],
-            'finance_manager' => ['title' => 'مدیر مالی', 'description' => 'مدیریت مالی و پرداخت حقوق', 'keys' => ['financial.view', 'financial.manage', 'salary-payments.view', 'salary-payments.manage', 'payroll.view', 'reports.view']],
+            'payroll_officer' => ['title' => 'کارشناس حقوق و دستمزد', 'description' => 'محاسبه و آماده‌سازی حقوق', 'keys' => ['payroll.view', 'payroll.manage', 'salaries.view', 'salaries.manage', 'attendance.view', 'insurance.view', 'insurance.manage', 'insurance.payment']],
+            'payroll_manager' => ['title' => 'مدیر حقوق و دستمزد', 'description' => 'تایید حقوق و صدور سند', 'keys' => ['payroll.view', 'payroll.manage', 'payroll.approve', 'payroll.post', 'salaries.view', 'salaries.manage', 'employment-orders.view', 'employment-orders.approve', 'insurance.view', 'insurance.manage', 'insurance.payment']],
+            'finance_manager' => ['title' => 'مدیر مالی', 'description' => 'مدیریت مالی و پرداخت حقوق', 'keys' => ['financial.view', 'financial.manage', 'salary-payments.view', 'salary-payments.manage', 'payroll.view', 'reports.view', 'insurance.view', 'insurance.payment']],
         ];
 
         foreach ($hrRoles as $name => $data) {

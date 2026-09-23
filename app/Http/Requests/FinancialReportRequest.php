@@ -51,6 +51,10 @@ class FinancialReportRequest extends FormRequest
             $filters['bank_account_id'] = (int) $filters['bank_account_id'];
         }
 
+        if (! empty($filters['cashbox_id'])) {
+            $filters['cashbox_id'] = (int) $filters['cashbox_id'];
+        }
+
         if (! empty($filters['cost_center'])) {
             $filters['cost_center'] = trim((string) $filters['cost_center']);
         }
@@ -74,6 +78,7 @@ class FinancialReportRequest extends FormRequest
             'party_id' => ['nullable', 'integer', 'exists:parties,id'],
             'account_id' => ['nullable', 'integer', 'exists:chart_accounts,id'],
             'bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
+            'cashbox_id' => ['nullable', 'integer', 'exists:cashboxes,id'],
             'cost_center' => ['nullable', 'string', 'max:255'],
             'comparison_scope' => ['nullable', 'in:monthly,quarterly,annual'],
             'search' => ['nullable', 'string', 'max:255'],

@@ -40,6 +40,26 @@ docs/business/*
 
 docs/standards/*
 
+---
+
+# Database Safety (CRITICAL)
+
+Protected production databases (NEVER touch from tests, seeders run for testing, or destructive artisan commands unless the user explicitly requests restore/migrate on that named DB):
+
+- `aaleir_erp`
+- `aaleir_erp_old`
+
+Allowed test database only:
+
+- `aaleir_erp_testing` (MySQL)
+
+Rules for every AI Agent:
+
+1. PHPUnit MUST use `phpunit.xml` which forces `DB_DATABASE=aaleir_erp_testing` (`force="true"`).
+2. Never run `migrate:fresh`, `db:wipe`, `RefreshDatabase`, or mass deletes against `aaleir_erp`.
+3. Ad-hoc PHP/tinker data mutations on production require explicit user approval naming the database.
+4. `tests/TestCase.php` hard-fails if a test resolves to a protected database.
+
 Never guess project architecture.
 
 Never invent new patterns.

@@ -1,6 +1,14 @@
 <x-erp.ui.page-shell title="گزارش احکام کارگزینی">
     <x-erp.ui.panel>
-        <x-erp.ui.page-header title="احکام کارگزینی" />
+        <x-erp.ui.page-header
+            title="احکام کارگزینی"
+            description="فهرست احکام برای کنترل، ارائه و چاپ فرم استاندارد وزارت کار"
+            :actions="[[
+                'label' => 'چاپ گزارش',
+                'url' => route('management-reports.hr-employment-orders.print', request()->query()),
+                'class' => 'erp-action-detail',
+            ]]"
+        />
 
         <x-erp.ui.filter-bar method="GET">
             <div class="row g-2">
@@ -18,19 +26,26 @@
             </div>
         </x-erp.ui.filter-bar>
 
-        <x-erp.ui.data-table :headers="['شماره', 'پرسنل', 'نوع', 'تاریخ اثر', 'پست', 'حقوق پایه', 'وضعیت']" colspan="7">
+        <x-erp.ui.data-table :headers="['شماره', 'پرسنل', 'نوع', 'تاریخ اجرا', 'گروه/رتبه/پایه', 'حقوق پایه', 'مشمول بیمه', 'وضعیت', 'عملیات']" colspan="9">
             @forelse($rows as $order)
                 <tr>
                     <td>{{ $order->number }}</td>
                     <td>{{ $order->employee?->full_name ?: '-' }}</td>
-                    <td>{{ $order->order_type }}</td>
+                    <td>{{ $order->orderTypeLabel() }}</td>
                     <td>{{ formatJalaliDateSafe($order->effective_date) }}</td>
-                    <td>{{ $order->employee?->position ?: '-' }}</td>
-                    <td>{{ number_format((float) $order->base_salary) }}</td>
+                    <td dir="ltr">{{ ($order->job_group ?: '-') . ' / ' . ($order->job_rank ?: '-') . ' / ' . ($order->job_base ?: '-') }}</td>
+                    <td>{{ formatMoney((float) $order->base_salary) }}</td>
+                    <td>{{ formatMoney($order->totalInsurableWage()) }}</td>
                     <td>{{ $order->status === 'approved' ? 'تایید شده' : 'پیش‌نویس' }}</td>
+                    <td>
+                        <a class="erp-action-btn erp-action-detail" target="_blank"
+                           href="{{ route('management-reports.hr-employment-orders.print-form', $order) }}">
+                            چاپ فرم حکم
+                        </a>
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="py-6 text-center text-slate-500">رکوردی یافت نشد.</td></tr>
+                <tr><td colspan="9" class="py-6 text-center text-slate-500">رکوردی یافت نشد.</td></tr>
             @endforelse
         </x-erp.ui.data-table>
 

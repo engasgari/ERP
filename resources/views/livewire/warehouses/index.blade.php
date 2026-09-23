@@ -55,11 +55,19 @@
                             <input class="form-control form-control-sm" value="{{ $warehouse->description }}" wire:change="updateField({{ $warehouse->id }}, 'description', $event.target.value)" placeholder="شرح">
                         </td>
                         <td>
-                            <div class="d-grid d-sm-flex gap-2">
-                                <button type="button" wire:click="show({{ $warehouse->id }})" class="erp-action-btn erp-action-detail">جزئیات</button>
-                                <a href="{{ route('warehouses.show', $warehouse) }}" class="erp-action-btn erp-action-detail text-center">گزارش</a>
-                                <button type="button" wire:click="delete({{ $warehouse->id }})" wire:confirm="آیا از حذف این انبار مطمئن هستید؟" wire:loading.attr="disabled" wire:target="delete({{ $warehouse->id }})" class="erp-action-btn erp-action-delete">حذف</button>
-                            </div>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action icon="view" label="جزئیات" wire:click="show({{ $warehouse->id }})" />
+                                <x-erp.ui.row-action icon="chart" label="گزارش" :href="route('warehouses.show', $warehouse)" />
+                                <x-erp.ui.row-action
+                                    icon="delete"
+                                    label="حذف"
+                                    tone="danger"
+                                    wire:click="delete({{ $warehouse->id }})"
+                                    wire:confirm="آیا از حذف این انبار مطمئن هستید؟"
+                                    wire:loading.attr="disabled"
+                                    wire:target="delete({{ $warehouse->id }})"
+                                />
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty

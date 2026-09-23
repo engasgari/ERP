@@ -12,17 +12,17 @@
         </div>
         <div class="summary-card">
             <div class="summary-label">جمع بدهکار (ریال)</div>
-            <div class="summary-value">{{ number_format($summary['debit']) }}</div>
+            <div class="summary-value">{{ formatMoney($summary['debit']) }}</div>
         </div>
         <div class="summary-card">
             <div class="summary-label">جمع بستانکار (ریال)</div>
-            <div class="summary-value">{{ number_format($summary['credit']) }}</div>
+            <div class="summary-value">{{ formatMoney($summary['credit']) }}</div>
         </div>
     </section>
 
     <div class="print-note">
         مانده حساب:
-        <strong>{{ number_format(abs($summary['balance'])) }} {{ $summary['balance_type'] }}</strong>
+        <strong>{{ formatMoney(abs($summary['balance'])) }} {{ $summary['balance_type'] }}</strong>
     </div>
 
     <table>
@@ -48,9 +48,9 @@
                 <td>{{ data_get($line, 'party.name', '-') }}</td>
                 <td>{{ data_get($line, 'project.name', '-') }}</td>
                 <td>{{ data_get($line, 'description') ?: data_get($line, 'document.description', '-') }}</td>
-                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'debit') ? number_format((float) data_get($line, 'debit')) : '-' }}</td>
-                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'credit') ? number_format((float) data_get($line, 'credit')) : '-' }}</td>
-                <td class="text-left" dir="ltr">{{ number_format((float) data_get($line, 'running_balance')) }}</td>
+                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'debit') ? formatMoney((float) data_get($line, 'debit')) : '-' }}</td>
+                <td class="text-left" dir="ltr">{{ (float) data_get($line, 'credit') ? formatMoney((float) data_get($line, 'credit')) : '-' }}</td>
+                <td class="text-left" dir="ltr">{{ formatMoney((float) data_get($line, 'running_balance')) }}</td>
             </tr>
         @empty
             <tr>
@@ -61,9 +61,9 @@
         <tfoot>
         <tr>
             <td colspan="6">جمع</td>
-            <td class="text-left" dir="ltr">{{ number_format($summary['debit']) }}</td>
-            <td class="text-left" dir="ltr">{{ number_format($summary['credit']) }}</td>
-            <td class="text-left" dir="ltr">{{ number_format($summary['balance']) }}</td>
+            <td class="text-left" dir="ltr">{{ formatMoney($summary['debit']) }}</td>
+            <td class="text-left" dir="ltr">{{ formatMoney($summary['credit']) }}</td>
+            <td class="text-left" dir="ltr">{{ formatMoney($summary['balance']) }}</td>
         </tr>
         </tfoot>
     </table>

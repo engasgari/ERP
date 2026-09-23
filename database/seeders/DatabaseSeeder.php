@@ -25,9 +25,11 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call(AccessControlSeeder::class);
+        $this->call(CrmSeeder::class);
         $this->call(BusinessCoreSeeder::class);
         $this->call(WorkCalendarSeeder::class);
         $this->call(AccountingTreasurySeeder::class);
+        $this->call(PartnerShareholdersSeeder::class);
         $this->call(StandardPayrollSeeder::class);
         $this->call(SmallBusinessHrSeeder::class);
         $this->call(StandardPayrollSeeder::class);

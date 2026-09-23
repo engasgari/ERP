@@ -89,6 +89,14 @@
                             @endforeach
                         </select>
                     </label>
+                    <label class="text-sm font-bold text-slate-700">صندوق
+                        <select name="cashbox_id" class="mt-1 w-full rounded-lg border-slate-300">
+                            <option value="">همه</option>
+                            @foreach($cashboxes ?? [] as $cashbox)
+                                <option value="{{ $cashbox->id }}" @selected(request('cashbox_id') == $cashbox->id)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
                     <label class="text-sm font-bold text-slate-700">طرف حساب
                         <select name="party_id" class="mt-1 w-full rounded-lg border-slate-300">
                             <option value="">همه</option>
@@ -151,6 +159,11 @@
                         'period_cash_in' => 'ورودی نقد دوره',
                         'period_cash_out' => 'خروجی نقد دوره',
                         'closing_cash' => 'نقد پایان دوره',
+                        'opening_balance' => 'مانده افتتاحیه',
+                        'period_debit' => 'جمع بدهکار دوره',
+                        'period_credit' => 'جمع بستانکار دوره',
+                        'closing_balance' => 'مانده نهایی',
+                        'line_count' => 'تعداد ردیف',
                         'net_profit' => 'سود خالص',
                         'revenue' => 'درآمد',
                         'cost_of_sales' => 'بهای تمام‌شده فروش',
@@ -163,7 +176,7 @@
                 @foreach($summaryItems as $label => $value)
                     <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $summaryLabels[$label] ?? str_replace('_', ' ', $label) }}</div>
-                        <div class="mt-2 text-lg font-black text-slate-900">{{ is_numeric($value) ? number_format((float) $value) : $value }}</div>
+                        <div class="mt-2 text-lg font-black text-slate-900">{{ is_numeric($value) ? formatMoney((float) $value) : $value }}</div>
                     </div>
                 @endforeach
             </section>
@@ -190,7 +203,7 @@
                         'customer-statement', 'supplier-statement' => ['code', 'name', 'debit', 'credit', 'balance', 'balance_type'],
                         'outstanding-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
                         'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'days_overdue', 'outstanding_balance'],
-                        'cash-book', 'bank-book', 'bank-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+                        'cash-book', 'bank-book', 'bank-statement', 'cash-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
                         'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
                         'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
                         'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],
@@ -204,6 +217,7 @@
                         'journal-entries-by-account' => ['account', 'debit', 'credit', 'balance'],
                         'audit-trail' => ['date', 'event', 'type', 'user_id', 'auditable_id'],
                         'deleted-modified-transactions' => str_contains($title, 'حذف') ? ['number', 'date', 'status', 'description', 'deleted_at'] : ['document', 'event', 'user_id'],
+                        'tax-electronic-books' => ['row_number', 'date', 'ledger_code', 'ledger_title', 'subsidiary_code', 'subsidiary_title', 'description', 'debit', 'credit'],
                         default => is_array($items->first()) ? array_keys($items->first()) : [],
                     };
                 };
@@ -227,8 +241,14 @@
                             @foreach($columns as $key)
                                 <td>
                                     @php $cell = data_get($row, $key); @endphp
-                                    @if(is_numeric($cell))
-                                        {{ number_format((float) $cell) }}
+                                    @if($key === 'description' && data_get($row, 'description_primary'))
+                                        <x-erp.ui.bank-statement-description
+                                            :primary="data_get($row, 'description_primary')"
+                                            :secondary="data_get($row, 'description_secondary')"
+                                            :description="data_get($row, 'description')"
+                                        />
+                                    @elseif(is_numeric($cell))
+                                        {{ formatMoney((float) $cell) }}
                                     @elseif($cell instanceof \Carbon\CarbonInterface)
                                         {{ gregorianToJalaliDate($cell) }}
                                     @elseif(is_array($cell))
@@ -253,9 +273,9 @@
                                                             <td>{{ $line['document_number'] ?? '-' }}</td>
                                                             <td>{{ $line['account'] ?? '-' }}</td>
                                                             <td>{{ $line['description'] ?? '-' }}</td>
-                                                            <td>{{ isset($line['debit']) ? number_format((float) $line['debit']) : '-' }}</td>
-                                                            <td>{{ isset($line['credit']) ? number_format((float) $line['credit']) : '-' }}</td>
-                                                            <td>{{ isset($line['running_balance']) ? number_format((float) $line['running_balance']) : '-' }}</td>
+                                                            <td>{{ isset($line['debit']) ? formatMoney((float) $line['debit']) : '-' }}</td>
+                                                            <td>{{ isset($line['credit']) ? formatMoney((float) $line['credit']) : '-' }}</td>
+                                                            <td>{{ isset($line['running_balance']) ? formatMoney((float) $line['running_balance']) : '-' }}</td>
                                                         </tr>
                                                     @endforeach
                                                 </x-erp.ui.data-table>

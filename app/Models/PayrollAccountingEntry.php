@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PayrollAccountingEntry extends Model
 {
     protected $fillable = [
-        'payroll_calculation_id', 'employee_id', 'payroll_period_id', 'entry_number',
+        'payroll_calculation_id', 'employee_id', 'payroll_period_id', 'accounting_document_id', 'entry_number',
         'salary_expense_debit', 'insurance_expense_debit', 'salary_payable_credit',
         'insurance_payable_credit', 'tax_payable_credit', 'status', 'lines',
     ];
@@ -20,4 +21,9 @@ class PayrollAccountingEntry extends Model
         'tax_payable_credit' => 'decimal:2',
         'lines' => 'array',
     ];
+
+    public function accountingDocument(): BelongsTo
+    {
+        return $this->belongsTo(AccountingDocument::class);
+    }
 }

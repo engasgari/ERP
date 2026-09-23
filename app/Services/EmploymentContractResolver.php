@@ -35,6 +35,11 @@ class EmploymentContractResolver
 
     private function isHourly(string $employmentType, string $salaryType): bool
     {
+        // ماهانه بودن حکم/استخدام بر نوع حقوق ساعتیِ قدیمیِ پرونده اولویت دارد.
+        if (in_array($employmentType, ['monthly', 'monthly_contract', 'permanent', 'full_time'], true)) {
+            return false;
+        }
+
         return in_array($employmentType, ['hourly', 'hourly_contract'], true)
             || $salaryType === 'hourly';
     }

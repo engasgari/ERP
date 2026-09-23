@@ -27,9 +27,9 @@ class Summaries extends Component
 
     public function mount(): void
     {
-        $todayParts = explode('/', formatJalaliDateSafe(now()));
-        $this->year = (int) request()->integer('year', (int) ($todayParts[0] ?? 1405));
-        $this->month = (int) request()->integer('month', (int) ($todayParts[1] ?? 1));
+        $this->year = (int) request()->integer('year', (int) getCurrentPersianYear());
+        $this->month = (int) request()->integer('month', (int) getCurrentPersianMonth());
+        $this->normalizePeriodFilters();
     }
 
     public function updated($name): void
@@ -41,6 +41,8 @@ class Summaries extends Component
 
     public function rebuild(): void
     {
+        $this->normalizePeriodFilters();
+
         $this->validate([
             'year' => ['required', 'integer', 'min:1400', 'max:1500'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
@@ -63,7 +65,7 @@ class Summaries extends Component
             return;
         }
 
-        session()->flash('success', 'خلاصه کارکرد برای ' . number_format($summaries->count()) . ' نفر بازسازی شد.');
+        session()->flash('success', 'خلاصه کارکرد برای ' . formatMoney($summaries->count()) . ' نفر بازسازی شد.');
     }
 
     public function render()
@@ -89,5 +91,16 @@ class Summaries extends Component
             ->count();
 
         return view('livewire.attendance.summaries', compact('summaries', 'employeesWithoutSummary'));
+    }
+
+    private function normalizePeriodFilters(): void
+    {
+        if ($this->year < 1400 || $this->year > 1500) {
+            $this->year = (int) getCurrentPersianYear();
+        }
+
+        if ($this->month < 1 || $this->month > 12) {
+            $this->month = (int) getCurrentPersianMonth();
+        }
     }
 }

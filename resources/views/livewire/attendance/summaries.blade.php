@@ -10,7 +10,7 @@
                 </p>
                 @if($employeesWithoutSummary > 0)
                     <p class="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                        {{ number_format($employeesWithoutSummary) }} پرسنل فعال هنوز تخصیص گروه کاری ندارند؛ بدون گروه کاری، برنامه شیفت و تقویم برایشان قابل محاسبه نیست.
+                        {{ formatMoney($employeesWithoutSummary) }} پرسنل فعال هنوز تخصیص گروه کاری ندارند؛ بدون گروه کاری، برنامه شیفت و تقویم برایشان قابل محاسبه نیست.
                     </p>
                 @endif
             </div>
@@ -72,21 +72,21 @@
                 @forelse($summaries as $summary)
                     <tr wire:key="summary-{{ $summary->id }}">
                         <td class="font-semibold text-slate-900">{{ $summary->employee?->full_name }}</td>
-                        <td>{{ number_format($summary->planned_minutes / 60, 2) }} ساعت</td>
-                        <td>{{ number_format($summary->worked_minutes / 60, 2) }} ساعت</td>
-                        <td>{{ number_format($summary->overtime_minutes / 60, 2) }} ساعت</td>
+                        <td>{{ formatMoney($summary->planned_minutes / 60, 2) }} ساعت</td>
+                        <td>{{ formatMoney($summary->worked_minutes / 60, 2) }} ساعت</td>
+                        <td>{{ formatMoney($summary->overtime_minutes / 60, 2) }} ساعت</td>
                         <td>
-                            {{ number_format($summary->hourly_leave_minutes / 60, 2) }} ساعت
+                            {{ formatMoney($summary->hourly_leave_minutes / 60, 2) }} ساعت
                             /
-                            {{ number_format((float) $summary->daily_leave_days, 2) }} روز
+                            {{ formatMoney((float) $summary->daily_leave_days, 2) }} روز
                         </td>
                         <td>
-                            {{ number_format($summary->hourly_mission_minutes / 60, 2) }} ساعت
+                            {{ formatMoney($summary->hourly_mission_minutes / 60, 2) }} ساعت
                             /
-                            {{ number_format((float) $summary->daily_mission_days, 2) }} روز
+                            {{ formatMoney((float) $summary->daily_mission_days, 2) }} روز
                         </td>
-                        <td>{{ number_format(($summary->delay_minutes + $summary->early_leave_minutes) / 60, 2) }} ساعت</td>
-                        <td>{{ number_format($summary->absence_minutes / 60, 2) }} ساعت</td>
+                        <td>{{ formatMoney(($summary->delay_minutes + $summary->early_leave_minutes) / 60, 2) }} ساعت</td>
+                        <td>{{ formatMoney($summary->absence_minutes / 60, 2) }} ساعت</td>
                     </tr>
                 @empty
                     <tr>

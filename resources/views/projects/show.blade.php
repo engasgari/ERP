@@ -26,15 +26,15 @@
             <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <div class="rounded-md border border-blue-200 bg-blue-50 p-4">
                     <div class="text-sm font-bold text-blue-700">درآمد</div>
-                    <div class="mt-1 text-2xl font-black text-blue-800">{{ number_format($project->total_income) }}</div>
+                    <div class="mt-1 text-2xl font-black text-blue-800">{{ formatMoney($project->total_income) }}</div>
                 </div>
                 <div class="rounded-md border border-red-200 bg-red-50 p-4">
                     <div class="text-sm font-bold text-red-700">هزینه</div>
-                    <div class="mt-1 text-2xl font-black text-red-800">{{ number_format($project->total_expense) }}</div>
+                    <div class="mt-1 text-2xl font-black text-red-800">{{ formatMoney($project->total_expense) }}</div>
                 </div>
                 <div class="rounded-md border border-green-200 bg-green-50 p-4">
                     <div class="text-sm font-bold text-green-700">ساعت کار</div>
-                    <div class="mt-1 text-2xl font-black text-green-800">{{ number_format($project->total_work_hours, 1) }}</div>
+                    <div class="mt-1 text-2xl font-black text-green-800">{{ formatMoney($project->total_work_hours, 1) }}</div>
                 </div>
                 <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
                     <div class="text-sm font-bold text-slate-700">وضعیت پروژه</div>
@@ -54,9 +54,9 @@
 
                 <table class="w-full border-collapse border border-gray-300 text-sm">
                     <tbody>
-                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">تاریخ شروع</th><td class="border border-gray-300 p-3">{{ $project->start_date ? verta($project->start_date)->format('Y/m/d') : '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">تاریخ پایان</th><td class="border border-gray-300 p-3">{{ $project->end_date ? verta($project->end_date)->format('Y/m/d') : '-' }}</td></tr>
-                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">بودجه</th><td class="border border-gray-300 p-3">{{ number_format((float) $project->budget) }}</td></tr>
+                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">تاریخ شروع</th><td class="border border-gray-300 p-3">{{ $project->start_date ? gregorianToJalaliDate($project->start_date) : '-' }}</td></tr>
+                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">تاریخ پایان</th><td class="border border-gray-300 p-3">{{ $project->end_date ? gregorianToJalaliDate($project->end_date) : '-' }}</td></tr>
+                    <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">بودجه</th><td class="border border-gray-300 p-3">{{ formatMoney((float) $project->budget) }}</td></tr>
                     <tr><th class="border border-gray-300 bg-gray-50 p-3 text-right">سفارش تولید</th><td class="border border-gray-300 p-3">{{ $project->productionOrders->count() }}</td></tr>
                     </tbody>
                 </table>
@@ -83,7 +83,7 @@
                             <tr>
                                 <td class="border border-gray-300 p-2">{{ $order->number }}</td>
                                 <td class="border border-gray-300 p-2">{{ $order->item?->name }}</td>
-                                <td class="border border-gray-300 p-2">{{ number_format((float) $order->quantity, 3) }}</td>
+                                <td class="border border-gray-300 p-2">{{ formatQuantity((float) $order->quantity) }}</td>
                                 <td class="border border-gray-300 p-2">{{ $order->status_label }}</td>
                                 <td class="border border-gray-300 p-2"><a href="{{ route('production-orders.show', $order) }}" class="font-bold text-blue-700">جزئیات</a></td>
                             </tr>

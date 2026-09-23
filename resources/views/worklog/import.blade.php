@@ -7,9 +7,9 @@
         <div class="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto">
             <div class="mb-6 flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-2xl font-bold">Import Attendance</h2>
+                    <h2 class="text-2xl font-bold">ورود اکسل کارکرد (Piofy)</h2>
                     <p class="mt-1 text-sm text-slate-500">
-                        این صفحه فقط فایل نمونه حضور و غیاب را می‌پذیرد. فایل CSV را آپلود کنید تا هر جفت تردد ورود و خروج به یک رکورد در جدول <code>work_logs</code> تبدیل شود.
+                        خروجی ماهانه دستگاه تردد (xlsx یا csv) را آپلود کنید. هر جفت ورود/خروج یک رکورد کارکرد می‌سازد و پروژه خالی می‌ماند تا در لیست کارکرد انتخاب شود.
                     </p>
                 </div>
                 <a href="{{ route('work-logs.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
@@ -17,16 +17,12 @@
                 </a>
             </div>
 
-            @if(session('success'))
-                <div class="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-800">
-                    {{ session('success') }}
-                </div>
+            @if (session('success'))
+                <div class="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
             @endif
 
-            @if(session('error'))
-                <div class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">
-                    {{ session('error') }}
-                </div>
+            @if (session('error'))
+                <div class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800">{{ session('error') }}</div>
             @endif
 
             @if ($errors->any())
@@ -41,11 +37,11 @@
                 @csrf
 
                 <div>
-                    <label for="file" class="block text-sm font-semibold text-slate-700 mb-2">فایل CSV دستگاه تردد</label>
-                    <input type="file" id="file" name="file" accept=".csv,.txt" required
+                    <label for="file" class="block text-sm font-semibold text-slate-700 mb-2">فایل خروجی دستگاه (xlsx / csv)</label>
+                    <input type="file" id="file" name="file" accept=".xlsx,.xls,.csv,.txt" required
                            class="w-full border border-gray-300 rounded-lg px-3 py-2">
                     <p class="mt-2 text-xs text-slate-500">
-                        هدر صحیح: user_id, employee_code, user_name, project_id, project_name, jalali_datetime, gregorian_datetime
+                        هدر Piofy: شناسه کاربر، نام کاربر، شماره کارت، زمان تردد (شمسی)، زمان تردد (میلادی)، کلید عملیاتی، عنوان کلید عملیاتی
                     </p>
                 </div>
 
@@ -65,46 +61,40 @@
             <div class="mt-6 rounded-lg bg-gray-50 p-4 text-sm text-slate-700">
                 <h3 class="mb-2 font-bold">نحوه تبدیل</h3>
                 <ul class="list-disc space-y-2 pr-5">
-                    <li>اگر ستون <code>employee_code</code> یا <code>user_id</code> وجود داشته باشد، پرسنل پیدا می‌شود.</li>
-                    <li>اگر <code>project_id</code> معتبر نباشد، سیستم از پروژه پیش‌فرض استفاده می‌کند.</li>
-                    <li>اگر فقط یک فایل تردد با ورود و خروج داشته باشید، از اولین و آخرین زمان همان روز یک کارکرد ساخته می‌شود.</li>
-                    <li>این صفحه برای import دستی کارکرد نیست و نیازی به <code>work_date</code> ندارد.</li>
+                    <li>پرسنل با شماره کارت، شناسه کاربر، کد پرسنلی یا نام پیدا می‌شود.</li>
+                    <li>بعد از ورود، پروژه همه رکوردها خالی است؛ در لیست کارکرد پروژه را انتخاب کنید.</li>
+                    <li>برای هر پرسنل در هر روز، اولین و آخرین تردد به عنوان ورود و خروج ثبت می‌شود.</li>
+                    <li>فایل خروجی مستقیم دستگاه Piofy با پسوند xlsx قابل آپلود است.</li>
                 </ul>
             </div>
 
             <div class="mt-6 rounded-lg bg-gray-50 p-4 text-sm text-slate-700">
-                <h3 class="mb-2 font-bold">نمونه فایل</h3>
+                <h3 class="mb-2 font-bold">نمونه ستون‌های دستگاه</h3>
                 <div class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="w-full text-xs">
                         <thead>
                         <tr>
-                            <th>user_id</th>
-                            <th>employee_code</th>
-                            <th>user_name</th>
-                            <th>project_id</th>
-                            <th>project_name</th>
-                            <th>jalali_datetime</th>
-                            <th>gregorian_datetime</th>
+                            <th>شناسه کاربر</th>
+                            <th>نام کاربر</th>
+                            <th>شماره کارت</th>
+                            <th>زمان تردد (شمسی)</th>
+                            <th>زمان تردد (میلادی)</th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr>
                             <td>1</td>
-                            <td>EMP-00001</td>
                             <td>Employee Name</td>
-                            <td>1</td>
-                            <td>اداری - داخل سازمانی</td>
-                            <td>1403/03/17 08:00</td>
-                            <td>2024-06-06 08:00</td>
+                            <td>1001</td>
+                            <td>1405/06/25 08:00:00</td>
+                            <td>2026/09/16 08:00:00</td>
                         </tr>
                         <tr>
                             <td>1</td>
-                            <td>EMP-00001</td>
                             <td>Employee Name</td>
-                            <td>1</td>
-                            <td>اداری - داخل سازمانی</td>
-                            <td>1403/03/17 16:00</td>
-                            <td>2024-06-06 16:00</td>
+                            <td>1001</td>
+                            <td>1405/06/25 16:00:00</td>
+                            <td>2026/09/16 16:00:00</td>
                         </tr>
                         </tbody>
                     </table>

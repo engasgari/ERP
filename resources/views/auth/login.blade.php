@@ -1,13 +1,16 @@
 <x-guest-layout>
     <div class="mb-5 text-right">
-        <h1 class="text-lg font-bold text-slate-800 opacity-80">ورود به سیستم ERP</h1>
-        <p class="mt-1 text-xs font-medium text-slate-500 opacity-70">برای ادامه، اطلاعات حساب کاربری خود را وارد کنید.</p>
+        <h1 class="text-lg font-bold text-slate-800 opacity-80">ورود به {{ $appLabel }}</h1>
+        <p class="mt-1 text-xs font-medium text-slate-500 opacity-70">برای ادامه اطلاعات حساب کاربری خود را وارد کنید.</p>
     </div>
 
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form method="POST" action="{{ route('login') }}" class="space-y-4">
+    <form method="POST"
+          action="{{ $app === 'crm' ? route('crm.login.store') : route('login') }}"
+          class="space-y-4">
         @csrf
+        <input type="hidden" name="app" value="{{ $app }}">
 
         <div>
             <x-input-label for="email" value="ایمیل" class="mb-1 text-right font-bold text-slate-700" />
@@ -56,7 +59,13 @@
 
         <button type="submit"
                 class="mt-2 inline-flex items-center justify-center rounded-md bg-slate-100 px-5 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2">
-            ورود
+            ورود به {{ $appLabel }}
         </button>
     </form>
+
+    <div class="mt-4 text-center">
+        <a href="{{ route('home') }}" class="text-xs font-medium text-slate-500 hover:text-slate-800">
+            بازگشت به انتخاب برنامه
+        </a>
+    </div>
 </x-guest-layout>

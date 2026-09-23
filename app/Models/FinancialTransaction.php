@@ -84,14 +84,14 @@ class FinancialTransaction extends Model
     // فرمت مبلغ
     public function getFormattedAmountAttribute()
     {
-        return number_format($this->amount) . ' ریال';
+        return formatMoney($this->amount) . ' ریال';
     }
 
     // مبلغ با علامت
     public function getSignedAmountAttribute()
     {
         $sign = $this->type == 'income' ? '+' : '-';
-        return $sign . number_format($this->amount) . ' ریال';
+        return $sign . formatMoney($this->amount) . ' ریال';
     }
 
     public function getSourceLabelAttribute(): string

@@ -10,59 +10,7 @@ class WorkLogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = WorkLog::with(['employee', 'project']);
-        $this->scopeWorkLogQuery($query, $request->user(), 'worklogs.view');
-
-        if ($request->filled('employee')) {
-            $query->whereHas('employee', function ($q) use ($request) {
-                $q->where('first_name', 'like', '%' . $request->employee . '%')
-                    ->orWhere('last_name', 'like', '%' . $request->employee . '%')
-                    ->orWhere('national_code', 'like', '%' . $request->employee . '%')
-                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $request->employee . '%']);
-            });
-        }
-
-        $projectId = $request->input('project_id', $request->input('project'));
-        if ($projectId !== null && $projectId !== '') {
-            $query->where('project_id', $projectId);
-        }
-
-        $startInput = $request->input('start_date', $request->input('start_date_fa'));
-        if ($startInput) {
-            $startDate = jalaliToGregorianDate($startInput);
-            if ($startDate) {
-                $query->whereDate('work_date', '>=', $startDate);
-            }
-        }
-
-        $endInput = $request->input('end_date', $request->input('end_date_fa'));
-        if ($endInput) {
-            $endDate = jalaliToGregorianDate($endInput);
-            if ($endDate) {
-                $query->whereDate('work_date', '<=', $endDate);
-            }
-        }
-
-        $hoursMin = normalizePersianDigits($request->input('hours_min'));
-        if ($hoursMin !== null && $hoursMin !== '' && is_numeric($hoursMin)) {
-            $query->where('hours', '>=', $hoursMin);
-        }
-
-        $hoursMax = normalizePersianDigits($request->input('hours_max'));
-        if ($hoursMax !== null && $hoursMax !== '' && is_numeric($hoursMax)) {
-            $query->where('hours', '<=', $hoursMax);
-        }
-
-        $workLogs = $query->latest()->paginate(20)->withQueryString();
-
-        $dateErrors = [
-            'start_date' => $startInput && !jalaliToGregorianDate($startInput) ? 'تاریخ شروع معتبر نیست.' : null,
-            'end_date' => $endInput && !jalaliToGregorianDate($endInput) ? 'تاریخ پایان معتبر نیست.' : null,
-        ];
-
-        $projects = Project::orderBy('name')->get();
-
-        return view('work-logs.index', compact('workLogs', 'projects', 'dateErrors'));
+        return view('work-logs.index');
     }
 
     public function create()
@@ -170,10 +118,13 @@ class WorkLogController extends Controller
             ->where('is_active', true)
             ->get();
         $projects = Project::where('status', 'active')->get();
-        // تبدیل فیلدهای تاریخ و زمان به Carbon object برای نمایش در فرم
         $workLog->work_date = \Carbon\Carbon::parse($workLog->work_date);
-        $workLog->start_time = \Carbon\Carbon::parse($workLog->start_time);
-        $workLog->end_time = \Carbon\Carbon::parse($workLog->end_time);
+        $workLog->start_time = $workLog->start_time
+            ? \Carbon\Carbon::parse($workLog->start_time)
+            : null;
+        $workLog->end_time = $workLog->end_time
+            ? \Carbon\Carbon::parse($workLog->end_time)
+            : null;
 
         return view('work-logs.edit', compact('workLog', 'employees', 'projects'));
     }
@@ -193,41 +144,44 @@ class WorkLogController extends Controller
             'project_id' => 'nullable|exists:projects,id',
             'work_date' => 'required|date',
             'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
+            'end_time' => 'nullable|date_format:H:i|after:start_time',
             'description' => 'nullable|string|max:500',
         ], [
             'end_time.after' => 'ساعت پایان باید بعد از ساعت شروع باشد',
         ]);
 
-        // محاسبه ساعت کار
         $start = \Carbon\Carbon::parse($request->start_time);
-        $end = \Carbon\Carbon::parse($request->end_time);
+        $endTime = $request->input('end_time');
+        $isIncomplete = blank($endTime);
+        $hours = 0;
 
-        // بررسی اگر زمان پایان کوچکتر از زمان شروع باشد (عبور از نیمه شب)
-        if ($end->lessThan($start)) {
-            $end->addDay();
+        if (! $isIncomplete) {
+            $end = \Carbon\Carbon::parse($endTime);
+
+            if ($end->lessThan($start)) {
+                $end->addDay();
+            }
+
+            $hours = $start->diffInMinutes($end) / 60;
         }
 
-        $hours = $start->diffInMinutes($end) / 60;
-
-        // دریافت نرخ ساعتی پرسنل
         $employee = Employee::find($request->employee_id);
         $hourlyRate = $employee->hourly_rate;
-
-        // محاسبه مبلغ کل
         $totalAmount = $hours * $hourlyRate;
 
-        // بروزرسانی رکورد
         $workLog->update([
             'employee_id' => $request->employee_id,
             'project_id' => $request->project_id,
             'work_date' => $request->work_date,
             'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
+            'end_time' => $endTime,
+            'check_in_time' => $request->start_time,
+            'check_out_time' => $endTime,
             'hours' => $hours,
+            'is_incomplete' => $isIncomplete,
             'description' => $request->description,
             'hourly_rate' => $hourlyRate,
-            'total_amount' => $totalAmount
+            'total_amount' => $totalAmount,
         ]);
 
         return redirect()->route('work-logs.index')

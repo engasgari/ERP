@@ -3,7 +3,10 @@
         <label class="erp-filter-field {{ $filter['class'] ?? '' }}">
             {{ $filter['label'] ?? '' }}
             @if(($filter['type'] ?? 'text') === 'select')
-                <select wire:model.live="{{ $filter['model'] }}">
+                <select
+                    wire:model.live="{{ $filter['model'] }}"
+                    @if(count($filter['options'] ?? []) > 5) data-erp-lookup-select @endif
+                >
                     @foreach(($filter['options'] ?? []) as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach

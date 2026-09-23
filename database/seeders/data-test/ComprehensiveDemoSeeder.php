@@ -29,7 +29,6 @@ use App\Models\MonthlyAttendance;
 use App\Models\OrganizationUnit;
 use App\Models\Party;
 use App\Models\PartyType;
-use App\Models\Payment;
 use App\Models\PayrollCalculation;
 use App\Models\PayrollCalculationLine;
 use App\Models\PayrollItem;
@@ -40,8 +39,6 @@ use App\Models\Position;
 use App\Models\ProductionOrder;
 use App\Models\Project;
 use App\Models\Role;
-use App\Models\Salary;
-use App\Models\SalaryLine;
 use App\Models\TreasuryTransaction;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -131,6 +128,8 @@ class ComprehensiveDemoSeeder extends Seeder
             'salary-payments.manage' => ['مدیریت پرداخت حقوق', 'مالی'],
             'settings.manage' => ['مدیریت تنظیمات', 'تنظیمات'],
             'reports.view' => ['مشاهده گزارش‌ها', 'گزارش‌ها'],
+            'reports.sales.view' => ['مشاهده گزارش‌های فروش', 'گزارش‌ها'],
+            'reports.sales.export' => ['خروجی گزارش‌های فروش', 'گزارش‌ها'],
         ];
 
         foreach ($permissions as $key => [$title, $group]) {
@@ -667,20 +666,6 @@ class ComprehensiveDemoSeeder extends Seeder
             Payslip::updateOrCreate(
                 ['payroll_calculation_id' => $calculation->id],
                 ['employee_id' => $employee->id, 'payroll_period_id' => $period->id, 'number' => 'PAYSLIP-DEMO-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT), 'issued_at' => now(), 'snapshot' => ['gross' => $gross, 'net' => $net], 'status' => 'issued']
-            );
-
-            $salary = Salary::updateOrCreate(
-                ['employee_id' => $employee->id, 'year' => 1405, 'month' => 3],
-                ['payroll_period_id' => $period->id, 'total_hours' => 174 + $index, 'hourly_rate' => $employee->hourly_rate, 'base_salary' => $employee->base_salary, 'overtime_hours' => 6 + $index, 'overtime_rate' => $employee->overtime_rate, 'overtime_salary' => (6 + $index) * (float) $employee->overtime_rate, 'bonus' => 500000, 'benefits' => 5900000, 'gross_salary' => $gross, 'deduction' => 0, 'insurance_amount' => $insurance, 'tax_amount' => $tax, 'loan_amount' => 0, 'penalty_amount' => 0, 'total_deductions' => $insurance + $tax, 'net_salary' => $net, 'advance_payment' => 0, 'final_salary' => $net, 'status' => 'calculated', 'notes' => 'حقوق نمایشی خرداد ۱۴۰۵']
-            );
-
-            SalaryLine::updateOrCreate(
-                ['salary_id' => $salary->id, 'code' => 'demo_base_salary'],
-                ['payroll_item_id' => $earning->id, 'title' => 'حقوق پایه', 'type' => 'earning', 'amount' => $employee->base_salary, 'meta' => []]
-            );
-            Payment::updateOrCreate(
-                ['salary_id' => $salary->id, 'reference_number' => 'PAY-DEMO-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT)],
-                ['employee_id' => $employee->id, 'amount' => round($net / 2), 'payment_date' => now()->toDateString(), 'payment_method' => 'bank', 'description' => 'پرداخت علی‌الحساب نمایشی']
             );
 
             AttendanceCalculation::updateOrCreate(

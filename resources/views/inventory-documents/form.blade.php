@@ -16,7 +16,10 @@
             'unit_price' => $line->unit_price,
             'description' => $line->description,
         ])->all() : []))->filter(fn ($line) => !empty($line['item_id']))->values();
-        $itemData = $items->mapWithKeys(fn ($item) => [$item->id => ['unit' => $item->unit?->name ?? '']]);
+        $itemOptions = collect(itemSearchSelectOptions($items, 'کالا'));
+        $itemData = $items->mapWithKeys(fn ($item) => [
+            $item->id => ['unit' => $item->unit?->name ?? ''],
+        ]);
     @endphp
 
     <x-slot name="header">
@@ -124,12 +127,11 @@
         <tr class="inventory-line">
             <td class="line-index"></td>
             <td>
-                <select class="line-item">
-                    <option value="">انتخاب کالا</option>
-                    @foreach($items as $item)
-                        <option value="{{ $item->id }}">{{ $item->name }}</option>
-                    @endforeach
-                </select>
+                <div class="erp-search-select" data-erp-search-select data-options-source="inventory-items">
+                    <input type="hidden" class="line-item" value="">
+                    <input type="text" class="erp-search-select__input" placeholder="جستجو نام، کد یا دسته..." autocomplete="off" spellcheck="false">
+                    <div class="erp-search-select__list" hidden></div>
+                </div>
             </td>
             <td><input class="line-unit compact-line-field" readonly tabindex="-1"></td>
             <td><input class="line-quantity compact-line-field" type="number" step="0.001" min="0.001" dir="ltr"></td>
@@ -142,6 +144,8 @@
     <script>
     (() => {
         const itemData = @json($itemData);
+        const itemOptions = @json($itemOptions);
+        window.__erpInventoryItemOptions = itemOptions;
         const oldLines = @json($oldLines);
         const body = document.getElementById('inventory-lines-body');
         const template = document.getElementById('inventory-line-template');
@@ -152,10 +156,18 @@
             targetWarehouseField?.classList.toggle('hidden', typeSelect?.value !== 'transfer');
         }
 
+        function getLineItemInput(row) {
+            return row.querySelector('.line-item');
+        }
+
+        function getLineItemSearch(row) {
+            return row.querySelector('[data-erp-search-select]');
+        }
+
         function renameRows() {
             body.querySelectorAll('.inventory-line').forEach((row, index) => {
                 row.querySelector('.line-index').textContent = index + 1;
-                row.querySelector('.line-item').name = `lines[${index}][item_id]`;
+                getLineItemInput(row).name = `lines[${index}][item_id]`;
                 row.querySelector('.line-quantity').name = `lines[${index}][quantity]`;
                 row.querySelector('.line-price').name = `lines[${index}][unit_price]`;
                 row.querySelector('.line-description').name = `lines[${index}][description]`;
@@ -165,23 +177,24 @@
 
         function addRow(values = {}) {
             const row = template.content.firstElementChild.cloneNode(true);
-            row.querySelector('.line-item').value = values.item_id || '';
+            body.appendChild(row);
+            window.ErpSearchSelect?.bind(getLineItemSearch(row));
+            window.ErpSearchSelect?.setValue(getLineItemSearch(row), values.item_id || '');
             row.querySelector('.line-quantity').value = values.quantity || '';
             row.querySelector('.line-price').value = values.unit_price || '';
             row.querySelector('.line-description').value = values.description || '';
-            body.appendChild(row);
             hydrateUnit(row);
             renameRows();
         }
 
         function hydrateUnit(row) {
-            const itemId = row.querySelector('.line-item').value;
+            const itemId = getLineItemInput(row).value;
             row.querySelector('.line-unit').value = itemData[itemId]?.unit || '';
         }
 
         function maybeAddRow() {
             const last = body.querySelector('.inventory-line:last-child');
-            if (last && last.querySelector('.line-item').value) {
+            if (last && getLineItemInput(last).value) {
                 addRow();
             }
         }

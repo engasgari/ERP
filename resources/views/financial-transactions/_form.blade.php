@@ -5,46 +5,49 @@
     $backRoute = $backRoute ?? route('financial-transactions.index');
     $transaction = $financialTransaction ?? null;
     $selectedType = old('type', $transaction?->type ?? 'expense');
-    $selectedCategory = old('category', $transaction?->category);
     $selectedChartAccountId = old('chart_account_id', $codingSelection['chart_account_id'] ?? null);
     $selectedDetailAccountId = old('detail_account_id', $codingSelection['detail_account_id'] ?? null);
-    $selectedCodingGroup = $codingGroups[$selectedType] ?? ['categories' => [], 'details' => [], 'main' => null];
-    $selectedCodingCategories = $selectedCodingGroup['categories'] ?? [];
-    $selectedCodingDetails = $selectedCodingGroup['details'] ?? [];
-    $selectedCodingMain = $selectedCodingGroup['main'] ?? null;
-    $selectedChartAccountId = $selectedChartAccountId ?? ($selectedCodingMain['id'] ?? null);
+    $selectedCategory = old('category', $transaction?->category);
+    $selectedCodingGroup = $codingGroups[$selectedType] ?? ['subsidiaries' => [], 'details_by_subsidiary' => []];
+    $initialDetails = $selectedChartAccountId
+        ? ($selectedCodingGroup['details_by_subsidiary'][(string) $selectedChartAccountId] ?? [])
+        : [];
 @endphp
 
-<form method="POST" action="{{ $action }}" class="space-y-5">
+<form method="POST" action="{{ $action }}" class="financial-transaction-form">
     @csrf
     @if($isEdit)
         @method('PUT')
     @endif
 
-    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">نوع *</span>
-                <select id="type" name="type" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+    <section class="ft-card">
+        <header class="ft-card-head">
+            <h3>اطلاعات سند</h3>
+            <p>نوع، مبلغ، تاریخ و محل پرداخت/دریافت</p>
+        </header>
+        <div class="ft-card-body ft-grid ft-grid-header">
+            <label class="ft-field">
+                <span>نوع *</span>
+                <select id="type" name="type" required>
                     <option value="">انتخاب نوع</option>
                     <option value="income" @selected($selectedType === 'income')>درآمد</option>
                     <option value="expense" @selected($selectedType === 'expense')>هزینه</option>
                 </select>
             </label>
 
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">مبلغ (ریال) *</span>
-                <input type="number" id="amount" name="amount" value="{{ old('amount', $transaction?->amount) }}" required step="1000" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <label class="ft-field">
+                <span>مبلغ (ریال) *</span>
+                <input type="number" id="amount" name="amount" value="{{ old('amount', $transaction?->amount) }}" required step="1000">
             </label>
 
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">تاریخ *</span>
-                <input type="text" id="transaction_date" name="transaction_date" inputmode="numeric" dir="ltr" placeholder="1404/08/01" value="{{ $isEdit ? jalaliDateInputValue(old('transaction_date'), $transaction?->transaction_date) : (old('transaction_date') ? jalaliDateInputValue(old('transaction_date')) : todayJalaliDate()) }}" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <label class="ft-field">
+                <span>تاریخ *</span>
+                <input type="text" id="transaction_date" name="transaction_date" inputmode="numeric" dir="ltr" placeholder="1404/08/01" value="{{ $isEdit ? jalaliDateInputValue(old('transaction_date'), $transaction?->transaction_date) : (old('transaction_date') ? jalaliDateInputValue(old('transaction_date')) : todayJalaliDate()) }}" required>
             </label>
 
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">پروژه</span>
-                <select name="project_id" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <label class="ft-field">
+                <span>پروژه</span>
+                <select name="project_id">
                     <option value="">بدون پروژه</option>
                     @foreach($projects as $project)
                         <option value="{{ $project->id }}" @selected(old('project_id', $transaction?->project_id) == $project->id)>{{ $project->name }}</option>
@@ -52,9 +55,9 @@
                 </select>
             </label>
 
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">بانک</span>
-                <select id="bank_account_id" name="bank_account_id" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <label class="ft-field">
+                <span>بانک</span>
+                <select id="bank_account_id" name="bank_account_id">
                     <option value="">انتخاب بانک</option>
                     @foreach($bankAccounts as $bankAccount)
                         <option value="{{ $bankAccount->id }}" @selected(old('bank_account_id', $transaction?->bank_account_id) == $bankAccount->id)>{{ $bankAccount->bank_name }} - {{ $bankAccount->code }}</option>
@@ -62,9 +65,9 @@
                 </select>
             </label>
 
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">صندوق</span>
-                <select id="cashbox_id" name="cashbox_id" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            <label class="ft-field">
+                <span>صندوق</span>
+                <select id="cashbox_id" name="cashbox_id">
                     <option value="">انتخاب صندوق</option>
                     @foreach($cashboxes as $cashbox)
                         <option value="{{ $cashbox->id }}" @selected(old('cashbox_id', $transaction?->cashbox_id) == $cashbox->id)>{{ $cashbox->name }} - {{ $cashbox->code }}</option>
@@ -74,131 +77,319 @@
         </div>
     </section>
 
-    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <label class="block">
-                <span class="mb-1 block text-sm font-medium text-gray-700">دسته‌بندی *</span>
-                <select id="category" name="category" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+    <section class="ft-card">
+        <header class="ft-card-head">
+            <h3>کدینگ و شرح</h3>
+            <p>ابتدا معین را انتخاب کنید، سپس تفصیل همان معین نمایش داده می‌شود</p>
+        </header>
+        <div class="ft-card-body ft-grid ft-grid-body">
+            <label class="ft-field">
+                <span>دسته‌بندی (معین) *</span>
+                <select id="chart_account_id" name="chart_account_id" required>
                     <option value="">انتخاب دسته‌بندی</option>
-                    @forelse($selectedCodingCategories as $category)
-                        <option value="{{ $category }}" @selected($selectedCategory === $category)>{{ $category }}</option>
-                    @empty
-                        <option value="" disabled>برای این نوع داده‌ای تعریف نشده است</option>
-                    @endforelse
+                    @foreach($selectedCodingGroup['subsidiaries'] ?? [] as $subsidiary)
+                        <option value="{{ $subsidiary['id'] }}" @selected((string) $selectedChartAccountId === (string) $subsidiary['id'])>{{ $subsidiary['label'] }}</option>
+                    @endforeach
                 </select>
             </label>
 
-            <label class="block md:col-span-2">
-                <span class="mb-1 block text-sm font-medium text-gray-700">تفصیل *</span>
-                <select id="detail_account_id" name="detail_account_id" required class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                    <option value="">انتخاب تفصیل</option>
-                    @forelse($selectedCodingDetails as $detail)
-                        <option value="{{ $detail['id'] }}" data-parent-id="{{ $detail['parent_id'] }}" @selected((string) $selectedDetailAccountId === (string) $detail['id'])>{{ $detail['label'] }}</option>
-                    @empty
-                        <option value="" disabled>تفصیلی برای این نوع تعریف نشده است</option>
-                    @endforelse
+            <label class="ft-field">
+                <span>تفصیل *</span>
+                <select id="detail_account_id" name="detail_account_id" required @disabled(! $selectedChartAccountId)>
+                    @if($selectedChartAccountId)
+                        <option value="">انتخاب تفصیل</option>
+                        @foreach($initialDetails as $detail)
+                            <option value="{{ $detail['id'] }}" @selected((string) $selectedDetailAccountId === (string) $detail['id'])>{{ $detail['label'] }}</option>
+                        @endforeach
+                    @else
+                        <option value="">ابتدا دسته‌بندی (معین) را انتخاب کنید</option>
+                    @endif
                 </select>
             </label>
 
-            <input type="hidden" id="chart_account_id" name="chart_account_id" value="{{ $selectedChartAccountId }}">
-
-            <label class="block md:col-span-1">
-                <span class="mb-1 block text-sm font-medium text-gray-700">شماره مرجع</span>
-                <input type="text" id="reference_number" name="reference_number" value="{{ old('reference_number', $transaction?->reference_number) }}" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="شماره رسید / فاکتور">
+            <label class="ft-field">
+                <span>شماره مرجع</span>
+                <input type="text" id="reference_number" name="reference_number" value="{{ old('reference_number', $transaction?->reference_number) }}" placeholder="شماره رسید / فاکتور">
             </label>
 
-            <label class="block md:col-span-2">
-                <span class="mb-1 block text-sm font-medium text-gray-700">شرح</span>
-                <textarea id="description" name="description" rows="2" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="اجاره، ناهار پرسنل، درآمد متفرقه">{{ old('description', $transaction?->description) }}</textarea>
+            <label class="ft-field ft-field-wide">
+                <span>شرح</span>
+                <input type="text" id="description" name="description" value="{{ old('description', $transaction?->description) }}" placeholder="اجاره، ناهار پرسنل، درآمد متفرقه">
             </label>
         </div>
+
+        <input type="hidden" id="category" name="category" value="{{ $selectedCategory }}">
     </section>
 
-    <div class="flex flex-wrap gap-3">
-        <a href="{{ $backRoute }}" class="rounded-md bg-gray-500 px-4 py-2 text-sm text-white transition duration-200 hover:bg-gray-600">انصراف</a>
-        <button type="submit" class="rounded-md bg-blue-500 px-4 py-2 text-sm text-white transition duration-200 hover:bg-blue-600">{{ $buttonLabel }}</button>
+    <div class="ft-actions">
+        <button type="submit" class="erp-action-btn erp-action-edit">{{ $buttonLabel }}</button>
+        <a href="{{ $backRoute }}" class="erp-action-btn erp-action-detail text-center">انصراف</a>
     </div>
 </form>
 
+<style>
+    .financial-transaction-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .financial-transaction-form .ft-card {
+        overflow: hidden;
+        border-radius: 0.75rem;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .financial-transaction-form .ft-card-head {
+        border-bottom: 1px solid #e2e8f0;
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        padding: 0.65rem 0.85rem;
+    }
+
+    .financial-transaction-form .ft-card-head h3 {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .financial-transaction-form .ft-card-head p {
+        margin: 0.15rem 0 0;
+        font-size: 0.72rem;
+        color: #64748b;
+    }
+
+    .financial-transaction-form .ft-card-body {
+        padding: 0.75rem 0.85rem 0.85rem;
+    }
+
+    .financial-transaction-form .ft-grid {
+        display: grid;
+        gap: 0.65rem 0.75rem;
+    }
+
+    .financial-transaction-form .ft-grid-header {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .financial-transaction-form .ft-grid-body {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (min-width: 768px) {
+        .financial-transaction-form .ft-grid-header {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .financial-transaction-form .ft-grid-body {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .financial-transaction-form .ft-field-wide {
+            grid-column: span 2;
+        }
+    }
+
+    .financial-transaction-form .ft-field {
+        display: block;
+        min-width: 0;
+    }
+
+    .financial-transaction-form .ft-field > span {
+        display: block;
+        margin-bottom: 0.2rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .financial-transaction-form .ft-field input,
+    .financial-transaction-form .ft-field select,
+    .financial-transaction-form .ft-field .erp-search-select__input {
+        width: 100%;
+        border-radius: 0.375rem;
+        border: 1px solid #cbd5e1;
+        padding: 0.35rem 0.5rem;
+        font-size: 0.8125rem;
+        line-height: 1.25rem;
+        background: #fff;
+    }
+
+    .financial-transaction-form .ft-field input:focus,
+    .financial-transaction-form .ft-field select:focus,
+    .financial-transaction-form .ft-field .erp-search-select__input:focus {
+        outline: 2px solid transparent;
+        border-color: #64748b;
+        box-shadow: 0 0 0 1px #64748b;
+    }
+
+    .financial-transaction-form .ft-field select:disabled,
+    .financial-transaction-form .ft-field .erp-search-select__input:disabled {
+        background: #f8fafc;
+        color: #94a3b8;
+        cursor: not-allowed;
+    }
+
+    .financial-transaction-form .ft-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+</style>
+
 <script>
-    const typeSelect = document.getElementById('type');
-    const chartInput = document.getElementById('chart_account_id');
-    const categorySelect = document.getElementById('category');
-    const detailSelect = document.getElementById('detail_account_id');
-    const codingGroups = @json($codingGroups);
-    let initialCategory = @json($selectedCategory);
-    let initialChartAccountId = @json($selectedChartAccountId);
-    let initialDetailAccountId = @json($selectedDetailAccountId);
+    (function () {
+        const codingGroups = @json($codingGroups);
+        let initialChartAccountId = @json($selectedChartAccountId);
+        let initialDetailAccountId = @json($selectedDetailAccountId);
 
-    function renderCoding(selectedType, useInitialSelection = false) {
-        const group = selectedType ? codingGroups[selectedType] : null;
+        function initFinancialTransactionForm() {
+            const form = document.querySelector('.financial-transaction-form:not([data-ft-bound])');
+            if (!form) {
+                return;
+            }
 
-        categorySelect.innerHTML = '<option value="">انتخاب دسته‌بندی</option>';
-        detailSelect.innerHTML = '<option value="">انتخاب تفصیل</option>';
+            form.dataset.ftBound = '1';
 
-        if (!group || !group.main) {
-            chartInput.value = '';
-            return;
+            const typeSelect = form.querySelector('#type');
+            const chartSelect = form.querySelector('#chart_account_id');
+            const detailSelect = form.querySelector('#detail_account_id');
+            const categoryInput = form.querySelector('#category');
+
+            if (!typeSelect || !chartSelect || !detailSelect || !categoryInput) {
+                return;
+            }
+
+            function currentGroup() {
+                return codingGroups[typeSelect.value] || null;
+            }
+
+            function detailsForSubsidiary(group, subsidiaryId) {
+                if (!group || !subsidiaryId) {
+                    return [];
+                }
+
+                const map = group.details_by_subsidiary || {};
+
+                return map[String(subsidiaryId)] || map[subsidiaryId] || [];
+            }
+
+            function syncCategory() {
+                const detailValue = window.ErpSearchSelect?.getValue(window.ErpSearchSelect.findBySelectId('detail_account_id'))
+                    || detailSelect.value;
+                const detailOption = Array.from(detailSelect.options).find((option) => option.value === detailValue);
+
+                if (!detailOption || !detailOption.value) {
+                    const chartValue = window.ErpSearchSelect?.getValue(window.ErpSearchSelect.findBySelectId('chart_account_id'))
+                        || chartSelect.value;
+                    const chartOption = Array.from(chartSelect.options).find((option) => option.value === chartValue);
+                    categoryInput.value = chartOption?.textContent?.trim() || '';
+
+                    return;
+                }
+
+                categoryInput.value = detailOption.textContent.trim();
+            }
+
+            function applySelectOptions(selectEl, placeholderHtml, options, selectedValue = null) {
+                selectEl.innerHTML = placeholderHtml;
+
+                options.forEach((optionData) => {
+                    const option = document.createElement('option');
+                    option.value = optionData.id;
+                    option.textContent = optionData.label;
+                    selectEl.appendChild(option);
+                });
+
+                if (selectedValue) {
+                    selectEl.value = String(selectedValue);
+                }
+
+                window.ErpSearchSelect?.refreshFromSelect(selectEl);
+
+                const wrapper = window.ErpSearchSelect?.findBySelectId(selectEl.id);
+
+                if (wrapper && selectedValue) {
+                    window.ErpSearchSelect.setValue(wrapper, selectedValue);
+                }
+            }
+
+            function renderDetails(useInitialSelection = false) {
+                const group = currentGroup();
+                const subsidiaryId = window.ErpSearchSelect?.getValue(window.ErpSearchSelect.findBySelectId('chart_account_id'))
+                    || chartSelect.value;
+                const details = detailsForSubsidiary(group, subsidiaryId);
+                const detailWrapper = window.ErpSearchSelect?.findBySelectId('detail_account_id');
+
+                detailSelect.disabled = ! subsidiaryId;
+                window.ErpSearchSelect?.setDisabled(detailWrapper, ! subsidiaryId);
+
+                if (! subsidiaryId) {
+                    applySelectOptions(
+                        detailSelect,
+                        '<option value="">ابتدا دسته‌بندی (معین) را انتخاب کنید</option>',
+                        [],
+                    );
+                    categoryInput.value = '';
+                    detailSelect.required = true;
+
+                    return;
+                }
+
+                let selectedDetailId = null;
+
+                if (useInitialSelection && initialDetailAccountId) {
+                    selectedDetailId = initialDetailAccountId;
+                    initialDetailAccountId = null;
+                } else if (details.length === 1) {
+                    selectedDetailId = details[0].id;
+                }
+
+                applySelectOptions(
+                    detailSelect,
+                    '<option value="">انتخاب تفصیل</option>',
+                    details,
+                    selectedDetailId,
+                );
+
+                syncCategory();
+            }
+
+            function renderSubsidiaries(useInitialSelection = false) {
+                const group = currentGroup();
+                let selectedChartId = null;
+
+                if (useInitialSelection && initialChartAccountId) {
+                    selectedChartId = initialChartAccountId;
+                    initialChartAccountId = null;
+                }
+
+                applySelectOptions(
+                    chartSelect,
+                    '<option value="">انتخاب دسته‌بندی</option>',
+                    group?.subsidiaries || [],
+                    selectedChartId,
+                );
+
+                renderDetails(useInitialSelection);
+            }
+
+            typeSelect.addEventListener('change', function () {
+                renderSubsidiaries(false);
+            });
+
+            chartSelect.addEventListener('change', function () {
+                renderDetails(false);
+            });
+
+            detailSelect.addEventListener('change', syncCategory);
+
+            renderSubsidiaries(true);
         }
 
-        (group.categories || []).forEach((category) => {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            categorySelect.appendChild(option);
-        });
-
-        categorySelect.value = useInitialSelection && initialCategory ? initialCategory : (group.categories?.[0] || '');
-
-        (group.details || []).forEach((detail) => {
-            const option = document.createElement('option');
-            option.value = detail.id;
-            option.textContent = detail.label;
-            option.dataset.parentId = detail.parent_id || '';
-            detailSelect.appendChild(option);
-        });
-
-        applyDetailForCategory(useInitialSelection);
-        initialCategory = null;
-        initialChartAccountId = null;
-        initialDetailAccountId = null;
-    }
-
-    function applyDetailForCategory(useInitialSelection = false) {
-        const selectedType = typeSelect.value;
-        const group = selectedType ? codingGroups[selectedType] : null;
-        if (!group || !group.main) {
-            chartInput.value = '';
-            return;
-        }
-
-        chartInput.value = group.main.id;
-
-        const selectedCategory = categorySelect.value;
-        const matchingDetailId = group.detail_by_category?.[selectedCategory] || null;
-
-        if (useInitialSelection && initialDetailAccountId) {
-            detailSelect.value = initialDetailAccountId;
-        } else if (matchingDetailId) {
-            detailSelect.value = matchingDetailId;
-        } else if (detailSelect.options.length > 1 && !detailSelect.value) {
-            detailSelect.selectedIndex = 1;
-        }
-    }
-
-    typeSelect.addEventListener('change', function () {
-        renderCoding(this.value);
-    });
-
-    categorySelect.addEventListener('change', function () {
-        applyDetailForCategory();
-    });
-
-    detailSelect.addEventListener('change', function () {
-        const selectedOption = this.options[this.selectedIndex];
-        chartInput.value = selectedOption?.dataset?.parentId || chartInput.value;
-    });
-
-    renderCoding(typeSelect.value, true);
+        document.addEventListener('DOMContentLoaded', initFinancialTransactionForm);
+        document.addEventListener('livewire:navigated', initFinancialTransactionForm);
+    })();
 </script>
-

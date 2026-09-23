@@ -25,12 +25,13 @@
                     </label>
                     <label class="grid gap-1 text-sm font-bold text-slate-600">
                         محصول *
-                        <select name="item_id" required class="rounded-md border-slate-300">
-                            <option value="">انتخاب محصول</option>
-                            @foreach($products as $product)
-                                <option value="{{ $product->id }}" @selected(old('item_id', $order->item_id) == $product->id)>{{ $product->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-erp.ui.item-search-select
+                            name="item_id"
+                            :value="old('item_id', $order->item_id)"
+                            :items="$products"
+                            inputClass="rounded-md border-slate-300"
+                            required
+                        />
                     </label>
                     <label class="grid gap-1 text-sm font-bold text-slate-600">
                         فرمول ساخت

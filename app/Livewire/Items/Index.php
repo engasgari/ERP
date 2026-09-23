@@ -10,6 +10,8 @@ use App\Models\InvoiceLine;
 use App\Models\Item;
 use App\Models\MeasurementUnit;
 use App\Models\ProductionMaterialConsumption;
+use App\Models\Warehouse;
+use App\Services\InventoryPostingService;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -33,7 +35,6 @@ class Index extends Component
         'measurement_unit_id' => ['except' => ''],
         'category' => ['except' => ''],
         'is_active' => ['except' => ''],
-        'page' => ['except' => 1],
     ];
 
     public function clearFilters(): void
@@ -70,43 +71,6 @@ class Index extends Component
             session()->flash('error', 'به دلیل وجود سند یا گردش مرتبط، امکان حذف این کالا/خدمت وجود ندارد.');
             session()->flash('error_details', ['خطای دیتابیس یا وابستگی']);
         }
-    }
-
-    public function updateField(int $itemId, string $field, mixed $value): void
-    {
-        abort_unless(in_array($field, [
-            'name',
-            'type',
-            'measurement_unit_id',
-            'category',
-            'sale_price',
-            'purchase_price',
-            'is_active',
-        ], true), 403);
-
-        $item = Item::findOrFail($itemId);
-
-        $data = match ($field) {
-            'name' => ['name' => trim((string) $value)],
-            'type' => ['type' => in_array($value, ['product', 'service'], true) ? $value : $item->type],
-            'measurement_unit_id' => ['measurement_unit_id' => $value !== '' ? (int) $value : null],
-            'category' => ['category' => trim((string) $value) ?: null],
-            'sale_price', 'purchase_price' =>
-                [$field => $value !== '' ? max(0, (float) $value) : null],
-            'is_active' => ['is_active' => (string) $value === '1'],
-        };
-
-        if (($data['name'] ?? $item->name) === '') {
-            session()->flash('error', 'نام کالا/خدمت الزامی است.');
-            return;
-        }
-
-        if (($data['type'] ?? null) === 'service') {
-            $data['measurement_unit_id'] = null;
-        }
-
-        $item->update($data);
-        session()->flash('success', 'تغییرات کالا/خدمت ذخیره شد.');
     }
 
     public function render()
@@ -157,12 +121,36 @@ class Index extends Component
             ? Item::with('unit')->find($this->showingId)
             : null;
 
+        $stockByItem = $this->stockTotalsForItems(
+            $items->getCollection()->where('type', 'product')->pluck('id')->all()
+        );
+
         return view('livewire.items.index', compact(
             'items',
             'units',
             'categories',
-            'showingItem'
+            'showingItem',
+            'stockByItem'
         ));
+    }
+
+    private function stockTotalsForItems(array $itemIds): array
+    {
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $inventory = app(InventoryPostingService::class);
+        $warehouseIds = Warehouse::where('is_active', true)->pluck('id');
+
+        $stockByItem = [];
+
+        foreach ($itemIds as $itemId) {
+            $stockByItem[$itemId] = (float) $warehouseIds
+                ->sum(fn (int $warehouseId) => $inventory->availableQuantity($itemId, $warehouseId));
+        }
+
+        return $stockByItem;
     }
 
     private function relatedDetails(Item $item): array

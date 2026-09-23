@@ -46,24 +46,31 @@ class AttendanceDayCalculatorService
 
         $delayMinutes = 0;
         $earlyMinutes = 0;
+        $delayFrom = null;
+        $delayTo = null;
+        $earlyFrom = null;
+        $earlyTo = null;
+        $scheduledStart = $this->dateTime($date, $config['start_time']);
+        $scheduledEnd = $this->dateTime($date, $config['end_time'], $this->isOvernightShift($config['start_time'], $config['end_time']));
+
         if ($isWorkingDay && $shift && $firstLog && $lastLog) {
-            $scheduledStart = $this->dateTime($date, $config['start_time']);
-            $scheduledEnd = $this->dateTime($date, $config['end_time'], $this->isOvernightShift($config['start_time'], $config['end_time']));
             if ($firstLog->gt($scheduledStart)) {
-                $delayMinutes = max(
-                    0,
-                    $scheduledStart->diffInMinutes($firstLog)
-                    - (int) $config['late_tolerance_minutes']
-                    - $this->requestEdgeCoverageMinutes($date, $leaves->concat($missions), $scheduledStart, $firstLog, $config)
-                );
+                $rawLate = $scheduledStart->diffInMinutes($firstLog);
+                $coveredLate = $this->requestEdgeCoverageMinutes($date, $leaves->concat($missions), $scheduledStart, $firstLog, $config);
+                $delayMinutes = max(0, $rawLate - (int) $config['late_tolerance_minutes'] - $coveredLate);
+                if ($delayMinutes > 0) {
+                    $delayFrom = $scheduledStart->copy()->addMinutes($coveredLate)->format('H:i');
+                    $delayTo = $firstLog->format('H:i');
+                }
             }
             if ($lastLog->lt($scheduledEnd)) {
-                $earlyMinutes = max(
-                    0,
-                    $lastLog->diffInMinutes($scheduledEnd)
-                    - (int) $config['early_leave_tolerance_minutes']
-                    - $this->requestEdgeCoverageMinutes($date, $leaves->concat($missions), $lastLog, $scheduledEnd, $config)
-                );
+                $rawEarly = $lastLog->diffInMinutes($scheduledEnd);
+                $coveredEarly = $this->requestEdgeCoverageMinutes($date, $leaves->concat($missions), $lastLog, $scheduledEnd, $config);
+                $earlyMinutes = max(0, $rawEarly - (int) $config['early_leave_tolerance_minutes'] - $coveredEarly);
+                if ($earlyMinutes > 0) {
+                    $earlyFrom = $lastLog->format('H:i');
+                    $earlyTo = $scheduledEnd->format('H:i');
+                }
             }
         }
 
@@ -79,6 +86,22 @@ class AttendanceDayCalculatorService
         );
         $netPayableMinutes = max(0, $plannedMinutes - $attendanceDeductionMinutes);
         $payableMinutes = $netPayableMinutes + $overtimeMinutes;
+
+        $absenceFrom = null;
+        $absenceTo = null;
+        if ($isWorkingDay && $absenceMinutes > 0) {
+            if (! $firstLog || ! $lastLog) {
+                $absenceFrom = $scheduledStart->format('H:i');
+                $absenceTo = $scheduledEnd->format('H:i');
+            } elseif ($delayMinutes > 0 || $earlyMinutes > 0) {
+                // فاصله‌های تأخیر/تعجیل به‌صورت جدا گزارش می‌شوند؛ کسری مانده به‌عنوان غیبت بدون بازه ساعت.
+                $absenceFrom = null;
+                $absenceTo = null;
+            } else {
+                $absenceFrom = $scheduledStart->format('H:i');
+                $absenceTo = $scheduledEnd->format('H:i');
+            }
+        }
 
         return [
             'date' => $date->toDateString(),
@@ -113,6 +136,12 @@ class AttendanceDayCalculatorService
             ],
             'first_log_at' => $firstLog?->toDateTimeString(),
             'last_log_at' => $lastLog?->toDateTimeString(),
+            'delay_from' => $delayFrom,
+            'delay_to' => $delayTo,
+            'early_leave_from' => $earlyFrom,
+            'early_leave_to' => $earlyTo,
+            'absence_from' => $absenceFrom,
+            'absence_to' => $absenceTo,
         ];
     }
 
@@ -260,7 +289,11 @@ class AttendanceDayCalculatorService
         $lastInterval = $intervals->sortByDesc(fn (array $interval) => $interval[1])->first();
         $firstLog = $firstInterval[0] ?? null;
         $lastLog = $lastInterval[1] ?? null;
-        $workedMinutes = (int) round($logs->sum(fn (WorkLog|AttendanceRawLog $log) => (float) ($log->hours ?? 0) * 60));
+
+        // Prefer punch/check-in span so net `hours` values do not double-count the shift break later.
+        $workedMinutes = (int) $intervals->sum(
+            fn (array $interval): int => max(0, $interval[0]->diffInMinutes($interval[1]))
+        );
 
         return [
             'worked_minutes' => $workedMinutes,

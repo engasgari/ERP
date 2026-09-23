@@ -4,7 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>چاپ فاکتور {{ $invoice->number }}</title>
-    <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
+    @include('components.pdf-persian-font-styles', [
+        'forPdf' => $forPdf ?? false,
+        'pdfFontRegular' => $pdfFontRegular ?? null,
+        'pdfFontBold' => $pdfFontBold ?? null,
+    ])
     <style>
         @page {
             size: A4 landscape;
@@ -22,8 +26,68 @@
             margin: 0;
             background: #e5e7eb;
             color: #000;
-            font-family: Vazirmatn, Tahoma, Arial, sans-serif;
+            font-family: vazirmatn, Vazirmatn, Tahoma, Arial, sans-serif;
+            direction: rtl;
+            text-align: right;
         }
+
+        @if($forPdf ?? false)
+        body {
+            line-height: 1.65;
+            word-spacing: 0.02em;
+        }
+
+        th,
+        td {
+            direction: rtl;
+            text-align: right;
+            padding: 4px 6px;
+            line-height: 1.6;
+        }
+
+        th.section-title,
+        .title-box,
+        .items-table th {
+            text-align: center;
+        }
+
+        .top-grid-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 2mm;
+        }
+
+        .top-grid-table td {
+            border: 1px solid #000;
+            vertical-align: middle;
+            padding: 3px 5px;
+        }
+
+        .top-grid-table .title-cell {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 900;
+        }
+
+        .meta-label {
+            background: #e5e5e5;
+            font-weight: 900;
+            text-align: center;
+            width: 18mm;
+        }
+
+        .meta-value {
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: embed;
+        }
+
+        .items-table td.num {
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: embed;
+        }
+        @endif
 
         body {
             padding: 10px;
@@ -282,13 +346,52 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ ($forPdf ?? false) ? 'pdf-document' : '' }}">
 @php
     $isSale = $invoice->direction === 'sale';
     $documentTitle = $invoice->document_type === 'proforma'
         ? 'پیش فاکتور فروش کالا و خدمات'
-        : ($isSale ? 'فاکتور فروش کالا و خدمات' : 'فاکتور خرید کالا و خدمات');
-    $partyLabel = $isSale ? 'خریدار' : 'فروشنده';
+        : ($isSale ? 'فاکتور فروش کالا و خدمات' : 'صورتحساب خرید کالا و خدمات');
+
+    // Official invoice layout: seller block first, buyer block second.
+    // Sale: company = seller, party = buyer
+    // Purchase: party = seller, company = buyer
+    $seller = $isSale
+        ? [
+            'name' => $company?->company_name ?? config('app.name', 'ERP'),
+            'economic_code' => $company?->economic_code ?: '-',
+            'national_id' => $company?->national_id ?: '-',
+            'address' => $company?->address ?: '-',
+            'postal_code' => $company?->postal_code ?: '-',
+            'phone' => $company?->phone ?: '-',
+        ]
+        : [
+            'name' => $invoice->party?->name ?: 'طرف حساب حذف‌شده',
+            'economic_code' => $invoice->party?->economic_code ?: '-',
+            'national_id' => $invoice->party?->national_id ?: '-',
+            'address' => $invoice->party?->address ?: '-',
+            'postal_code' => $invoice->party?->postal_code ?: '-',
+            'phone' => $invoice->party?->phone ?: ($invoice->party?->mobile ?: '-'),
+        ];
+
+    $buyer = $isSale
+        ? [
+            'name' => $invoice->party?->name ?: 'طرف حساب حذف‌شده',
+            'economic_code' => $invoice->party?->economic_code ?: '-',
+            'national_id' => $invoice->party?->national_id ?: '-',
+            'address' => $invoice->party?->address ?: '-',
+            'postal_code' => $invoice->party?->postal_code ?: '-',
+            'phone' => $invoice->party?->phone ?: ($invoice->party?->mobile ?: '-'),
+        ]
+        : [
+            'name' => $company?->company_name ?? config('app.name', 'ERP'),
+            'economic_code' => $company?->economic_code ?: '-',
+            'national_id' => $company?->national_id ?: '-',
+            'address' => $company?->address ?: '-',
+            'postal_code' => $company?->postal_code ?: '-',
+            'phone' => $company?->phone ?: '-',
+        ];
+
     $rowBaseTotal = $invoice->lines->sum(fn ($line) => (float) $line->quantity * (float) $line->unit_price);
     $discountTotal = (float) $invoice->discount_amount;
     $taxTotal = (float) $invoice->tax_amount;
@@ -302,14 +405,33 @@
         <a href="#" onclick="window.close(); return false;">بستن</a>
     @else
         <a href="{{ route('invoices.show', $invoice) }}">بازگشت</a>
-        <a href="{{ route('invoices.pdf', $invoice) }}">PDF</a>
-        <a href="{{ route('invoices.excel', $invoice) }}">Excel</a>
+        <a href="{{ route('invoices.pdf', $invoice) }}" target="_blank" data-no-spa>PDF</a>
+        <a href="{{ route('invoices.excel', $invoice) }}" target="_blank" data-no-spa>Excel</a>
     @endif
     <button type="button" onclick="window.print()">چاپ</button>
 </div>
 @endunless
 
 <main class="invoice-page">
+    @if($forPdf ?? false)
+        <table class="top-grid-table">
+            <tr>
+                <td style="width:33%">
+                    <table style="width:100%;border-collapse:collapse">
+                        <tr><td class="meta-label">تاریخ:</td><td class="meta-value">{{ gregorianToJalaliDate($invoice->invoice_date) }}</td></tr>
+                        <tr><td class="meta-label">وضعیت:</td><td class="meta-value">{{ $invoice->status === 'confirmed' ? 'تایید نهایی' : 'ثبت موقت' }}</td></tr>
+                    </table>
+                </td>
+                <td class="title-cell" style="width:34%">{{ $documentTitle }}</td>
+                <td style="width:33%">
+                    <table style="width:100%;border-collapse:collapse">
+                        <tr><td class="meta-label">شماره فاکتور:</td><td class="meta-value">{{ $invoice->number }}</td></tr>
+                        <tr><td class="meta-label">پروژه:</td><td class="meta-value">{{ $invoice->project?->code ? $invoice->project->code . ' - ' . $invoice->project->name : '-' }}</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    @else
     <div class="top-grid">
         <div class="top-box">
             <div class="meta-row">
@@ -335,6 +457,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     <table class="party-table">
         <tr>
@@ -342,39 +465,43 @@
         </tr>
         <tr>
             <th class="label">نام شخص حقیقی / حقوقی:</th>
-            <td colspan="3">{{ $company?->company_name ?? config('app.name', 'ERP') }}</td>
+            <td colspan="3">{{ $seller['name'] }}</td>
             <th class="label">شماره اقتصادی:</th>
-            <td>{{ $company?->economic_code ?: '-' }}</td>
+            <td>{{ $seller['economic_code'] }}</td>
             <th class="label">شناسه ملی:</th>
-            <td>{{ $company?->national_id ?: '-' }}</td>
+            <td>{{ $seller['national_id'] }}</td>
         </tr>
         <tr>
             <th class="label">نشانی کامل:</th>
-            <td colspan="3">{{ $company?->address ?: '-' }}</td>
+            <td colspan="3">{{ $seller['address'] }}</td>
             <th class="label">کد پستی:</th>
-            <td>{{ $company?->postal_code ?: '-' }}</td>
+            <td>{{ $seller['postal_code'] }}</td>
             <th class="label">تلفن / همراه:</th>
-            <td>{{ $company?->phone ?: '-' }}</td>
+            <td>{{ $seller['phone'] }}</td>
         </tr>
     </table>
 
     <table class="party-table">
         <tr>
-            <th class="section-title" colspan="8">مشخصات {{ $partyLabel }}</th>
+            <th class="section-title" colspan="8">مشخصات خریدار</th>
         </tr>
         <tr>
             <th class="label">نام شخص حقیقی / حقوقی:</th>
-            <td colspan="3">{{ $invoice->party?->name ?: 'طرف حساب حذف‌شده' }}</td>
+            <td colspan="3">{{ $buyer['name'] }}</td>
             <th class="label">شماره اقتصادی:</th>
-            <td>{{ $invoice->party?->economic_code ?: '-' }}</td>
+            <td>{{ $buyer['economic_code'] }}</td>
             <th class="label">شناسه / کد ملی:</th>
-            <td>{{ $invoice->party?->national_id ?: '-' }}</td>
+            <td>{{ $buyer['national_id'] }}</td>
         </tr>
         <tr>
             <th class="label">نشانی کامل:</th>
-            <td colspan="5">{{ $invoice->party?->address ?: '-' }}</td>
+            <td colspan="{{ $isSale ? 5 : 3 }}">{{ $buyer['address'] }}</td>
+            @unless($isSale)
+                <th class="label">کد پستی:</th>
+                <td>{{ $buyer['postal_code'] }}</td>
+            @endunless
             <th class="label">تلفن / همراه:</th>
-            <td>{{ $invoice->party?->phone ?: ($invoice->party?->mobile ?: '-') }}</td>
+            <td>{{ $buyer['phone'] }}</td>
         </tr>
     </table>
 
@@ -412,14 +539,14 @@
                         <span>{{ $line->description }}</span>
                     @endif
                 </td>
-                <td>{{ number_format((float) $line->quantity, 3) }}</td>
+                <td>{{ formatQuantity((float) $line->quantity) }}</td>
                 <td>{{ $line->item->unit?->name ?: '-' }}</td>
-                <td>{{ number_format((float) $line->unit_price) }}</td>
-                <td>{{ number_format($base) }}</td>
-                <td>{{ number_format((float) $line->discount_amount) }}</td>
-                <td>{{ number_format($afterDiscount) }}</td>
-                <td>{{ number_format((float) $line->tax_amount) }}</td>
-                <td>{{ number_format((float) $line->line_total) }}</td>
+                <td>{{ formatMoney((float) $line->unit_price) }}</td>
+                <td>{{ formatMoney($base) }}</td>
+                <td>{{ formatMoney((float) $line->discount_amount) }}</td>
+                <td>{{ formatMoney($afterDiscount) }}</td>
+                <td>{{ formatMoney((float) $line->tax_amount) }}</td>
+                <td>{{ formatMoney((float) $line->line_total) }}</td>
             </tr>
         @endforeach
 
@@ -443,11 +570,11 @@
         <tr>
             <th colspan="2">جمع کل:</th>
             <td colspan="4" class="description">{{ persianNumberToWords($finalTotal) }} ریال</td>
-            <td>{{ number_format($rowBaseTotal) }}</td>
-            <td>{{ number_format($discountTotal) }}</td>
-            <td>{{ number_format(max($rowBaseTotal - $discountTotal, 0)) }}</td>
-            <td>{{ number_format($taxTotal) }}</td>
-            <td>{{ number_format($finalTotal) }}</td>
+            <td>{{ formatMoney($rowBaseTotal) }}</td>
+            <td>{{ formatMoney($discountTotal) }}</td>
+            <td>{{ formatMoney(max($rowBaseTotal - $discountTotal, 0)) }}</td>
+            <td>{{ formatMoney($taxTotal) }}</td>
+            <td>{{ formatMoney($finalTotal) }}</td>
         </tr>
         </tfoot>
     </table>

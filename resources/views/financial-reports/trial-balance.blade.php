@@ -7,10 +7,10 @@
             @forelse($rows as $row)
                 <tr>
                     <td>{{ chartAccountDisplayLabel($row['account']) }}</td>
-                    <td>{{ number_format($row['debit']) }}</td>
-                    <td>{{ number_format($row['credit']) }}</td>
-                    <td>{{ number_format($row['debit_balance']) }}</td>
-                    <td>{{ number_format($row['credit_balance']) }}</td>
+                    <td>{{ formatMoney($row['debit']) }}</td>
+                    <td>{{ formatMoney($row['credit']) }}</td>
+                    <td>{{ formatMoney($row['debit_balance']) }}</td>
+                    <td>{{ formatMoney($row['credit_balance']) }}</td>
                 </tr>
             @empty
                 <tr><td colspan="5" class="text-center text-slate-500 py-6">ردیفی برای نمایش وجود ندارد.</td></tr>

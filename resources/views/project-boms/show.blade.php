@@ -39,9 +39,9 @@
                     @foreach($bom->lines as $line)
                         <tr>
                             <td class="border border-gray-300 p-2 font-bold">{{ $line->component?->name }}</td>
-                            <td class="border border-gray-300 p-2">{{ number_format((float) $line->quantity, 3) }}</td>
-                            <td class="border border-gray-300 p-2">{{ number_format((float) $line->waste_percentage, 2) }}%</td>
-                            <td class="border border-gray-300 p-2">{{ number_format($line->net_quantity, 3) }}</td>
+                            <td class="border border-gray-300 p-2">{{ formatQuantity((float) $line->quantity) }}</td>
+                            <td class="border border-gray-300 p-2">{{ formatMoney((float) $line->waste_percentage, 2) }}%</td>
+                            <td class="border border-gray-300 p-2">{{ formatQuantity($line->net_quantity) }}</td>
                             <td class="border border-gray-300 p-2">{{ $line->unit?->name ?: $line->component?->unit?->name ?: '-' }}</td>
                             <td class="border border-gray-300 p-2">{{ $line->notes ?: '-' }}</td>
                         </tr>

@@ -1,52 +1,46 @@
-<x-erp.ui.panel>
-    <x-erp.ui.page-header
-        title="سرفصل‌های مالی"
-        :actions="[
-            ['label' => 'سرفصل جدید', 'url' => route('chart-accounts.create'), 'class' => 'erp-action-edit'],
-        ]"
-    />
-
-    @include('livewire.partials.flash')
-
-    <x-erp.ui.filter-bar wire:submit.prevent>
-        <div class="row g-2 g-md-3 align-items-end">
-            <label class="erp-filter-field col-12 col-md-6 col-lg-4">جستجو
-                <input wire:model.live.debounce.400ms="search" placeholder="کد، عنوان یا والد">
-            </label>
-
-            <label class="erp-filter-field col-12 col-md-6 col-lg-2">سطح
-                <select wire:model.live="level">
-                    <option value="">همه</option>
-                    @foreach($levelLabels as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </label>
-
-            <label class="erp-filter-field col-12 col-md-6 col-lg-2">ماهیت
-                <select wire:model.live="nature">
-                    <option value="">همه</option>
-                    @foreach($natureLabels as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </label>
-
-            <label class="erp-filter-field col-12 col-md-6 col-lg-2">نوع
-                <select wire:model.live="is_system">
-                    <option value="">همه</option>
-                    <option value="1">سیستمی</option>
-                    <option value="0">دستی</option>
-                </select>
-            </label>
-
-            <div class="col-12 col-lg-2 d-grid">
-                <button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلترها</button>
+<x-erp.ui.list-page
+    title="سرفصل‌های مالی"
+    description="کدینگ حساب‌ها شامل گروه، کل، معین و تفصیل."
+    route="chart-accounts.index"
+    :actions="[
+        ['label' => 'سرفصل جدید', 'url' => route('chart-accounts.create'), 'class' => 'erp-action-edit'],
+    ]"
+>
+    <x-slot name="filters">
+        <x-erp.ui.filter-bar wire:submit.prevent>
+            <div class="row g-2 g-md-3 align-items-end">
+                <label class="erp-filter-field col-12 col-md-6 col-lg-4">جستجو
+                    <input wire:model.live.debounce.400ms="search" placeholder="کد، عنوان یا والد">
+                </label>
+                <label class="erp-filter-field col-12 col-md-6 col-lg-2">سطح
+                    <select wire:model.live="level">
+                        <option value="">همه</option>
+                        @foreach($levelLabels as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="erp-filter-field col-12 col-md-6 col-lg-2">ماهیت
+                    <select wire:model.live="nature">
+                        <option value="">همه</option>
+                        @foreach($natureLabels as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="erp-filter-field col-12 col-md-6 col-lg-2">نوع
+                    <select wire:model.live="is_system">
+                        <option value="">همه</option>
+                        <option value="1">سیستمی</option>
+                        <option value="0">دستی</option>
+                    </select>
+                </label>
+                <div class="col-12 col-lg-2 d-grid">
+                    <button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلترها</button>
+                </div>
             </div>
-        </div>
-    </x-erp.ui.filter-bar>
-
-    <div wire:loading.delay class="text-sm text-slate-500">در حال به‌روزرسانی...</div>
+        </x-erp.ui.filter-bar>
+    </x-slot>
 
     <div wire:loading.remove>
         <x-erp.ui.data-table :headers="['کد', 'عنوان', 'سطح', 'ماهیت', 'والد', 'نوع', 'عملیات']" colspan="7" empty-message="سرفصلی یافت نشد.">
@@ -98,4 +92,4 @@
             </div>
         </x-erp.ui.details-modal>
     @endif
-</x-erp.ui.panel>
+</x-erp.ui.list-page>

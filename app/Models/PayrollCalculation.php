@@ -71,4 +71,28 @@ class PayrollCalculation extends Model
     {
         return $this->morphOne(AccountingDocument::class, 'source');
     }
+
+    public function insuranceRecord(): HasOne
+    {
+        return $this->hasOne(InsuranceRecord::class, 'payroll_calculation_id');
+    }
+
+    public function taxRecord(): HasOne
+    {
+        return $this->hasOne(TaxRecord::class, 'payroll_calculation_id');
+    }
+
+    public function getInsuranceBaseAttribute(): float
+    {
+        return (float) ($this->relationLoaded('insuranceRecord')
+            ? $this->insuranceRecord?->insurance_wage
+            : $this->insuranceRecord()->value('insurance_wage') ?? 0);
+    }
+
+    public function getTaxBaseAttribute(): float
+    {
+        return (float) ($this->relationLoaded('taxRecord')
+            ? $this->taxRecord?->taxable_income
+            : $this->taxRecord()->value('taxable_income') ?? 0);
+    }
 }

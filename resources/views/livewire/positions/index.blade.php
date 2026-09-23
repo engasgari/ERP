@@ -17,6 +17,44 @@
         <label class="erp-filter-field col-12 col-md-3">شرح<input wire:model="form.description"></label><div class="col-12 col-md-2 d-grid d-sm-flex gap-2"><button class="erp-action-btn erp-action-edit">ذخیره</button><button type="button" wire:click="cancel" class="erp-action-btn">جدید</button></div>
     </div></form>
     <div class="erp-ui-filter-bar"><div class="row g-2"><label class="erp-filter-field col-12 col-md-9">جستجو<input wire:model.live.debounce.400ms="search"></label><div class="col-12 col-md-3 d-grid"><button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلتر</button></div></div></div>
-    <div class="table-responsive"><table class="erp-ui-data-table w-full"><thead><tr><th>کد</th><th>عنوان</th><th>شغل</th><th>واحد</th><th>سرپرست</th><th>ظرفیت</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>@forelse($positions as $position)<tr wire:key="position-{{ $position->id }}"><td>{{ $position->code }}</td><td>{{ $position->title }}</td><td>{{ $position->job?->title ?: '-' }}</td><td>{{ $position->organizationUnit?->title ?: '-' }}</td><td>{{ $position->supervisor?->title ?: '-' }}</td><td>{{ $position->capacity }}</td><td>{{ $position->is_active ? 'فعال' : 'غیرفعال' }}</td><td><div class="d-grid d-sm-flex gap-2"><button wire:click="edit({{ $position->id }})" class="erp-action-btn erp-action-edit">ویرایش</button><button wire:click="delete({{ $position->id }})" wire:confirm="حذف شود؟" class="erp-action-btn erp-action-delete">حذف</button></div></td></tr>@empty<tr><td colspan="8" class="text-center py-6 text-slate-500">رکوردی ثبت نشده است.</td></tr>@endforelse</tbody></table></div>
+    <div class="table-responsive">
+        <table class="erp-ui-data-table w-full">
+            <thead>
+                <tr>
+                    <th>کد</th>
+                    <th>عنوان</th>
+                    <th>شغل</th>
+                    <th>واحد</th>
+                    <th>سرپرست</th>
+                    <th>ظرفیت</th>
+                    <th>وضعیت</th>
+                    <th>عملیات</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($positions as $position)
+                    <tr wire:key="position-{{ $position->id }}">
+                        <td>{{ $position->code }}</td>
+                        <td>{{ $position->title }}</td>
+                        <td>{{ $position->job?->title ?: '-' }}</td>
+                        <td>{{ $position->organizationUnit?->title ?: '-' }}</td>
+                        <td>{{ $position->supervisor?->title ?: '-' }}</td>
+                        <td>{{ $position->capacity }}</td>
+                        <td>{{ $position->is_active ? 'فعال' : 'غیرفعال' }}</td>
+                        <td>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action icon="edit" label="ویرایش" wire:click="edit({{ $position->id }})" />
+                                <x-erp.ui.row-action icon="delete" label="حذف" tone="danger" wire:click="delete({{ $position->id }})" wire:confirm="حذف شود؟" />
+                            </x-erp.ui.row-actions>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="8" class="text-center py-6 text-slate-500">رکوردی ثبت نشده است.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
     {{ $positions->links() }}
 </div></div>

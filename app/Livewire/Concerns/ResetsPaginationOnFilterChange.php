@@ -6,8 +6,10 @@ trait ResetsPaginationOnFilterChange
 {
     public function updated(string $name): void
     {
-        if ($name !== 'page') {
-            $this->resetPage();
+        if ($name === 'page' || str_starts_with($name, 'form.')) {
+            return;
         }
+
+        $this->resetPage();
     }
 }

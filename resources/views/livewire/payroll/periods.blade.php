@@ -1,11 +1,5 @@
 <div dir="rtl" class="space-y-6">
-    @if(session('success'))
-        <div class="rounded-lg bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
-    @endif
-
-    @if(session('error'))
-        <div class="rounded-lg bg-red-50 p-4 text-sm text-red-800">{{ session('error') }}</div>
-    @endif
+    @include('livewire.partials.flash')
 
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -14,6 +8,9 @@
                 <p class="mt-1 text-sm leading-7 text-slate-500">
                     دوره را بسازید، کارکرد را از روی <span class="font-semibold text-slate-700">work_logs</span> محاسبه کنید و بعد حقوق، بیمه، مالیات و فیش را تولید کنید.
                     اگر دوره هنوز تایید نشده باشد، می‌توانید آن را حذف کنید و محاسبه را دوباره انجام دهید.
+                    برای اصلاح دستی مبالغ و ثبت پرداخت با حساب بانکی به
+                    <a href="{{ route('payroll.payments.index', ['year' => $year, 'month' => $month]) }}" class="font-semibold text-emerald-700 underline">لیست و پرداخت حقوق</a>
+                    بروید.
                 </p>
             </div>
 
@@ -97,37 +94,67 @@
                                 {{ $statusLabels[$period->status] ?? $period->status }}
                             </span>
                         </td>
-                        <td class="px-3 py-3 text-slate-700">{{ number_format($period->monthly_attendances_count) }} نفر</td>
-                        <td class="px-3 py-3 text-slate-700">{{ number_format($period->payroll_calculations_count) }} فیش</td>
-                        <td class="px-3 py-3 font-semibold text-slate-900">{{ number_format((float) $period->payroll_calculations_sum_net_payable) }}</td>
+                        <td class="px-3 py-3 text-slate-700">{{ formatMoney($period->monthly_attendances_count) }} نفر</td>
+                        <td class="px-3 py-3 text-slate-700">{{ formatMoney($period->payroll_calculations_count) }} فیش</td>
+                        <td class="px-3 py-3 font-semibold text-slate-900">{{ formatMoney((float) $period->payroll_calculations_sum_net_payable) }}</td>
                         <td class="px-3 py-3">
-                            <div class="flex flex-col gap-2 sm:flex-row">
-                                <button type="button" wire:click="calculate({{ $period->id }})" wire:confirm="محاسبه مجدد این دوره انجام شود؟" wire:loading.attr="disabled" wire:target="calculate({{ $period->id }})" class="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                                    محاسبه
-                                </button>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action
+                                    icon="calculate"
+                                    label="محاسبه"
+                                    wire:click="calculate({{ $period->id }})"
+                                    wire:confirm="محاسبه مجدد این دوره انجام شود؟"
+                                    wire:loading.attr="disabled"
+                                    wire:target="calculate({{ $period->id }})"
+                                />
 
                                 @if(in_array($period->status, ['draft', 'calculated'], true))
-                                    <button type="button" wire:click="deletePeriod({{ $period->id }})" wire:confirm="این دوره حذف شود؟ اطلاعات محاسبه‌شده هم پاک می‌شود." wire:loading.attr="disabled" wire:target="deletePeriod({{ $period->id }})" class="rounded-md bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                                        حذف
-                                    </button>
+                                    <x-erp.ui.row-action
+                                        icon="delete"
+                                        label="حذف"
+                                        tone="danger"
+                                        wire:click="deletePeriod({{ $period->id }})"
+                                        wire:confirm="این دوره حذف شود؟ اطلاعات محاسبه‌شده هم پاک می‌شود."
+                                        wire:loading.attr="disabled"
+                                        wire:target="deletePeriod({{ $period->id }})"
+                                    />
                                 @endif
 
                                 @if($period->status === 'calculated')
-                                    <button type="button" wire:click="approve({{ $period->id }})" wire:confirm="دوره حقوق تایید شود؟" wire:loading.attr="disabled" wire:target="approve({{ $period->id }})" class="rounded-md bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-60">
-                                        تایید
-                                    </button>
+                                    <x-erp.ui.row-action
+                                        icon="confirm"
+                                        label="تایید"
+                                        tone="success"
+                                        wire:click="approve({{ $period->id }})"
+                                        wire:confirm="دوره حقوق تایید شود؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="approve({{ $period->id }})"
+                                    />
                                 @endif
 
                                 @if($period->status === 'approved')
-                                    <button type="button" wire:click="close({{ $period->id }})" wire:confirm="بعد از بستن دوره، محاسبه مجدد انجام نمی‌شود. ادامه می‌دهید؟" wire:loading.attr="disabled" wire:target="close({{ $period->id }})" class="rounded-md bg-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60">
-                                        بستن
-                                    </button>
+                                    <x-erp.ui.row-action
+                                        icon="close"
+                                        label="بستن"
+                                        wire:click="close({{ $period->id }})"
+                                        wire:confirm="بعد از بستن دوره، محاسبه مجدد انجام نمی‌شود. ادامه می‌دهید؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="close({{ $period->id }})"
+                                    />
                                 @endif
 
                                 @if($period->status === 'closed')
-                                    <span class="text-xs font-semibold text-slate-500">دوره بسته شده است</span>
+                                    <x-erp.ui.row-action
+                                        icon="reopen"
+                                        label="بازگشایی"
+                                        tone="success"
+                                        wire:click="reopen({{ $period->id }})"
+                                        wire:confirm="دوره بسته‌شده باز شود و محاسبه مجدد فعال گردد؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="reopen({{ $period->id }})"
+                                    />
                                 @endif
-                            </div>
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty
@@ -158,9 +185,9 @@
                     </div>
                     <div class="mt-3 text-sm text-slate-700">
                         @if($item->calculation_type === 'percentage')
-                            {{ rtrim(rtrim(number_format((float) $item->default_rate, 4), '0'), '.') }} درصد
+                            {{ rtrim(rtrim(formatMoney((float) $item->default_rate, 4), '0'), '.') }} درصد
                         @else
-                            {{ number_format((float) $item->default_amount) }} ریال
+                            {{ formatMoney((float) $item->default_amount) }} ریال
                         @endif
                     </div>
                     @if($item->source_title)
@@ -177,7 +204,7 @@
                 <h3 class="text-lg font-bold text-slate-900">ریز محاسبات دوره انتخاب‌شده</h3>
                 <p class="mt-1 text-sm text-slate-500">این جدول خروجی نهایی موتور جدید را برای ماه انتخاب‌شده نشان می‌دهد.</p>
             </div>
-            <div class="text-sm text-slate-500">{{ number_format($calculations->count()) }} رکورد</div>
+            <div class="text-sm text-slate-500">{{ formatMoney($calculations->count()) }} رکورد</div>
         </div>
 
         <div class="overflow-x-auto">
@@ -205,14 +232,14 @@
                     <tr>
                         <td class="px-3 py-3 font-semibold text-slate-900">{{ $calculation->employee->full_name }}</td>
                         <td class="px-3 py-3 text-slate-700">
-                            {{ number_format((float) $calculation->attendance?->normal_hours, 2) }} عادی
+                            {{ formatMoney((float) $calculation->attendance?->normal_hours, 2) }} عادی
                             /
-                            {{ number_format((float) $calculation->attendance?->overtime_hours, 2) }} اضافه‌کاری
+                            {{ formatMoney((float) $calculation->attendance?->overtime_hours, 2) }} اضافه‌کاری
                         </td>
-                        <td class="px-3 py-3 text-slate-700">{{ number_format((float) $calculation->gross_salary) }}</td>
-                        <td class="px-3 py-3 text-slate-700">{{ number_format((float) $calculation->total_deductions) }}</td>
+                        <td class="px-3 py-3 text-slate-700">{{ formatMoney((float) $calculation->gross_salary) }}</td>
+                        <td class="px-3 py-3 text-slate-700">{{ formatMoney((float) $calculation->total_deductions) }}</td>
                         <td class="px-3 py-3 font-semibold text-slate-900">
-                            {{ number_format((float) $calculation->net_payable) }}
+                            {{ formatMoney((float) $calculation->net_payable) }}
                             <div class="mt-1 text-xs {{ $calculation->status === 'failed' ? 'text-red-700' : 'text-green-700' }}">
                                 {{ $calculation->status === 'failed' ? 'ناموفق' : 'محاسبه شده' }}
                             </div>
@@ -221,21 +248,38 @@
                             @endif
                         </td>
                         <td class="px-3 py-3 text-slate-700">
-                            <div class="font-semibold text-slate-900">{{ number_format($payableCredit) }}</div>
+                            <div class="font-semibold text-slate-900">{{ formatMoney($payableCredit) }}</div>
                             <div class="mt-1 text-xs text-slate-500">
-                                {{ $remainingAmount > 0 ? 'مانده برای پرداخت: ' . number_format($remainingAmount) : 'تسویه شده' }}
+                                {{ $remainingAmount > 0 ? 'مانده برای پرداخت: ' . formatMoney($remainingAmount) : 'تسویه شده' }}
                             </div>
                         </td>
                         <td class="px-3 py-3 text-slate-700">
-                            {{ $calculation->accountingEntry?->entry_number ?: '-' }}
-                            <div class="text-xs text-slate-500">{{ $calculation->accountingEntry?->status ?: 'ثبت نشده' }}</div>
+                            @if($calculation->accountingDocument)
+                                <a href="{{ route('accounting-documents.show', $calculation->accountingDocument) }}" class="font-semibold text-emerald-700 underline" wire:navigate>
+                                    {{ $calculation->accountingDocument->number }}
+                                </a>
+                                <div class="text-xs text-slate-500">ثبت حقوق</div>
+                            @elseif($calculation->accountingEntry?->entry_number)
+                                <span class="font-semibold text-slate-700">{{ $calculation->accountingEntry->entry_number }}</span>
+                                <div class="text-xs text-amber-700">سند حسابداری یافت نشد</div>
+                            @else
+                                <span class="text-xs text-slate-500">ثبت نشده</span>
+                            @endif
                         </td>
                         <td class="px-3 py-3 text-slate-700">
                             @if($calculation->payments->isNotEmpty())
-                                <div class="font-semibold text-emerald-700">{{ number_format($paidAmount) }}</div>
+                                <div class="font-semibold text-emerald-700">{{ formatMoney($paidAmount) }}</div>
                                 <div class="mt-1 text-xs text-slate-500">
                                     سند: {{ $calculation->payments->first()?->accountingDocument?->number ?: '-' }}
                                 </div>
+                                @if($period && $period->status !== 'closed')
+                                    <button type="button"
+                                            wire:click="reversePayment({{ $calculation->id }})"
+                                            wire:confirm="پرداخت {{ $calculation->employee->full_name }} برگشت داده شود؟"
+                                            class="mt-2 rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                                        برگشت پرداخت
+                                    </button>
+                                @endif
                             @else
                                 <span class="text-xs text-slate-500">هنوز پرداخت نشده</span>
                             @endif
@@ -261,7 +305,7 @@
                 <p class="mt-1 text-sm text-slate-500">پرداخت را جدا از محاسبه ثبت کنید تا سند حسابداری پرداخت فقط بعد از تسویه صادر شود.</p>
             </div>
             <div class="text-sm text-slate-500">
-                {{ number_format($calculations->filter(fn ($calculation) => $calculation->status !== 'failed' && ((float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'))) > 0)->count()) }} مورد باز
+                {{ formatMoney($calculations->filter(fn ($calculation) => $calculation->status !== 'failed' && ((float) $calculation->net_payable - (float) ($calculation->payments_sum_amount ?? $calculation->payments->sum('amount'))) > 0)->count()) }} مورد باز
             </div>
         </div>
 
@@ -276,33 +320,54 @@
                             <div class="font-semibold text-slate-900">{{ $calculation->employee->full_name }}</div>
                             <div class="mt-1 text-sm text-slate-600">
                                 دوره {{ $calculation->period?->persian_title }} -
-                                مانده پرداخت: <span class="font-semibold text-emerald-700">{{ number_format($paymentAmount) }}</span>
+                                مانده پرداخت: <span class="font-semibold text-emerald-700">{{ formatMoney($paymentAmount) }}</span>
                             </div>
                             <div class="mt-1 text-xs text-slate-500">
-                                بستانکاری ثبت‌شده: {{ number_format((float) ($calculation->accountingEntry?->salary_payable_credit ?? $calculation->net_payable)) }}
+                                بستانکاری ثبت‌شده: {{ formatMoney((float) ($calculation->accountingEntry?->salary_payable_credit ?? $calculation->net_payable)) }}
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 xl:min-w-[760px]">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 xl:min-w-[900px]">
                             <label class="block">
                                 <span class="text-sm font-medium text-slate-700">تاریخ پرداخت</span>
-                                <input type="text"
-                                       wire:model.defer="paymentDrafts.{{ $calculation->id }}.payment_date"
-                                       value="{{ data_get($paymentDrafts, $calculation->id . '.payment_date', todayJalaliDate()) }}"
-                                       data-jalali-datepicker
-                                       inputmode="numeric"
-                                       dir="ltr"
-                                       placeholder="1405/03/17"
-                                       class="mt-1 w-full rounded-md border-gray-300 text-right">
+                                <div class="mt-1">
+                                    <x-erp.ui.jalali-date-input
+                                        wire:model.live="paymentDrafts.{{ $calculation->id }}.payment_date"
+                                        placeholder="1405/03/17"
+                                        class="w-full"
+                                    />
+                                </div>
                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-slate-700">روش</span>
-                                <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.method" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                                <select wire:model.live="paymentDrafts.{{ $calculation->id }}.method" class="mt-1 w-full rounded-md border-gray-300 text-right">
                                     <option value="bank">بانکی</option>
                                     <option value="cash">نقدی</option>
                                 </select>
                             </label>
+
+                            @if(($paymentDrafts[$calculation->id]['method'] ?? 'bank') === 'bank')
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">حساب بانکی</span>
+                                    <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.bank_account_id" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                                        <option value="">انتخاب کنید</option>
+                                        @foreach($bankAccounts as $bank)
+                                            <option value="{{ $bank->id }}">{{ $bank->bank_name }} — {{ $bank->account_number ?: $bank->code }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @else
+                                <label class="block">
+                                    <span class="text-sm font-medium text-slate-700">صندوق</span>
+                                    <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.cashbox_id" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                                        <option value="">انتخاب کنید</option>
+                                        @foreach($cashboxes as $cashbox)
+                                            <option value="{{ $cashbox->id }}">{{ $cashbox->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </label>
+                            @endif
 
                             <label class="block">
                                 <span class="text-sm font-medium text-slate-700">مبلغ</span>

@@ -38,6 +38,7 @@ class FinancialReportRegistry
                 'description' => 'دفتر نقدی، بانک، مغایرت‌گیری و جریان نقد دوره‌ای',
                 'reports' => [
                     ['key' => 'cash-book', 'title' => 'دفتر صندوق', 'description' => 'گردش صندوق‌های نقدی'],
+                    ['key' => 'cash-statement', 'title' => 'صورتحساب صندوق', 'description' => 'موجودی و گردش صندوق‌های نقدی'],
                     ['key' => 'bank-statement', 'title' => 'صورتحساب بانک', 'description' => 'موجودی و گردش حساب‌های بانکی'],
                     ['key' => 'bank-reconciliation', 'title' => 'گزارش مغایرت بانکی', 'description' => 'تطبیق دفتر بانک با تراکنش‌های ثبت‌شده'],
                     ['key' => 'cash-flow-by-period', 'title' => 'جریان نقد بر اساس دوره', 'description' => 'جریان نقد به‌تفکیک ماه/دوره'],
@@ -45,8 +46,9 @@ class FinancialReportRegistry
             ],
             [
                 'title' => 'مالیات',
-                'description' => 'مالیات فروش، خرید، VAT و سطرهای مالیاتی',
+                'description' => 'مالیات فروش، خرید، VAT، دفاتر الکترونیک و سطرهای مالیاتی',
                 'reports' => [
+                    ['key' => 'tax-electronic-books', 'title' => 'دفاتر الکترونیک مالیاتی', 'description' => 'خروجی اکسل مطابق قالب رسمی سامانه مالیاتی'],
                     ['key' => 'sales-tax', 'title' => 'گزارش مالیات فروش', 'description' => 'مالیات فروش فاکتورهای فروش'],
                     ['key' => 'purchase-tax', 'title' => 'گزارش مالیات خرید', 'description' => 'مالیات خرید فاکتورهای خرید'],
                     ['key' => 'vat-summary', 'title' => 'خلاصه VAT', 'description' => 'جمع فروش، خرید، مالیات و مانده قابل پرداخت'],

@@ -15,12 +15,6 @@
             </div>
         </div>
 
-        @if(session('success'))
-            <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>
-        @endif
-        @if(session('error'))
-            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ session('error') }}</div>
-        @endif
         @if($errors->any())
             <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                 {{ $errors->first() }}

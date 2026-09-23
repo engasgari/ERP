@@ -9,7 +9,7 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Repositories\AccountingDocumentRepository;
 use App\Services\AccountingPostingService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\PersianPdf;
 use Illuminate\Http\Request;
 
 class AccountingDocumentController extends Controller
@@ -20,11 +20,9 @@ class AccountingDocumentController extends Controller
     ) {
     }
 
-    public function index(Request $request)
+    public function index()
     {
-        return view('accounting-documents.index', [
-            'documents' => $this->documents->paginate($this->normalizedFilters($request)),
-        ]);
+        return view('accounting-documents.index');
     }
 
     public function create()
@@ -59,10 +57,9 @@ class AccountingDocumentController extends Controller
 
     public function pdf(AccountingDocument $accountingDocument)
     {
-        $pdf = Pdf::loadView('accounting-documents.print', [
+        $pdf = PersianPdf::loadView('accounting-documents.print', [
             'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount']),
-            'forPdf' => true,
-        ])->setPaper('a4', 'landscape');
+        ], 'a4', 'landscape');
 
         return $pdf->download('accounting-document-' . $accountingDocument->number . '.pdf');
     }
@@ -124,17 +121,21 @@ class AccountingDocumentController extends Controller
 
     public function unpost(Request $request, AccountingDocument $accountingDocument)
     {
-        if ($redirect = $this->redirectIfPosted($accountingDocument)) {
+        if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
             return $redirect;
         }
 
-        if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
+        if ($redirect = $this->redirectIfNotPosted($accountingDocument, 'فقط اسناد ثبت قطعی را می‌توان به پیش‌نویس برگرداند.')) {
+            return $redirect;
+        }
+
+        if ($redirect = $this->redirectIfVoided($accountingDocument)) {
             return $redirect;
         }
 
         $this->posting->unpost($accountingDocument, $request->user()->id);
 
-        return back()->with('success', 'سند حسابداری به حالت پیش‌نویس برگشت.');
+        return back()->with('success', 'سند حسابداری به حالت پیش‌نویس برگشت و اکنون قابل ویرایش است.');
     }
 
     private function formData(AccountingDocument $document): array
@@ -184,6 +185,28 @@ class AccountingDocumentController extends Controller
 
         return redirect()
             ->route('accounting-documents.show', $document)
-            ->with('error', 'این سند حسابداری ثبت قطعی شده و ویرایش، حذف یا بازگشت به پیش‌نویس برای آن مجاز نیست.');
+            ->with('error', 'این سند حسابداری ثبت قطعی شده است. برای ویرایش یا حذف، ابتدا آن را به پیش‌نویس برگردانید.');
+    }
+
+    private function redirectIfNotPosted(AccountingDocument $document, string $message)
+    {
+        if ($document->status === 'posted') {
+            return null;
+        }
+
+        return redirect()
+            ->route('accounting-documents.show', $document)
+            ->with('error', $message);
+    }
+
+    private function redirectIfVoided(AccountingDocument $document)
+    {
+        if ($document->voided_at === null) {
+            return null;
+        }
+
+        return redirect()
+            ->route('accounting-documents.show', $document)
+            ->with('error', 'سند باطل‌شده قابل برگشت به پیش‌نویس نیست.');
     }
 }

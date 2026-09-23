@@ -2,6 +2,8 @@
     @php
         $isEdit = $isEdit ?? false;
         $transaction = $transaction ?? null;
+        $bankTreasuryType = App\Models\BankAccount::class;
+        $cashboxTreasuryType = App\Models\Cashbox::class;
         $transactionDate = old('transaction_date')
             ? jalaliDateInputValue(old('transaction_date'))
             : ($transaction ? gregorianToJalaliDate($transaction->transaction_date) : todayJalaliDate());
@@ -21,8 +23,41 @@
     </x-slot>
 
     <form method="post" action="{{ $isEdit ? route('treasury.update', $transaction) : route('treasury.store') }}" class="bg-white rounded-lg shadow-md p-6 space-y-4" x-data="{
+        transactionType: @js(old('type', $transaction?->type ?? 'deposit')),
         fromType: @js(old('from_treasury_type', $transaction?->from_treasury_type ?: '')),
         toType: @js(old('to_treasury_type', $transaction?->to_treasury_type ?: '')),
+        bankTreasuryType: @js($bankTreasuryType),
+        cashboxTreasuryType: @js($cashboxTreasuryType),
+        init() {
+            this.$watch('fromType', () => this.syncTreasuryLookups());
+            this.$watch('toType', () => this.syncTreasuryLookups());
+            this.$watch('transactionType', () => this.applyTransactionTypeDefaults());
+            this.applyTransactionTypeDefaults();
+            this.syncTreasuryLookups();
+        },
+        applyTransactionTypeDefaults() {
+            switch (this.transactionType) {
+                case 'bank_receipt':
+                    this.toType = this.bankTreasuryType;
+                    break;
+                case 'bank_payment':
+                    this.fromType = this.bankTreasuryType;
+                    break;
+                case 'cash_receipt':
+                    this.toType = this.cashboxTreasuryType;
+                    break;
+                case 'cash_payment':
+                    this.fromType = this.cashboxTreasuryType;
+                    break;
+            }
+        },
+        syncTreasuryLookups() {
+            queueMicrotask(() => {
+                if (typeof window.ErpUi?.syncLookupMirrorStates === 'function') {
+                    window.ErpUi.syncLookupMirrorStates(this.$el);
+                }
+            });
+        },
     }">
         @csrf
         @if($isEdit)
@@ -39,17 +74,17 @@
 
         <div class="grid md:grid-cols-3 gap-4">
             <label>نوع تراکنش
-                <select name="type" class="w-full">
+                <select name="type" class="w-full" x-model="transactionType">
                     @foreach($types as $value => $label)
                         <option value="{{ $value }}" @selected(old('type', $transaction?->type ?? 'deposit') === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
             </label>
             <label>تاریخ
-                <input type="text" name="transaction_date" inputmode="numeric" dir="ltr" placeholder="1405/03/19" value="{{ $transactionDate }}" required class="w-full">
+                <x-erp.ui.jalali-date-input name="transaction_date" :value="$transactionDate" required class="w-full" />
             </label>
             <label>مبلغ (ریال)
-                <input type="number" step="0.01" name="amount" value="{{ old('amount', $transaction?->amount) }}" required class="w-full">
+                <x-erp.ui.money-input name="amount" :value="old('amount', $transaction?->amount)" required class="w-full" />
             </label>
         </div>
 
@@ -59,23 +94,23 @@
                 <label>نوع حساب
                     <select name="from_treasury_type" class="w-full" x-model="fromType">
                         <option value="">انتخاب نشده</option>
-                        <option value="{{ App\Models\BankAccount::class }}">بانک</option>
-                        <option value="{{ App\Models\Cashbox::class }}">صندوق</option>
+                        <option value="{{ $bankTreasuryType }}">بانک</option>
+                        <option value="{{ $cashboxTreasuryType }}">صندوق</option>
                     </select>
                 </label>
-                <label x-show="fromType === @js(App\Models\BankAccount::class)" x-cloak>حساب بانکی
-                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== @js(App\Models\BankAccount::class)">
+                <label x-show="fromType === bankTreasuryType" x-cloak>حساب بانکی
+                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== bankTreasuryType">
                         <option value="">انتخاب بانک</option>
                         @foreach($banks as $bank)
-                            <option value="{{ $bank->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $bank->id && old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\BankAccount::class)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
+                            <option value="{{ $bank->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $bank->id && old('from_treasury_type', $transaction?->from_treasury_type) === $bankTreasuryType)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
                         @endforeach
                     </select>
                 </label>
-                <label x-show="fromType === @js(App\Models\Cashbox::class)" x-cloak>صندوق
-                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== @js(App\Models\Cashbox::class)">
+                <label x-show="fromType === cashboxTreasuryType" x-cloak>صندوق
+                    <select name="from_treasury_id" class="w-full" :disabled="fromType !== cashboxTreasuryType">
                         <option value="">انتخاب صندوق</option>
                         @foreach($cashboxes as $cashbox)
-                            <option value="{{ $cashbox->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $cashbox->id && old('from_treasury_type', $transaction?->from_treasury_type) === App\Models\Cashbox::class)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                            <option value="{{ $cashbox->id }}" @selected(old('from_treasury_id', $transaction?->from_treasury_id) == $cashbox->id && old('from_treasury_type', $transaction?->from_treasury_type) === $cashboxTreasuryType)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -86,23 +121,23 @@
                 <label>نوع حساب
                     <select name="to_treasury_type" class="w-full" x-model="toType">
                         <option value="">انتخاب نشده</option>
-                        <option value="{{ App\Models\BankAccount::class }}">بانک</option>
-                        <option value="{{ App\Models\Cashbox::class }}">صندوق</option>
+                        <option value="{{ $bankTreasuryType }}">بانک</option>
+                        <option value="{{ $cashboxTreasuryType }}">صندوق</option>
                     </select>
                 </label>
-                <label x-show="toType === @js(App\Models\BankAccount::class)" x-cloak>حساب بانکی
-                    <select name="to_treasury_id" class="w-full" :disabled="toType !== @js(App\Models\BankAccount::class)">
+                <label x-show="toType === bankTreasuryType" x-cloak>حساب بانکی
+                    <select name="to_treasury_id" class="w-full" :disabled="toType !== bankTreasuryType">
                         <option value="">انتخاب بانک</option>
                         @foreach($banks as $bank)
-                            <option value="{{ $bank->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $bank->id && old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\BankAccount::class)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
+                            <option value="{{ $bank->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $bank->id && old('to_treasury_type', $transaction?->to_treasury_type) === $bankTreasuryType)>{{ $bank->code }} - {{ $bank->bank_name }}</option>
                         @endforeach
                     </select>
                 </label>
-                <label x-show="toType === @js(App\Models\Cashbox::class)" x-cloak>صندوق
-                    <select name="to_treasury_id" class="w-full" :disabled="toType !== @js(App\Models\Cashbox::class)">
+                <label x-show="toType === cashboxTreasuryType" x-cloak>صندوق
+                    <select name="to_treasury_id" class="w-full" :disabled="toType !== cashboxTreasuryType">
                         <option value="">انتخاب صندوق</option>
                         @foreach($cashboxes as $cashbox)
-                            <option value="{{ $cashbox->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $cashbox->id && old('to_treasury_type', $transaction?->to_treasury_type) === App\Models\Cashbox::class)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                            <option value="{{ $cashbox->id }}" @selected(old('to_treasury_id', $transaction?->to_treasury_id) == $cashbox->id && old('to_treasury_type', $transaction?->to_treasury_type) === $cashboxTreasuryType)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
                         @endforeach
                     </select>
                 </label>

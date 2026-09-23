@@ -3,9 +3,7 @@
 namespace App\Services;
 
 use App\Models\TreasuryTransaction;
-use App\Models\AccountingDocument;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class TreasuryService
 {
@@ -20,8 +18,11 @@ class TreasuryService
     {
         return DB::transaction(function () use ($data, $userId) {
             $this->periods->ensureDateIsAllowed($data['transaction_date']);
+            $fiscalYear = $this->periods->fiscalYearForDate($data['transaction_date']);
+
             $transaction = TreasuryTransaction::create($data + [
-                'number' => $data['number'] ?? $this->nextNumber(),
+                'fiscal_year_id' => $fiscalYear?->id,
+                'number' => $data['number'] ?? $this->numbering->next('treasury_transaction', 'TR-', $fiscalYear?->id),
                 'created_by' => $userId,
                 'status' => 'draft',
             ]);
@@ -41,9 +42,12 @@ class TreasuryService
     {
         return DB::transaction(function () use ($transaction, $data, $userId) {
             $this->periods->ensureDateIsAllowed($data['transaction_date'] ?? $transaction->transaction_date);
-            $this->deleteAccountingDocument($transaction);
+            $this->deleteAccountingDocument($transaction, $userId);
+
+            $fiscalYear = $this->periods->fiscalYearForDate($data['transaction_date'] ?? $transaction->transaction_date);
 
             $transaction->update($data + [
+                'fiscal_year_id' => $fiscalYear?->id,
                 'status' => 'draft',
                 'accounting_document_id' => null,
                 'posted_at' => null,
@@ -60,57 +64,17 @@ class TreasuryService
         });
     }
 
-    private function nextNumber(): string
+    public function deleteWithAccounting(TreasuryTransaction $transaction, ?int $userId = null): void
     {
-        $prefix = 'TR-';
-        $padding = 5;
-
-        $maxNumber = TreasuryTransaction::withTrashed()
-            ->where('number', 'like', $prefix . '%')
-            ->pluck('number')
-            ->map(function (string $number) use ($prefix): int {
-                return (int) preg_replace('/^' . preg_quote($prefix, '/') . '/', '', $number);
-            })
-            ->max() ?: 0;
-
-        if ($maxNumber < 0) {
-            throw new RuntimeException('شماره‌گذاری خزانه معتبر نیست.');
-        }
-
-        return $prefix . str_pad((string) ($maxNumber + 1), $padding, '0', STR_PAD_LEFT);
-    }
-
-    public function deleteWithAccounting(TreasuryTransaction $transaction): void
-    {
-        DB::transaction(function () use ($transaction) {
+        DB::transaction(function () use ($transaction, $userId) {
             $this->periods->ensureDateIsAllowed($transaction->transaction_date);
-            $this->deleteAccountingDocument($transaction);
+            $this->deleteAccountingDocument($transaction, $userId);
             $transaction->delete();
         });
     }
 
-    private function deleteAccountingDocument(TreasuryTransaction $transaction): void
+    private function deleteAccountingDocument(TreasuryTransaction $transaction, ?int $userId = null): void
     {
-        $ids = collect([$transaction->accounting_document_id])
-            ->merge(AccountingDocument::withTrashed()
-                ->where('source_type', TreasuryTransaction::class)
-                ->where('source_id', $transaction->id)
-                ->pluck('id'))
-            ->filter()
-            ->unique();
-
-        foreach ($ids as $id) {
-            $document = AccountingDocument::withTrashed()->find($id);
-            if (!$document) {
-                continue;
-            }
-
-            if ($document->status === 'posted') {
-             throw new RuntimeException('سند حسابداری ثبت قطعی شده از مسیر خزانه قابل حذف نیست.');
-            }
-
-            $document->lines()->delete();
-            $document->forceDelete();
-        }
+        $this->posting->deleteTreasuryTransactionDocument($transaction, $userId);
     }
 }

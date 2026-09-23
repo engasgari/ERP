@@ -54,10 +54,18 @@
                         </select>
                     </td>
                     <td>
-                        <div class="d-grid d-sm-flex gap-2">
-                            <a class="erp-action-btn erp-action-edit text-center" href="{{ route('work-groups.edit', $group) }}">ویرایش کامل</a>
-                            <button type="button" wire:click="delete({{ $group->id }})" wire:confirm="گروه کاری حذف شود؟" wire:loading.attr="disabled" wire:target="delete({{ $group->id }})" class="erp-action-btn erp-action-delete">حذف</button>
-                        </div>
+                        <x-erp.ui.row-actions>
+                            <x-erp.ui.row-action icon="edit" label="ویرایش کامل" :href="route('work-groups.edit', $group)" />
+                            <x-erp.ui.row-action
+                                icon="delete"
+                                label="حذف"
+                                tone="danger"
+                                wire:click="delete({{ $group->id }})"
+                                wire:confirm="گروه کاری حذف شود؟"
+                                wire:loading.attr="disabled"
+                                wire:target="delete({{ $group->id }})"
+                            />
+                        </x-erp.ui.row-actions>
                     </td>
                 </tr>
             @empty

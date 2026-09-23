@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\BomVersion;
+use App\Models\FinancialTransaction;
+use App\Models\InventoryDocument;
+use App\Models\Invoice;
 use App\Models\PayrollCalculation;
 use App\Models\Project;
-use App\Models\Salary;
 use App\Models\ProductionOrder;
 use App\Models\PayrollAccountingSetting;
 use Illuminate\Support\Facades\DB;
@@ -14,27 +16,48 @@ class ProjectCostingService
 {
     public function summary(Project $project): array
     {
-        $revenue = $this->projectRevenue($project);
+        $invoiceSales = $this->invoiceSaleTotals($project);
+        $invoicePurchases = $this->invoicePurchaseTotals($project);
+        $financialRevenue = $this->financialRevenue($project);
+        $revenue = $financialRevenue + $invoiceSales['net'];
+        $grossRevenue = $financialRevenue + $invoiceSales['gross'];
         $materialCost = $this->materialCost($project);
         $laborCost = $this->directLaborCost($project);
-        $serviceCost = $this->serviceCost($project);
+        $serviceCostGross = $invoicePurchases['gross'];
+        $serviceCostNet = $invoicePurchases['net'];
+        $registeredExpenseCost = $this->registeredExpenseCost($project);
+        $ledgerExpenseCost = $this->ledgerProjectExpenseCost($project);
         $overheadCost = 0.0;
-        $totalCost = $materialCost + $laborCost + $serviceCost;
-        $profit = $revenue - $totalCost;
-        $margin = $revenue > 0 ? ($profit / $revenue) * 100 : 0;
+        $totalCostGross = $materialCost + $laborCost + $serviceCostGross + $registeredExpenseCost + $ledgerExpenseCost + $overheadCost;
+        $totalCostNet = $materialCost + $laborCost + $serviceCostNet + $registeredExpenseCost + $ledgerExpenseCost + $overheadCost;
+        $profitNet = $revenue - $totalCostNet;
+        $profitGross = $grossRevenue - $totalCostGross;
+        $margin = $revenue > 0 ? ($profitNet / $revenue) * 100 : 0;
         $budget = (float) $project->budget;
 
         return [
             'revenue' => $revenue,
+            'gross_revenue' => $grossRevenue,
+            'financial_revenue' => $financialRevenue,
+            'invoice_gross_revenue' => $invoiceSales['gross'],
+            'vat_collected' => $invoiceSales['vat'],
+            'invoice_gross_purchase' => $invoicePurchases['gross'],
+            'vat_paid' => $invoicePurchases['vat'],
             'material_cost' => $materialCost,
             'labor_cost' => $laborCost,
-            'service_cost' => $serviceCost,
+            'service_cost' => $serviceCostGross,
+            'service_cost_net' => $serviceCostNet,
+            'registered_expense_cost' => $registeredExpenseCost,
+            'ledger_expense_cost' => $ledgerExpenseCost,
             'overhead_cost' => $overheadCost,
-            'total_cost' => $totalCost,
-            'gross_profit' => $profit,
+            'total_cost' => $totalCostGross,
+            'total_cost_net' => $totalCostNet,
+            'gross_profit' => $profitNet,
+            'profit_net' => $profitNet,
+            'profit_gross' => $profitGross,
             'profit_margin' => $margin,
             'budget' => $budget,
-            'budget_variance' => $budget - $totalCost,
+            'budget_variance' => $budget - $totalCostNet,
             'material_variance' => $this->materialVariance($project),
             'work_hours' => (float) $project->workLogs()->sum('hours'),
         ];
@@ -83,33 +106,99 @@ class ProjectCostingService
             ->join('chart_accounts as accounts', 'accounts.id', '=', 'lines.chart_account_id')
             ->where('lines.project_id', $project->id)
             ->where('docs.status', 'posted')
-            ->whereIn('docs.source_type', [PayrollCalculation::class, Salary::class])
+            ->whereIn('docs.source_type', [PayrollCalculation::class])
             ->where('accounts.code', $salaryExpenseCode)
             ->sum('lines.debit');
     }
 
-    private function projectRevenue(Project $project): float
+    public function projectRevenue(Project $project): float
     {
-        $financialRevenue = (float) $project->financialTransactions()
+        return $this->financialRevenue($project) + $this->invoiceSaleTotals($project)['net'];
+    }
+
+    public function financialRevenue(Project $project): float
+    {
+        return (float) $project->financialTransactions()
             ->where('type', 'income')
             ->sum('amount');
+    }
 
-        $invoiceRevenue = (float) DB::table('invoices')
+    /**
+     * @return array{gross: float, vat: float, net: float}
+     */
+    public function invoiceSaleTotals(Project $project): array
+    {
+        $row = DB::table('invoices')
             ->where('project_id', $project->id)
             ->where('direction', 'sale')
-            ->where('status', 'confirmed')
-            ->sum('total_amount');
+            ->where(function ($query) {
+                $query->where('status', 'confirmed')
+                    ->orWhereNotNull('accounting_document_id');
+            })
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as gross')
+            ->selectRaw('COALESCE(SUM(tax_amount), 0) as vat')
+            ->selectRaw('COALESCE(SUM(total_amount - tax_amount), 0) as net')
+            ->first();
 
-        return $financialRevenue + $invoiceRevenue;
+        return [
+            'gross' => (float) ($row->gross ?? 0),
+            'vat' => (float) ($row->vat ?? 0),
+            'net' => (float) ($row->net ?? 0),
+        ];
+    }
+
+    /**
+     * @return array{gross: float, vat: float, net: float}
+     */
+    public function invoicePurchaseTotals(Project $project): array
+    {
+        $row = DB::table('invoices')
+            ->where('project_id', $project->id)
+            ->where('direction', 'purchase')
+            ->where('status', 'confirmed')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as gross')
+            ->selectRaw('COALESCE(SUM(tax_amount), 0) as vat')
+            ->selectRaw('COALESCE(SUM(total_amount - tax_amount), 0) as net')
+            ->first();
+
+        return [
+            'gross' => (float) ($row->gross ?? 0),
+            'vat' => (float) ($row->vat ?? 0),
+            'net' => (float) ($row->net ?? 0),
+        ];
     }
 
     public function serviceCost(Project $project): float
     {
-        return (float) DB::table('invoices')
-            ->where('project_id', $project->id)
-            ->where('direction', 'purchase')
-            ->where('status', 'confirmed')
-            ->sum('total_amount');
+        return $this->invoicePurchaseTotals($project)['gross'];
+    }
+
+    public function registeredExpenseCost(Project $project): float
+    {
+        return (float) $project->financialTransactions()
+            ->where('type', 'expense')
+            ->sum('amount');
+    }
+
+    public function ledgerProjectExpenseCost(Project $project): float
+    {
+        return (float) DB::table('accounting_document_lines as lines')
+            ->join('accounting_documents as docs', 'docs.id', '=', 'lines.accounting_document_id')
+            ->join('chart_accounts as accounts', 'accounts.id', '=', 'lines.chart_account_id')
+            ->where('lines.project_id', $project->id)
+            ->where('docs.status', 'posted')
+            ->where('accounts.nature', 'debit')
+            ->where('accounts.code', 'like', '5%')
+            ->where(function ($query): void {
+                $query->whereNull('docs.source_type')
+                    ->orWhereNotIn('docs.source_type', [
+                        PayrollCalculation::class,
+                        FinancialTransaction::class,
+                        Invoice::class,
+                        InventoryDocument::class,
+                    ]);
+            })
+            ->sum('lines.debit');
     }
 
     private function salaryExpenseAccountCode(): string

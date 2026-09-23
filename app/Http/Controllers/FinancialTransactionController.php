@@ -7,201 +7,18 @@ use App\Models\Cashbox;
 use App\Models\ChartAccount;
 use App\Models\FinancialTransaction;
 use App\Models\Project;
+use App\Repositories\FinancialTransactionRepository;
+use App\Services\AccountingPostingService;
+use App\Services\ProjectCostingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
-use App\Services\AccountingPostingService;
 
 class FinancialTransactionController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = FinancialTransaction::with(['project', 'bankAccount', 'cashbox', 'chartAccount', 'detailAccount', 'accountingDocument']);
-
-        if ($request->filled('project_id')) {
-            if ($request->input('project_id') === 'null') {
-                $query->whereNull('project_id');
-            } else {
-                $query->where('project_id', $request->project_id);
-            }
-        }
-
-        if ($request->filled('bank_account_id')) {
-            $query->where('bank_account_id', $request->bank_account_id);
-        }
-
-        if ($request->filled('cashbox_id')) {
-            $query->where('cashbox_id', $request->cashbox_id);
-        }
-
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        if ($request->filled('category')) {
-            $query->where('category', 'like', '%' . $request->category . '%');
-        }
-
-        if ($request->filled('reference_number')) {
-            $query->where('reference_number', 'like', '%' . $request->reference_number . '%');
-        }
-
-        if ($request->filled('description')) {
-            $query->where('description', 'like', '%' . $request->description . '%');
-        }
-
-        if ($request->filled('start_date')) {
-            $startDate = jalaliToGregorianDate($request->start_date);
-            if ($startDate) {
-                $query->whereDate('transaction_date', '>=', $startDate);
-            }
-        }
-
-        if ($request->filled('end_date')) {
-            $endDate = jalaliToGregorianDate($request->end_date);
-            if ($endDate) {
-                $query->whereDate('transaction_date', '<=', $endDate);
-            }
-        }
-
-        $amountMin = normalizePersianDigits($request->input('amount_min'));
-        if ($amountMin !== null && $amountMin !== '' && is_numeric($amountMin)) {
-            $query->where('amount', '>=', $amountMin);
-        }
-
-        $amountMax = normalizePersianDigits($request->input('amount_max'));
-        if ($amountMax !== null && $amountMax !== '' && is_numeric($amountMax)) {
-            $query->where('amount', '<=', $amountMax);
-        }
-
-        $summaryQuery = clone $query;
-        $totalIncome = (clone $summaryQuery)->where('type', 'income')->sum('amount');
-        $totalExpense = (clone $summaryQuery)->where('type', 'expense')->sum('amount');
-
-        $transactions = $query->latest()->paginate(15)->withQueryString();
-
-        $summary = [
-            'total_income' => $totalIncome,
-            'total_expense' => $totalExpense,
-            'profit_loss' => $totalIncome - $totalExpense,
-        ];
-
-        $projects = Project::orderBy('name')->get();
-        $bankAccounts = BankAccount::orderBy('bank_name')->orderBy('code')->get();
-        $cashboxes = Cashbox::orderBy('name')->orderBy('code')->get();
-        $categories = FinancialTransaction::query()
-            ->select('category')
-            ->whereNotNull('category')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
-
-        $dateErrors = [
-            'start_date' => $request->filled('start_date') && ! jalaliToGregorianDate($request->start_date) ? 'تاریخ شروع معتبر نیست.' : null,
-            'end_date' => $request->filled('end_date') && ! jalaliToGregorianDate($request->end_date) ? 'تاریخ پایان معتبر نیست.' : null,
-        ];
-
-        return view('financial-transactions.index', compact(
-            'transactions',
-            'summary',
-            'projects',
-            'bankAccounts',
-            'cashboxes',
-            'categories',
-            'dateErrors'
-        ));
-    }
-
-    public function summary(Request $request)
-    {
-        $query = FinancialTransaction::with(['project', 'bankAccount', 'cashbox', 'chartAccount', 'detailAccount', 'accountingDocument']);
-
-        if ($request->filled('project_id')) {
-            if ($request->input('project_id') === 'null') {
-                $query->whereNull('project_id');
-            } else {
-                $query->where('project_id', $request->project_id);
-            }
-        }
-
-        if ($request->filled('bank_account_id')) {
-            $query->where('bank_account_id', $request->bank_account_id);
-        }
-
-        if ($request->filled('cashbox_id')) {
-            $query->where('cashbox_id', $request->cashbox_id);
-        }
-
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        if ($request->filled('category')) {
-            $query->where('category', 'like', '%' . $request->category . '%');
-        }
-
-        if ($request->filled('reference_number')) {
-            $query->where('reference_number', 'like', '%' . $request->reference_number . '%');
-        }
-
-        if ($request->filled('description')) {
-            $query->where('description', 'like', '%' . $request->description . '%');
-        }
-
-        if ($request->filled('start_date')) {
-            $startDate = jalaliToGregorianDate($request->start_date);
-            if ($startDate) {
-                $query->whereDate('transaction_date', '>=', $startDate);
-            }
-        }
-
-        if ($request->filled('end_date')) {
-            $endDate = jalaliToGregorianDate($request->end_date);
-            if ($endDate) {
-                $query->whereDate('transaction_date', '<=', $endDate);
-            }
-        }
-
-        $transactions = $query->latest()->get();
-        $summary = [
-            'total_income' => (float) $transactions->where('type', 'income')->sum('amount'),
-            'total_expense' => (float) $transactions->where('type', 'expense')->sum('amount'),
-        ];
-        $summary['profit_loss'] = $summary['total_income'] - $summary['total_expense'];
-
-        $byType = $transactions->groupBy('type')->map(fn ($rows) => (float) $rows->sum('amount'));
-        $bySource = $transactions->groupBy(function ($transaction) {
-            if ($transaction->bankAccount) {
-                return 'bank:' . $transaction->bankAccount->bank_name . ' - ' . $transaction->bankAccount->code;
-            }
-
-            if ($transaction->cashbox) {
-                return 'cashbox:' . $transaction->cashbox->name . ' - ' . $transaction->cashbox->code;
-            }
-
-            return 'unassigned';
-        })->map(function ($rows, $label) {
-            return [
-                'label' => $label,
-                'count' => $rows->count(),
-                'income' => (float) $rows->where('type', 'income')->sum('amount'),
-                'expense' => (float) $rows->where('type', 'expense')->sum('amount'),
-                'net' => (float) $rows->where('type', 'income')->sum('amount') - (float) $rows->where('type', 'expense')->sum('amount'),
-            ];
-        })->values();
-
-        $byCategory = $transactions->groupBy('category')->map(function ($rows, $category) {
-            return [
-                'category' => $category,
-                'count' => $rows->count(),
-                'income' => (float) $rows->where('type', 'income')->sum('amount'),
-                'expense' => (float) $rows->where('type', 'expense')->sum('amount'),
-                'net' => (float) $rows->where('type', 'income')->sum('amount') - (float) $rows->where('type', 'expense')->sum('amount'),
-            ];
-        })->sortByDesc('net')->values();
-
-        return view('financial-transactions.summary', compact('transactions', 'summary', 'byType', 'bySource', 'byCategory'));
+        return view('financial-transactions.index');
     }
 
     public function create()
@@ -236,6 +53,7 @@ class FinancialTransactionController extends Controller
             'bank_account_id.exists' => 'بانک انتخاب شده معتبر نیست.',
             'cashbox_id.exists' => 'صندوق انتخاب شده معتبر نیست.',
         ])->after(function ($validator) use ($request) {
+            $this->appendFinancialTransactionCodingValidation($validator, $request);
             $bankAccountId = $request->input('bank_account_id');
             $cashboxId = $request->input('cashbox_id');
 
@@ -248,47 +66,13 @@ class FinancialTransactionController extends Controller
                 $validator->errors()->add('bank_account_id', 'برای این سند فقط یکی از بانک یا صندوق را انتخاب کنید.');
                 $validator->errors()->add('cashbox_id', 'برای این سند فقط یکی از بانک یا صندوق را انتخاب کنید.');
             }
-            $chartAccountId = $request->input('chart_account_id');
-            if (filled($chartAccountId)) {
-                $chartAccount = ChartAccount::find($chartAccountId);
-                if (! $chartAccount) {
-                    $validator->errors()->add('chart_account_id', 'کدینگ انتخاب شده معتبر نیست.');
-                } elseif ($request->input('type') === 'income' && $chartAccount->code !== '4102') {
-                    $validator->errors()->add('chart_account_id', 'برای درآمد فقط کدینگ درآمد متفرقه قابل انتخاب است.');
-                } elseif ($request->input('type') === 'expense' && $chartAccount->code !== '5201') {
-                    $validator->errors()->add('chart_account_id', 'برای هزینه فقط کدینگ هزینه عمومی قابل انتخاب است.');
-                }
-
-                $detailAccountId = $request->input('detail_account_id');
-                if (filled($detailAccountId)) {
-                    $detailAccount = ChartAccount::find($detailAccountId);
-                    if (! $detailAccount || (int) $detailAccount->parent_id !== (int) $chartAccountId) {
-                        $validator->errors()->add('detail_account_id', 'تفصیل انتخاب شده باید زیرمجموعه کدینگ اصلی باشد.');
-                    }
-                }
-            }
-            $chartAccountId = $request->input('chart_account_id');
-            if (filled($chartAccountId)) {
-                $chartAccount = ChartAccount::find($chartAccountId);
-                if (! $chartAccount) {
-                    $validator->errors()->add('chart_account_id', 'کدینگ انتخاب شده معتبر نیست.');
-                } elseif ($request->input('type') === 'income' && $chartAccount->code !== '4102') {
-                    $validator->errors()->add('chart_account_id', 'برای درآمد فقط کدینگ درآمد متفرقه قابل انتخاب است.');
-                } elseif ($request->input('type') === 'expense' && $chartAccount->code !== '5201') {
-                    $validator->errors()->add('chart_account_id', 'برای هزینه فقط کدینگ هزینه عمومی قابل انتخاب است.');
-                }
-
-                $detailAccountId = $request->input('detail_account_id');
-                if (filled($detailAccountId)) {
-                    $detailAccount = ChartAccount::find($detailAccountId);
-                    if (! $detailAccount || (int) $detailAccount->parent_id !== (int) $chartAccountId) {
-                        $validator->errors()->add('detail_account_id', 'تفصیل انتخاب شده باید زیرمجموعه کدینگ اصلی باشد.');
-                    }
-                }
-            }
         })->validate();
 
         DB::transaction(function () use ($validated, $request, $posting) {
+            if (blank($validated['category'] ?? null) && filled($validated['detail_account_id'] ?? null)) {
+                $validated['category'] = ChartAccount::query()->whereKey($validated['detail_account_id'])->value('title');
+            }
+
             $transaction = FinancialTransaction::create($validated);
             $document = $posting->fromFinancialTransaction($transaction, $request->user()?->id);
 
@@ -341,6 +125,7 @@ class FinancialTransactionController extends Controller
             'bank_account_id.exists' => 'بانک انتخاب شده معتبر نیست.',
             'cashbox_id.exists' => 'صندوق انتخاب شده معتبر نیست.',
         ])->after(function ($validator) use ($request) {
+            $this->appendFinancialTransactionCodingValidation($validator, $request);
             $bankAccountId = $request->input('bank_account_id');
             $cashboxId = $request->input('cashbox_id');
 
@@ -356,7 +141,11 @@ class FinancialTransactionController extends Controller
         })->validate();
 
         DB::transaction(function () use ($financialTransaction, $validated, $request, $posting) {
-            $posting->deleteFinancialTransactionDocument($financialTransaction);
+            if (blank($validated['category'] ?? null) && filled($validated['detail_account_id'] ?? null)) {
+                $validated['category'] = ChartAccount::query()->whereKey($validated['detail_account_id'])->value('title');
+            }
+
+            $posting->deleteFinancialTransactionDocument($financialTransaction, $request->user()?->id);
 
             $financialTransaction->update($validated + [
                 'accounting_document_id' => null,
@@ -372,10 +161,10 @@ class FinancialTransactionController extends Controller
             ->with('success', 'تراکنش مالی با موفقیت ویرایش شد!');
     }
 
-    public function destroy(FinancialTransaction $financialTransaction, AccountingPostingService $posting)
+    public function destroy(FinancialTransaction $financialTransaction, AccountingPostingService $posting, Request $request)
     {
-        DB::transaction(function () use ($financialTransaction, $posting) {
-            $posting->deleteFinancialTransactionDocument($financialTransaction);
+        DB::transaction(function () use ($financialTransaction, $posting, $request) {
+            $posting->deleteFinancialTransactionDocument($financialTransaction, $request->user()?->id);
             $financialTransaction->delete();
         });
 
@@ -386,23 +175,30 @@ class FinancialTransactionController extends Controller
     public function projectReport($projectId)
     {
         $project = Project::with(['financialTransactions', 'workLogs.employee'])->findOrFail($projectId);
+        $costing = app(ProjectCostingService::class)->summary($project);
+        $repository = app(FinancialTransactionRepository::class);
 
-        $transactions = $project->financialTransactions()
-            ->with(['bankAccount', 'cashbox'])
-            ->latest()
-            ->get();
+        $transactions = $repository->unifiedRows([
+            'project_id' => (string) $project->id,
+        ]);
 
-        $incomeByCategory = $project->financialTransactions()
+        $incomeByCategory = $transactions
             ->where('type', 'income')
-            ->selectRaw('category, SUM(amount) as total')
-            ->groupBy('category')
-            ->get();
+            ->groupBy(fn ($row) => $row->category ?: 'بدون دسته')
+            ->map(fn ($group, $category) => (object) [
+                'category' => $category,
+                'total' => $group->sum('amount'),
+            ])
+            ->values();
 
-        $expenseByCategory = $project->financialTransactions()
+        $expenseByCategory = $transactions
             ->where('type', 'expense')
-            ->selectRaw('category, SUM(amount) as total')
-            ->groupBy('category')
-            ->get();
+            ->groupBy(fn ($row) => $row->category ?: 'بدون دسته')
+            ->map(fn ($group, $category) => (object) [
+                'category' => $category,
+                'total' => $group->sum('amount'),
+            ])
+            ->values();
 
         $inventoryDocuments = $project->inventoryDocuments()
             ->with(['lines.item'])
@@ -419,9 +215,9 @@ class FinancialTransactionController extends Controller
                     'type_icon' => $document->type === 'consumption' ? 'مصرف' : 'خروج',
                     'type_label' => $document->type === 'consumption' ? 'حواله مصرف' : 'حواله خروج',
                     'item_name' => $line->item?->name ?: '-',
-                    'quantity' => number_format((float) $line->quantity, 3),
-                    'unit_price' => number_format((float) $line->unit_price),
-                    'total_amount' => number_format((float) $line->line_total),
+                    'quantity' => formatQuantity((float) $line->quantity),
+                    'unit_price' => formatMoney((float) $line->unit_price),
+                    'total_amount' => formatMoney((float) $line->line_total),
                     'description' => $line->description ?: $document->description,
                 ];
             });
@@ -431,13 +227,13 @@ class FinancialTransactionController extends Controller
             ->flatMap(fn ($document) => $document->lines)
             ->sum('line_total');
 
-        $totalIncome = (float) $project->financialTransactions()->where('type', 'income')->sum('amount');
-        $totalExpense = (float) $project->financialTransactions()->where('type', 'expense')->sum('amount');
-        $totalLaborCost = $project->total_labor_cost;
+        $totalIncome = (float) $costing['revenue'];
+        $totalExpense = (float) ($costing['registered_expense_cost'] + $costing['ledger_expense_cost']);
+        $totalLaborCost = (float) $costing['labor_cost'];
 
         $grossProfit = $totalIncome - $totalExpense;
-        $netProfit = $grossProfit - $totalLaborCost - $wareHouseOutTotalAmount;
-        $profitPercentage = $totalIncome > 0 ? ($netProfit / $totalIncome) * 100 : 0;
+        $netProfit = (float) $costing['profit_net'];
+        $profitPercentage = (float) $costing['profit_margin'];
         $WareHouseOutTotalAmount = $wareHouseOutTotalAmount;
 
         return view('financial-transactions.project-report', compact(
@@ -459,47 +255,47 @@ class FinancialTransactionController extends Controller
 
     private function codingGroups(): array
     {
-        $accounts = ChartAccount::query()
-            ->whereIn('code', ['4102', '5201'])
-            ->with(['children' => fn ($query) => $query->orderBy('code')])
-            ->orderBy('code')
-            ->get()
-            ->keyBy('code');
-        $categories = $this->getTransactionCategories();
-
         return [
-            'income' => array_merge(
-                $this->codingGroupPayload($accounts->get('4102')),
-                [
-                    'categories' => $categories['income'],
-                    'detail_by_category' => $this->detailCodeMap('income', $categories['income']),
-                ]
-            ),
-            'expense' => array_merge(
-                $this->codingGroupPayload($accounts->get('5201')),
-                [
-                    'categories' => $categories['expense'],
-                    'detail_by_category' => $this->detailCodeMap('expense', $categories['expense']),
-                ]
-            ),
+            'income' => $this->buildCodingGroupPayload(['41', '42']),
+            'expense' => $this->buildCodingGroupPayload(['52']),
         ];
     }
 
-    private function codingGroupPayload(?ChartAccount $mainAccount): array
+    private function buildCodingGroupPayload(array $ledgerCodes): array
     {
+        $ledgerIds = ChartAccount::query()
+            ->whereIn('code', $ledgerCodes)
+            ->pluck('id');
+
+        $subsidiaries = ChartAccount::query()
+            ->whereIn('parent_id', $ledgerIds)
+            ->where('level', 'subsidiary')
+            ->where('is_active', true)
+            ->with(['children' => fn ($query) => $query->where('level', 'detail')->where('is_active', true)->orderBy('code')])
+            ->orderBy('code')
+            ->get();
+
         return [
-            'main' => $this->codingAccountPayload($mainAccount),
-            'details' => $mainAccount
-                ? $mainAccount->children
-                    ->sortBy('code')
-                    ->values()
-                    ->map(fn (ChartAccount $account) => $this->codingAccountPayload($account))
-                    ->all()
-                : [],
+            'subsidiaries' => $subsidiaries
+                ->map(fn (ChartAccount $account) => $this->codingAccountPayload($account))
+                ->filter()
+                ->values()
+                ->all(),
+            'details_by_subsidiary' => $subsidiaries
+                ->mapWithKeys(function (ChartAccount $subsidiary) {
+                    return [
+                        (string) $subsidiary->id => $subsidiary->children
+                            ->map(fn (ChartAccount $detail) => $this->codingAccountPayload($detail, $subsidiary->id))
+                            ->filter()
+                            ->values()
+                            ->all(),
+                    ];
+                })
+                ->all(),
         ];
     }
 
-    private function codingAccountPayload(?ChartAccount $account): ?array
+    private function codingAccountPayload(?ChartAccount $account, ?int $parentId = null): ?array
     {
         if (! $account) {
             return null;
@@ -507,42 +303,87 @@ class FinancialTransactionController extends Controller
 
         return [
             'id' => $account->id,
-            'parent_id' => $account->parent_id,
+            'parent_id' => $parentId ?? $account->parent_id,
             'code' => $account->code,
             'title' => $account->title,
-            'label' => $account->code . ' - ' . $account->title,
+            'label' => $account->level === 'subsidiary'
+                ? $account->title
+                : $account->title,
         ];
     }
 
-    private function detailCodeMap(string $type, array $categories): array
+    private function appendFinancialTransactionCodingValidation($validator, Request $request): void
     {
-        $map = [];
+        $chartAccountId = $request->input('chart_account_id');
+        $detailAccountId = $request->input('detail_account_id');
+        $type = $request->input('type');
 
-        foreach ($categories as $category) {
-            $code = $this->legacyCategoryCode($type, $category);
-            if ($code) {
-                $map[$category] = ChartAccount::where('code', $code)->value('id');
-            }
+        if (! filled($chartAccountId)) {
+            return;
         }
 
-        return $map;
+        $chartAccount = ChartAccount::query()->with('parent')->find($chartAccountId);
+        if (! $chartAccount) {
+            $validator->errors()->add('chart_account_id', 'دسته‌بندی انتخاب شده معتبر نیست.');
+
+            return;
+        }
+
+        if ($chartAccount->level !== 'subsidiary') {
+            $validator->errors()->add('chart_account_id', 'دسته‌بندی باید یک حساب معین باشد.');
+        }
+
+        $ledgerCode = $chartAccount->parent?->code;
+        if ($type === 'expense' && $ledgerCode !== '52') {
+            $validator->errors()->add('chart_account_id', 'برای هزینه فقط حساب‌های معین هزینه قابل انتخاب است.');
+        }
+
+        if ($type === 'income' && ! in_array($ledgerCode, ['41', '42'], true)) {
+            $validator->errors()->add('chart_account_id', 'برای درآمد فقط حساب‌های معین درآمد قابل انتخاب است.');
+        }
+
+        if (! filled($detailAccountId)) {
+            $validator->errors()->add('detail_account_id', 'انتخاب تفصیل الزامی است.');
+
+            return;
+        }
+
+        $detailAccount = ChartAccount::find($detailAccountId);
+        if (! $detailAccount || (int) $detailAccount->parent_id !== (int) $chartAccountId) {
+            $validator->errors()->add('detail_account_id', 'تفصیل انتخاب شده باید زیرمجموعه دسته‌بندی باشد.');
+        }
     }
 
     private function resolveCodingSelection(FinancialTransaction $transaction): array
     {
         if ($transaction->chart_account_id || $transaction->detail_account_id) {
+            $chartAccountId = $transaction->chart_account_id;
+            if ($transaction->detail_account_id && ! $chartAccountId) {
+                $chartAccountId = ChartAccount::query()->whereKey($transaction->detail_account_id)->value('parent_id');
+            }
+
             return [
-                'chart_account_id' => $transaction->chart_account_id,
+                'chart_account_id' => $chartAccountId,
                 'detail_account_id' => $transaction->detail_account_id,
             ];
         }
 
         $categoryCode = $this->legacyCategoryCode($transaction->type, $transaction->category);
-        $mainCode = str_starts_with((string) $categoryCode, '41') ? '4102' : '5201';
+        if (! $categoryCode) {
+            return [
+                'chart_account_id' => null,
+                'detail_account_id' => null,
+            ];
+        }
+
+        $detailAccount = ChartAccount::query()->where('code', $categoryCode)->first();
+        $mainCode = str_starts_with((string) $categoryCode, '41') || str_starts_with((string) $categoryCode, '42')
+            ? substr($categoryCode, 0, 4)
+            : substr($categoryCode, 0, 4);
 
         return [
-            'chart_account_id' => ChartAccount::where('code', $mainCode)->value('id'),
-            'detail_account_id' => ChartAccount::where('code', $categoryCode)->value('id'),
+            'chart_account_id' => $detailAccount?->parent_id ?: ChartAccount::where('code', $mainCode)->value('id'),
+            'detail_account_id' => $detailAccount?->id,
         ];
     }
 
@@ -553,6 +394,8 @@ class FinancialTransactionController extends Controller
         return match ($type) {
             'income' => match ($category) {
                 'درآمد متفرقه', 'سایر درآمدهای غیر فاکتوری' => $category === 'سایر درآمدهای غیر فاکتوری' ? '410202' : '410201',
+                'برگشت هزینه' => '410203',
+                'دریافت متفرقه' => '410204',
                 default => '410201',
             },
             'expense' => match ($category) {
@@ -561,36 +404,14 @@ class FinancialTransactionController extends Controller
                 'تنخواه' => '520103',
                 'پذیرایی' => '520104',
                 'خرید لوازم' => '520105',
+                'کمیسیون بازاریابی' => '520506',
                 'تعمیرات' => '520106',
-                'حمل و نقل' => '520107',
+                'حمل و نقل' => '520401',
+                'حقوق و دستمزد' => '520201',
                 'سایر هزینه‌ها', 'سایر هزینه ها', 'سایر هزینه های روزمره' => '520108',
                 default => '520101',
             },
             default => null,
         };
-    }
-
-    private function getTransactionCategories(): array
-    {
-        return [
-            'income' => [
-                'فروش محصول',
-                'فروش خدمات',
-                'دریافت متفرقه',
-                'برگشت هزینه',
-                'سایر درآمدها',
-            ],
-            'expense' => [
-                'اجاره',
-                'ناهار پرسنل',
-                'تنخواه',
-                'پذیرایی',
-                'حمل و نقل',
-                'خرید لوازم',
-                'تعمیرات',
-                'حقوق و دستمزد',
-                'سایر هزینه‌ها',
-            ],
-        ];
     }
 }

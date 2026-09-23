@@ -35,11 +35,6 @@ class PayrollPeriod extends Model
         return $this->hasMany(AttendanceCalculation::class);
     }
 
-    public function salaries(): HasMany
-    {
-        return $this->hasMany(Salary::class);
-    }
-
     public function monthlyAttendances(): HasMany
     {
         return $this->hasMany(MonthlyAttendance::class);

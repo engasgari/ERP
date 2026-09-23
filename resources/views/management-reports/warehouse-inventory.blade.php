@@ -22,14 +22,14 @@
 
             @if($isLimited)
                 <div class="mb-3 rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                    {{ number_format($totalMatches) }} ردیف پیدا شد؛ فقط 1000 ردیف اول نمایش داده می‌شود. فیلتر را دقیق‌تر کنید.
+                    {{ formatMoney($totalMatches) }} ردیف پیدا شد؛ فقط 1000 ردیف اول نمایش داده می‌شود. فیلتر را دقیق‌تر کنید.
                 </div>
             @endif
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">تعداد اقلام</div><div class="font-bold text-gray-700">{{ number_format($summary['items_count']) }}</div></div>
-                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده تعدادی</div><div class="font-bold text-gray-700">{{ number_format($summary['balance_quantity']) }}</div></div>
-                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">ارزش مانده</div><div class="font-bold text-gray-700">{{ number_format($summary['balance_value']) }} تومان</div></div>
+                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">تعداد اقلام</div><div class="font-bold text-gray-700">{{ formatMoney($summary['items_count']) }}</div></div>
+                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">مانده تعدادی</div><div class="font-bold text-gray-700">{{ formatQuantity($summary['balance_quantity']) }}</div></div>
+                <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">ارزش مانده</div><div class="font-bold text-gray-700">{{ formatMoney($summary['balance_value']) }} تومان</div></div>
             </div>
 
             <div class="overflow-x-auto">
@@ -54,11 +54,11 @@
                             <td class="border border-gray-300 p-2 font-medium">{{ $row['item_name'] }}</td>
                             <td class="border border-gray-300 p-2">{{ $row['category'] }}</td>
                             <td class="border border-gray-300 p-2">{{ $row['project']?->name ?: '-' }}</td>
-                            <td class="border border-gray-300 p-2 text-green-700">{{ number_format($row['quantity_in']) }}</td>
-                            <td class="border border-gray-300 p-2 text-red-700">{{ number_format($row['quantity_out']) }}</td>
-                            <td class="border border-gray-300 p-2 font-bold">{{ number_format($row['balance_quantity']) }}</td>
-                            <td class="border border-gray-300 p-2">{{ number_format($row['average_price']) }}</td>
-                            <td class="border border-gray-300 p-2 font-bold">{{ number_format($row['balance_value']) }}</td>
+                            <td class="border border-gray-300 p-2 text-green-700">{{ formatQuantity($row['quantity_in']) }}</td>
+                            <td class="border border-gray-300 p-2 text-red-700">{{ formatQuantity($row['quantity_out']) }}</td>
+                            <td class="border border-gray-300 p-2 font-bold">{{ formatQuantity($row['balance_quantity']) }}</td>
+                            <td class="border border-gray-300 p-2">{{ formatMoney($row['average_price']) }}</td>
+                            <td class="border border-gray-300 p-2 font-bold">{{ formatMoney($row['balance_value']) }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="9" class="border border-gray-300 p-4 text-center text-gray-500">رکوردی یافت نشد.</td></tr>

@@ -44,13 +44,21 @@
                         </td>
                         <td>{{ $user->roles->pluck('title')->join('، ') ?: '-' }}</td>
                         <td>
-                            <div class="d-grid d-sm-flex gap-2">
-                                <a href="{{ route('access.users.edit', $user) }}" class="erp-action-btn erp-action-edit text-center">ویرایش کامل</a>
-                                <a href="{{ route('access.users.employee-access', $user) }}" class="erp-action-btn erp-action-detail text-center">دسترسی کارمندها</a>
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action icon="edit" label="ویرایش کامل" :href="route('access.users.edit', $user)" />
+                                <x-erp.ui.row-action icon="expand" label="دسترسی کارمندها" :href="route('access.users.employee-access', $user)" />
                                 @if($user->id !== auth()->id())
-                                    <button type="button" wire:click="delete({{ $user->id }})" wire:confirm="کاربر حذف شود؟" wire:loading.attr="disabled" wire:target="delete({{ $user->id }})" class="erp-action-btn erp-action-delete">حذف</button>
+                                    <x-erp.ui.row-action
+                                        icon="delete"
+                                        label="حذف"
+                                        tone="danger"
+                                        wire:click="delete({{ $user->id }})"
+                                        wire:confirm="کاربر حذف شود؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="delete({{ $user->id }})"
+                                    />
                                 @endif
-                            </div>
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty
