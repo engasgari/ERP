@@ -27,8 +27,8 @@
                         <option value="hourly">ساعتی</option>
                         <option value="daily">روزانه</option>
                     </select>
-                    <input wire:model="leave_start_date" placeholder="تاریخ شروع 1404/04/01" class="rounded-md border-gray-300 text-right">
-                    <input wire:model="leave_end_date" placeholder="تاریخ پایان" class="rounded-md border-gray-300 text-right">
+                    <x-erp.ui.jalali-date-input wire:model="leave_start_date" placeholder="1404/04/01" />
+                    <x-erp.ui.jalali-date-input wire:model="leave_end_date" placeholder="1404/04/01" />
                     @if($leave_request_type === 'hourly')
                         <input type="time" wire:model="leave_start_time" class="rounded-md border-gray-300 text-right">
                         <input type="time" wire:model="leave_end_time" class="rounded-md border-gray-300 text-right">
@@ -49,8 +49,8 @@
                         <option value="daily">روزانه</option>
                     </select>
                     <input wire:model="mission_destination" placeholder="مقصد" class="rounded-md border-gray-300 text-right">
-                    <input wire:model="mission_start_date" placeholder="تاریخ شروع 1404/04/01" class="rounded-md border-gray-300 text-right">
-                    <input wire:model="mission_end_date" placeholder="تاریخ پایان" class="rounded-md border-gray-300 text-right">
+                    <x-erp.ui.jalali-date-input wire:model="mission_start_date" placeholder="1404/04/01" />
+                    <x-erp.ui.jalali-date-input wire:model="mission_end_date" placeholder="1404/04/01" />
                     @if($mission_request_type === 'hourly')
                         <input type="time" wire:model="mission_start_time" class="rounded-md border-gray-300 text-right">
                         <input type="time" wire:model="mission_end_time" class="rounded-md border-gray-300 text-right">

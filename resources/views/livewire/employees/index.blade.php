@@ -33,7 +33,7 @@
                     </select>
                 </label>
                 <label class="erp-filter-field col-12 col-md-6 col-lg-3">از تاریخ شروع
-                    <input wire:model.live.debounce.500ms="start_date" inputmode="numeric" dir="ltr" placeholder="1403/01/01">
+                    <x-erp.ui.jalali-date-input wire:model.live.debounce.500ms="start_date" placeholder="1403/01/01" class="w-full" />
                 </label>
                 <div class="col-12 col-md-6 col-lg-3 d-grid">
                     <button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلترها</button>

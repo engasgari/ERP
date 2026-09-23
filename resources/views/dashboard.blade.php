@@ -1,9 +1,5 @@
-<x-app-layout>
+<x-app-layout :hide-breadcrumb="true">
     <x-slot name="header"></x-slot>
 
-    <div class="exec-dashboard-page py-5 sm:py-8">
-        <div class="exec-dashboard-page__inner mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8">
-            <livewire:dashboard.executive />
-        </div>
-    </div>
+    <livewire:dashboard.executive />
 </x-app-layout>

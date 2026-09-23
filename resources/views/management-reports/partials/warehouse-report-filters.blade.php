@@ -58,12 +58,12 @@
     <div class="erp-filter-row erp-filter-row-5">
         <label class="erp-filter-field">
             از تاریخ
-            <input name="start_date" value="{{ request('start_date') ? jalaliDateInputValue(request('start_date')) : '' }}" inputmode="numeric" dir="ltr" placeholder="1403/01/01">
+            <x-erp.ui.jalali-date-input name="start_date" :value="request('start_date') ? jalaliDateInputValue(request('start_date')) : ''" placeholder="1403/01/01" class="w-full" />
         </label>
 
         <label class="erp-filter-field">
             تا تاریخ
-            <input name="end_date" value="{{ request('end_date') ? jalaliDateInputValue(request('end_date')) : '' }}" inputmode="numeric" dir="ltr" placeholder="1403/12/29">
+            <x-erp.ui.jalali-date-input name="end_date" :value="request('end_date') ? jalaliDateInputValue(request('end_date')) : ''" placeholder="1403/12/29" class="w-full" />
         </label>
 
         <label class="erp-filter-field">

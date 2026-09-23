@@ -42,7 +42,14 @@
 
             <label class="ft-field">
                 <span>تاریخ *</span>
-                <input type="text" id="transaction_date" name="transaction_date" inputmode="numeric" dir="ltr" placeholder="1404/08/01" value="{{ $isEdit ? jalaliDateInputValue(old('transaction_date'), $transaction?->transaction_date) : (old('transaction_date') ? jalaliDateInputValue(old('transaction_date')) : todayJalaliDate()) }}" required>
+                <x-erp.ui.jalali-date-input
+                    id="transaction_date"
+                    name="transaction_date"
+                    :value="$isEdit ? jalaliDateInputValue(old('transaction_date'), $transaction?->transaction_date) : (old('transaction_date') ? jalaliDateInputValue(old('transaction_date')) : todayJalaliDate())"
+                    placeholder="1404/08/01"
+                    required
+                    class="w-full"
+                />
             </label>
 
             <label class="ft-field">

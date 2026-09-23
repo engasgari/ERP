@@ -195,6 +195,32 @@ class FinancialReportService
     }
 
     /**
+     * مانده مطالبات مشتریان از دفتر (حساب دریافتنی)، هم‌راستا با گزارش سن مطالبات.
+     *
+     * @return array{
+     *     total_receivables: float,
+     *     current: float,
+     *     overdue: float,
+     *     over_90: float,
+     *     party_count: int,
+     *     invoice_count: int,
+     *     buckets: array<string, float>
+     * }
+     */
+    public function customerReceivableSummary(array $filters = []): array
+    {
+        $report = $this->report('accounts-receivable-aging', $filters);
+        $summary = $this->agingBalanceSummary(
+            collect($report['sections'][0]['rows'] ?? []),
+            'total_receivables',
+        );
+
+        return array_merge($summary, [
+            'current' => (float) ($summary['buckets']['current'] ?? 0),
+        ]);
+    }
+
+    /**
      * مانده بدهی تأمین‌کنندگان از دفتر (حساب پرداختنی)، هم‌راستا با گزارش سن بدهی‌ها.
      *
      * @return array{
@@ -209,11 +235,26 @@ class FinancialReportService
     public function supplierPayableSummary(array $filters = []): array
     {
         $report = $this->report('accounts-payable-aging', $filters);
+        $rows = collect($report['sections'][0]['rows'] ?? []);
+        $summary = $this->agingBalanceSummary($rows, 'total_payables');
 
-        return $this->agingBalanceSummary(
-            collect($report['sections'][0]['rows'] ?? []),
-            'total_payables',
-        );
+        $parties = $rows
+            ->map(fn (array $row) => [
+                'party_id' => (int) ($row['party_id'] ?? 0),
+                'party_name' => (string) ($row['name'] ?? '—'),
+                'outstanding_amount' => abs((float) ($row['balance'] ?? 0)),
+                'days' => (int) abs((float) ($row['days'] ?? 0)),
+                'bucket' => (string) ($row['bucket'] ?? ''),
+            ])
+            ->filter(fn (array $row) => (float) $row['outstanding_amount'] > 0.00001)
+            ->sortByDesc('outstanding_amount')
+            ->values()
+            ->all();
+
+        return array_merge($summary, [
+            'current' => (float) ($summary['buckets']['current'] ?? 0),
+            'parties' => $parties,
+        ]);
     }
 
     /**
@@ -635,17 +676,21 @@ class FinancialReportService
         $accountId = $this->accountIdLike('1101');
         $rows = $this->partyBalances($filters, $accountId)->map(function ($row) {
             $days = $row['last_date'] ? now()->startOfDay()->diffInDays($row['last_date']) : 0;
+            // مانده دفتر ممکن است منفی ثبت شود؛ برای سن مطالبات قدر مطلق نمایش داده می‌شود.
+            $balance = abs((float) $row['balance_debit'] - (float) $row['balance_credit']);
 
             return [
                 'party_id' => $row['party']->id,
                 'party' => $row['party'],
                 'code' => $row['party']->code,
                 'name' => $row['party']->name,
-                'balance' => max($row['balance_debit'] - $row['balance_credit'], 0),
+                'balance' => $balance,
                 'days' => $days,
                 'bucket' => $this->agingBucket($days),
             ];
-        })->sortBy('name')->values();
+        })->filter(fn ($row) => (float) $row['balance'] > 0.00001)
+            ->sortBy('name')
+            ->values();
 
         return $this->reportPayload(
             key: $context->reportKey,
@@ -673,7 +718,9 @@ class FinancialReportService
             ->map(function (array $row) {
                 $credit = (float) $row['credit'];
                 $debit = (float) $row['debit'];
-                $days = $row['last_date'] ? now()->startOfDay()->diffInDays($row['last_date']) : 0;
+                $days = $row['last_date']
+                    ? (int) abs(now()->startOfDay()->diffInDays($row['last_date']))
+                    : 0;
 
                 return [
                     'party_id' => $row['party']->id,
@@ -2569,8 +2616,8 @@ class FinancialReportService
         $partyCount = 0;
 
         foreach ($rows as $row) {
-            $amount = (float) ($row['balance'] ?? 0);
-            if ($amount <= 0) {
+            $amount = abs((float) ($row['balance'] ?? 0));
+            if ($amount < 0.00001) {
                 continue;
             }
 

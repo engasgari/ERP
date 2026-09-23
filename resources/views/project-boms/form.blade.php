@@ -44,7 +44,7 @@
                     </label>
                     <label class="grid gap-1 text-sm font-bold text-slate-600">
                         تاریخ اثرگذاری
-                        <input name="effective_date" inputmode="numeric" dir="ltr" placeholder="1403/03/17" value="{{ jalaliDateInputValue(old('effective_date'), $bom->effective_date) }}" class="rounded-md border-slate-300">
+                        <x-erp.ui.jalali-date-input name="effective_date" :value="jalaliDateInputValue(old('effective_date'), $bom->effective_date)" placeholder="1403/03/17" class="w-full" />
                     </label>
                     <label class="grid gap-1 text-sm font-bold text-slate-600 md:col-span-4">
                         توضیحات

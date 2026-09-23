@@ -54,7 +54,12 @@ class ExecutiveDashboardRepository
     public function topDebtorCustomers(int $limit = 5): Collection
     {
         return $this->salesReports->aggregateByCustomer([])
-            ->filter(fn ($row) => (float) $row->outstanding_amount > 0)
+            ->map(function ($row) {
+                $row->outstanding_amount = abs((float) $row->outstanding_amount);
+
+                return $row;
+            })
+            ->filter(fn ($row) => (float) $row->outstanding_amount > 0.00001)
             ->sortByDesc('outstanding_amount')
             ->take($limit)
             ->map(fn ($row) => [

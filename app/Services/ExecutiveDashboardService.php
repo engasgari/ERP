@@ -55,7 +55,7 @@ class ExecutiveDashboardService
         if ($user->hasPermission('reports.sales.view') || $user->hasPermission('commerce.view')) {
             $currentSales = $this->salesReports->invoiceTotals($filters);
             $previousSales = $this->salesReports->invoiceTotals($previousFilters);
-            $receivables = $this->salesReports->receivableSummary($filters);
+            $receivables = $this->salesReports->receivableSummary([]);
 
             $salesGrowth = ExecutiveDashboardPeriod::growthPercent(
                 (float) $currentSales['total_amount'],
@@ -118,13 +118,16 @@ class ExecutiveDashboardService
                 route('sales-reports.show', array_merge(['report' => 'sales'], $filters)),
             );
 
-            $kpis[] = $this->kpi(
-                'receivables',
-                'مطالبات',
-                (float) $receivables['total_receivables'],
-                'money',
-                null,
-                route('sales-reports.show', ['report' => 'receivables']),
+            $kpis[] = array_merge(
+                $this->kpi(
+                    'receivables',
+                    'مطالبات',
+                    (float) $receivables['total_receivables'],
+                    'money',
+                    null,
+                    null,
+                ),
+                ['alpine_click' => 'openReceivables()'],
             );
 
             $kpis[] = $this->kpi(
@@ -168,22 +171,28 @@ class ExecutiveDashboardService
                 'bank_accounts' => $liquidity['bank_rows'],
             ];
 
-            $kpis[] = $this->kpi(
-                'liquidity',
-                'نقد و بانک',
-                $liquidity['total'],
-                'money',
-                null,
-                route('financial-reports.index'),
+            $kpis[] = array_merge(
+                $this->kpi(
+                    'liquidity',
+                    'نقد و بانک',
+                    $liquidity['total'],
+                    'money',
+                    null,
+                    null,
+                ),
+                ['alpine_click' => 'openLiquidity()'],
             );
 
-            $kpis[] = $this->kpi(
-                'payables',
-                'بدهی تأمین‌کنندگان',
-                (float) $payables['total_payables'],
-                'money',
-                null,
-                route('financial-reports.show', ['report' => 'accounts-payable-aging']),
+            $kpis[] = array_merge(
+                $this->kpi(
+                    'payables',
+                    'بدهی تأمین‌کنندگان',
+                    (float) $payables['total_payables'],
+                    'money',
+                    null,
+                    null,
+                ),
+                ['alpine_click' => 'openPayables()'],
             );
 
             if ($payables['overdue'] > 0) {

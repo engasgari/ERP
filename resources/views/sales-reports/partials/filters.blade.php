@@ -16,10 +16,10 @@
             </select>
         </label>
         <label class="text-sm font-bold text-slate-700">از تاریخ
-            <input type="text" name="date_from" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}" class="mt-1 w-full rounded-lg border-slate-300">
+            <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from') ? jalaliDateInputValue(request('date_from')) : ''" placeholder="1403/01/01" class="mt-1 w-full" />
         </label>
         <label class="text-sm font-bold text-slate-700">تا تاریخ
-            <input type="text" name="date_to" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}" class="mt-1 w-full rounded-lg border-slate-300">
+            <x-erp.ui.jalali-date-input name="date_to" :value="request('date_to') ? jalaliDateInputValue(request('date_to')) : ''" placeholder="1403/12/29" class="mt-1 w-full" />
         </label>
         <label class="text-sm font-bold text-slate-700">سال مالی
             <select name="fiscal_year_id" class="mt-1 w-full rounded-lg border-slate-300">

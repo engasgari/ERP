@@ -76,9 +76,14 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                             <div>
                                 <label for="work_date" class="block text-sm font-medium text-gray-700 mb-2">تاریخ کار *</label>
-                                <input type="text" id="work_date" name="work_date" inputmode="numeric" dir="ltr" placeholder="1403/03/17" required
-                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('work_date') border-red-500 @enderror"
-                                       value="{{ jalaliDateInputValue(old('work_date'), $workLog->work_date) }}">
+                                <x-erp.ui.jalali-date-input
+                                    id="work_date"
+                                    name="work_date"
+                                    :value="jalaliDateInputValue(old('work_date'), $workLog->work_date)"
+                                    placeholder="1403/03/17"
+                                    required
+                                    class="w-full"
+                                />
                                 @error('work_date')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                 @enderror

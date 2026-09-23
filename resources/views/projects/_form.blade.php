@@ -56,12 +56,12 @@
 
         <label class="grid gap-1 text-sm font-bold text-slate-600">
             تاریخ شروع
-            <input name="start_date" inputmode="numeric" dir="ltr" placeholder="1403/03/17" value="{{ jalaliDateInputValue(old('start_date'), $project->start_date) }}" class="rounded-md border-slate-300">
+            <x-erp.ui.jalali-date-input name="start_date" :value="jalaliDateInputValue(old('start_date'), $project->start_date)" placeholder="1403/03/17" class="w-full" />
         </label>
 
         <label class="grid gap-1 text-sm font-bold text-slate-600">
             تاریخ پایان
-            <input name="end_date" inputmode="numeric" dir="ltr" placeholder="1403/03/17" value="{{ jalaliDateInputValue(old('end_date'), $project->end_date) }}" class="rounded-md border-slate-300">
+            <x-erp.ui.jalali-date-input name="end_date" :value="jalaliDateInputValue(old('end_date'), $project->end_date)" placeholder="1403/03/17" class="w-full" />
         </label>
 
         <label class="grid gap-1 text-sm font-bold text-slate-600">

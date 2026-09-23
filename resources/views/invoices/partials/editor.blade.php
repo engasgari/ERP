@@ -89,7 +89,7 @@
                 </label>
                 <label>
                     تاریخ
-                    <input name="invoice_date" type="text" inputmode="numeric" dir="ltr" data-jalali-datepicker required placeholder="1403/03/17" value="{{ $invoiceDateValue }}">
+                    <x-erp.ui.jalali-date-input name="invoice_date" :value="$invoiceDateValue" required placeholder="1403/03/17" class="w-full" />
                 </label>
                 <label class="invoice-party-field">
                     {{ $partyLabel }}

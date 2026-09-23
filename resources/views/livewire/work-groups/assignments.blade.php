@@ -32,13 +32,13 @@
 
             <label class="block">
                 <span class="text-sm font-medium text-slate-700">شروع</span>
-                <input wire:model="start_date" placeholder="1404/04/01" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                <x-erp.ui.jalali-date-input wire:model="start_date" placeholder="1404/04/01" class="mt-1 w-full" />
                 @error('start_date') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
             </label>
 
             <label class="block">
                 <span class="text-sm font-medium text-slate-700">پایان</span>
-                <input wire:model="end_date" placeholder="برای تخصیص فعال خالی بگذارید" class="mt-1 w-full rounded-md border-gray-300 text-right">
+                <x-erp.ui.jalali-date-input wire:model="end_date" placeholder="1404/04/01" class="mt-1 w-full" />
                 @error('end_date') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
             </label>
 

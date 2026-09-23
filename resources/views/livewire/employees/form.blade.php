@@ -58,10 +58,10 @@
                         </select>
                     </label>
                     <label class="erp-filter-field">تاریخ استخدام *
-                        <input wire:model="form.hire_date" dir="ltr" placeholder="1403/01/01">
+                        <x-erp.ui.jalali-date-input wire:model="form.hire_date" placeholder="1403/01/01" class="w-full" />
                     </label>
                     <label class="erp-filter-field">تاریخ پایان همکاری
-                        <input wire:model="form.termination_date" dir="ltr" placeholder="1403/12/29">
+                        <x-erp.ui.jalali-date-input wire:model="form.termination_date" placeholder="1403/12/29" class="w-full" />
                     </label>
                     <label class="erp-filter-field">شماره بیمه
                         <input wire:model="form.insurance_number" dir="ltr">

@@ -45,10 +45,10 @@
                     <input type="text" name="title" value="{{ old('title', $editingYear?->title) }}" placeholder="مثلاً دوره مالی ۱۴۰۵">
                 </label>
                 <label class="erp-filter-field">تاریخ شروع
-                    <input type="text" name="start_date" value="{{ old('start_date', $editingYear ? gregorianToJalaliDate($editingYear->start_date) : '') }}" inputmode="numeric" dir="ltr" placeholder="1405/01/01" required>
+                    <x-erp.ui.jalali-date-input name="start_date" :value="old('start_date', $editingYear ? gregorianToJalaliDate($editingYear->start_date) : '')" placeholder="1405/01/01" required class="w-full" />
                 </label>
                 <label class="erp-filter-field">تاریخ پایان
-                    <input type="text" name="end_date" value="{{ old('end_date', $editingYear ? gregorianToJalaliDate($editingYear->end_date) : '') }}" inputmode="numeric" dir="ltr" placeholder="1405/12/29" required>
+                    <x-erp.ui.jalali-date-input name="end_date" :value="old('end_date', $editingYear ? gregorianToJalaliDate($editingYear->end_date) : '')" placeholder="1405/12/29" required class="w-full" />
                 </label>
                 <label class="erp-filter-field">واحد پول
                     <input type="text" name="currency" value="{{ old('currency', $editingYear?->currency ?: 'IRR') }}">

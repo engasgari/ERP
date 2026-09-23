@@ -27,7 +27,7 @@
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">تاریخ پرداخت</span>
-                    <input wire:model="paymentDate" type="text" class="mt-1 w-full rounded-md border-gray-300 text-right" placeholder="1404/06/01">
+                    <x-erp.ui.jalali-date-input wire:model="paymentDate" placeholder="1404/06/01" class="mt-1 w-full" />
                 </label>
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">روش پرداخت</span>

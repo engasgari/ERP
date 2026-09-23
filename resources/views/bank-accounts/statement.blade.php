@@ -38,10 +38,10 @@
             <form method="get" class="erp-ui-filter-bar mt-5">
                 <div class="erp-filter-row bank-statement-filter-row">
                     <label class="erp-filter-field">از تاریخ
-                        <input type="text" name="date_from" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}" inputmode="numeric" dir="ltr" placeholder="1404/08/01">
+                        <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from') ? jalaliDateInputValue(request('date_from')) : ''" placeholder="1404/08/01" class="w-full" />
                     </label>
                     <label class="erp-filter-field">تا تاریخ
-                        <input type="text" name="date_to" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}" inputmode="numeric" dir="ltr" placeholder="1404/08/30">
+                        <x-erp.ui.jalali-date-input name="date_to" :value="request('date_to') ? jalaliDateInputValue(request('date_to')) : ''" placeholder="1404/08/30" class="w-full" />
                     </label>
                     <label class="erp-filter-field">جستجو
                         <input type="text" name="search" value="{{ request('search') }}" placeholder="شماره سند، شرح، طرف حساب">

@@ -52,10 +52,10 @@
             </div>
             <div class="erp-filter-row erp-filter-row-5">
                 <label class="erp-filter-field">از تاریخ
-                    <input wire:model.live.debounce.500ms="start_date" inputmode="numeric" dir="ltr" placeholder="1404/01/01">
+                    <x-erp.ui.jalali-date-input wire:model.live.debounce.500ms="start_date" placeholder="1404/01/01" class="w-full" />
                 </label>
                 <label class="erp-filter-field">تا تاریخ
-                    <input wire:model.live.debounce.500ms="end_date" inputmode="numeric" dir="ltr" placeholder="1404/12/29">
+                    <x-erp.ui.jalali-date-input wire:model.live.debounce.500ms="end_date" placeholder="1404/12/29" class="w-full" />
                 </label>
                 <label class="erp-filter-field">مبلغ از
                     <input wire:model.live.debounce.500ms="amount_min" inputmode="numeric" dir="ltr" placeholder="0">

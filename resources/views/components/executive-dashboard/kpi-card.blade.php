@@ -11,6 +11,8 @@
     $delta = $kpi['delta_percent'] ?? null;
     $direction = $kpi['delta_direction'] ?? 'flat';
     $url = $kpi['url'] ?? null;
+    $action = $kpi['action'] ?? null;
+    $alpineClick = $kpi['alpine_click'] ?? null;
     $key = $kpi['key'] ?? 'default';
     $deltaClass = match ($direction) {
         'up' => 'exec-kpi-card__delta--up',
@@ -18,18 +20,36 @@
         default => 'exec-kpi-card__delta--flat',
     };
     $staggerMs = max(0, (int) $stagger) * 85;
+    $cardClass = 'exec-kpi-card exec-kpi-card--'.$key.' exec-animate-kpi';
+    if ($url || $action || $alpineClick) {
+        $cardClass .= ' exec-kpi-card--link';
+    }
 @endphp
 
-@if($url)
+@if($alpineClick)
+    <button
+        type="button"
+        @click="{{ $alpineClick }}"
+        class="{{ $cardClass }}"
+        style="--exec-stagger: {{ $staggerMs }}ms"
+    >
+@elseif($action)
+    <button
+        type="button"
+        wire:click="{{ $action }}"
+        class="{{ $cardClass }}"
+        style="--exec-stagger: {{ $staggerMs }}ms"
+    >
+@elseif($url)
     <a
         href="{{ $url }}"
         wire:navigate
-        class="exec-kpi-card exec-kpi-card--{{ $key }} exec-kpi-card--link exec-animate-kpi"
+        class="{{ $cardClass }}"
         style="--exec-stagger: {{ $staggerMs }}ms"
     >
 @else
     <article
-        class="exec-kpi-card exec-kpi-card--{{ $key }} exec-animate-kpi"
+        class="{{ $cardClass }}"
         style="--exec-stagger: {{ $staggerMs }}ms"
     >
 @endif
@@ -57,7 +77,9 @@
             <span class="exec-kpi-card__delta-period">دوره قبل</span>
         </div>
     @endif
-@if($url)
+@if($alpineClick || $action)
+    </button>
+@elseif($url)
     </a>
 @else
     </article>

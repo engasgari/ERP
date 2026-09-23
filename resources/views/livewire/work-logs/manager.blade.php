@@ -129,36 +129,11 @@
             padding: 0;
             margin: 0;
         }
-        .worklog-page .worklog-date-wrap {
-            position: relative;
-            display: block;
-            width: 100%;
-        }
-        .worklog-page .worklog-date-wrap .worklog-inline {
-            padding-left: 0.2rem;
-            padding-right: 1.35rem;
-        }
-        .worklog-page .worklog-date-trigger {
-            position: absolute;
-            right: 0;
-            top: 0;
-            bottom: 0;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.25rem;
-            padding: 0;
-            border: 0;
-            background: transparent;
-            color: #64748b;
-            cursor: pointer;
-        }
-        .worklog-page .worklog-date-trigger:hover {
-            color: #0f766e;
-        }
-        .worklog-page .worklog-date-trigger svg {
-            width: 0.8rem;
-            height: 0.8rem;
+        .worklog-page .worklog-inline.erp-jalali-date-input,
+        .worklog-page .worklog-inline[data-jalali-datepicker] {
+            direction: ltr;
+            text-align: left;
+            min-width: 6.75rem;
         }
         .worklog-page .worklog-code {
             min-width: 5.5rem;
@@ -453,31 +428,18 @@
                             </select>
                         </td>
                         <td>
-                            <div class="worklog-date-wrap">
-                                <input
-                                    type="text"
-                                    class="worklog-inline worklog-ltr"
-                                    value="{{ $dateFa }}"
-                                    dir="ltr"
-                                    inputmode="numeric"
-                                    autocomplete="off"
-                                    data-jalali-datepicker
-                                    placeholder="۱۴۰۳/۰۱/۰۱"
-                                    wire:change="updateField({{ $workLog->id }}, 'work_date', $event.target.value)"
-                                >
-                                <button
-                                    type="button"
-                                    tabindex="-1"
-                                    data-jalali-datepicker-trigger
-                                    class="worklog-date-trigger"
-                                    title="انتخاب از تقویم شمسی"
-                                    aria-label="باز کردن تقویم شمسی"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                        <path fill-rule="evenodd" d="M6 2a1 1 0 0 1 1 1v1h6V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1Zm11 7H3v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9Z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <input
+                                type="text"
+                                class="worklog-inline worklog-ltr erp-jalali-date-input"
+                                value="{{ $dateFa }}"
+                                dir="ltr"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                data-jalali-datepicker
+                                placeholder="1403/01/01"
+                                title="سال/ماه/روز — با کلیک تقویم شمسی باز می‌شود"
+                                wire:change="updateField({{ $workLog->id }}, 'work_date', $event.target.value)"
+                            >
                         </td>
                         <td>
                             <input

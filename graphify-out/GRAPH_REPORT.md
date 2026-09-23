@@ -1,16 +1,16 @@
-# Graph Report - ERP  (2026-09-22)
+# Graph Report - ERP  (2026-09-23)
 
 ## Corpus Check
-- 1546 files · ~863,198 words
+- 1370 files · ~754,705 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5923 nodes · 11679 edges · 1245 communities (1029 shown, 216 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 512 edges (avg confidence: 0.8)
+- 5753 nodes · 11694 edges · 1053 communities (854 shown, 199 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 513 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d2b39b44`
+- Built from commit: `e845d9ad`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -64,7 +64,6 @@
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
-- [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_Accounting Engine|Accounting Engine]]
 - [[_COMMUNITY_Financial Reports|Financial Reports]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
@@ -90,6 +89,7 @@
 - [[_COMMUNITY_Financial Reports|Financial Reports]]
 - [[_COMMUNITY_Community 73|Community 73]]
 - [[_COMMUNITY_Financial Reports|Financial Reports]]
+- [[_COMMUNITY_Commerce Invoicing|Commerce Invoicing]]
 - [[_COMMUNITY_Community 76|Community 76]]
 - [[_COMMUNITY_Community 77|Community 77]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
@@ -123,6 +123,7 @@
 - [[_COMMUNITY_Inventory Warehouse|Inventory Warehouse]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Financial Reports|Financial Reports]]
+- [[_COMMUNITY_HR Workforce|HR Workforce]]
 - [[_COMMUNITY_Community 110|Community 110]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Community 112|Community 112]]
@@ -217,6 +218,8 @@
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Community 218|Community 218]]
+- [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
+- [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Community 274|Community 274]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Community 278|Community 278]]
@@ -227,7 +230,6 @@
 - [[_COMMUNITY_Financial Reports|Financial Reports]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
-- [[_COMMUNITY_Community 321|Community 321]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
 - [[_COMMUNITY_Livewire UI Layer|Livewire UI Layer]]
@@ -273,6 +275,7 @@
 - [[_COMMUNITY_Community 406|Community 406]]
 - [[_COMMUNITY_Community 407|Community 407]]
 - [[_COMMUNITY_Community 408|Community 408]]
+- [[_COMMUNITY_Community 409|Community 409]]
 - [[_COMMUNITY_Community 410|Community 410]]
 - [[_COMMUNITY_Community 411|Community 411]]
 - [[_COMMUNITY_Community 412|Community 412]]
@@ -292,6 +295,7 @@
 - [[_COMMUNITY_Community 426|Community 426]]
 - [[_COMMUNITY_Community 427|Community 427]]
 - [[_COMMUNITY_Community 428|Community 428]]
+- [[_COMMUNITY_Community 429|Community 429]]
 - [[_COMMUNITY_Community 430|Community 430]]
 - [[_COMMUNITY_Community 431|Community 431]]
 - [[_COMMUNITY_Community 432|Community 432]]
@@ -313,10 +317,8 @@
 - [[_COMMUNITY_Community 460|Community 460]]
 - [[_COMMUNITY_Community 461|Community 461]]
 - [[_COMMUNITY_Community 462|Community 462]]
-- [[_COMMUNITY_Community 472|Community 472]]
 - [[_COMMUNITY_Community 502|Community 502]]
 - [[_COMMUNITY_Community 510|Community 510]]
-- [[_COMMUNITY_Community 512|Community 512]]
 - [[_COMMUNITY_Community 514|Community 514]]
 - [[_COMMUNITY_Community 530|Community 530]]
 - [[_COMMUNITY_Community 554|Community 554]]
@@ -335,11 +337,8 @@
 - [[_COMMUNITY_Community 825|Community 825]]
 - [[_COMMUNITY_Community 828|Community 828]]
 - [[_COMMUNITY_Community 832|Community 832]]
-- [[_COMMUNITY_Community 834|Community 834]]
-- [[_COMMUNITY_Community 839|Community 839]]
 - [[_COMMUNITY_Community 855|Community 855]]
 - [[_COMMUNITY_Community 856|Community 856]]
-- [[_COMMUNITY_Community 867|Community 867]]
 - [[_COMMUNITY_Community 875|Community 875]]
 - [[_COMMUNITY_Community 876|Community 876]]
 - [[_COMMUNITY_Community 877|Community 877]]
@@ -362,6 +361,7 @@
 - [[_COMMUNITY_Community 921|Community 921]]
 - [[_COMMUNITY_Community 922|Community 922]]
 - [[_COMMUNITY_Community 923|Community 923]]
+- [[_COMMUNITY_Community 932|Community 932]]
 - [[_COMMUNITY_Community 933|Community 933]]
 - [[_COMMUNITY_Community 934|Community 934]]
 - [[_COMMUNITY_Community 935|Community 935]]
@@ -372,34 +372,23 @@
 - [[_COMMUNITY_Community 977|Community 977]]
 - [[_COMMUNITY_Community 1010|Community 1010]]
 - [[_COMMUNITY_Community 1016|Community 1016]]
-- [[_COMMUNITY_Community 1037|Community 1037]]
 - [[_COMMUNITY_Community 1038|Community 1038]]
-- [[_COMMUNITY_Community 1040|Community 1040]]
-- [[_COMMUNITY_Community 1041|Community 1041]]
 - [[_COMMUNITY_Community 1044|Community 1044]]
 - [[_COMMUNITY_Community 1045|Community 1045]]
-- [[_COMMUNITY_Community 1073|Community 1073]]
-- [[_COMMUNITY_Community 1074|Community 1074]]
 - [[_COMMUNITY_Community 1080|Community 1080]]
-- [[_COMMUNITY_Community 1100|Community 1100]]
 - [[_COMMUNITY_Community 1103|Community 1103]]
 - [[_COMMUNITY_Community 1105|Community 1105]]
-- [[_COMMUNITY_Community 1107|Community 1107]]
 - [[_COMMUNITY_Community 1114|Community 1114]]
 - [[_COMMUNITY_Community 1115|Community 1115]]
 - [[_COMMUNITY_Community 1116|Community 1116]]
 - [[_COMMUNITY_Community 1117|Community 1117]]
 - [[_COMMUNITY_Community 1129|Community 1129]]
-- [[_COMMUNITY_Community 1146|Community 1146]]
 - [[_COMMUNITY_Community 1159|Community 1159]]
-- [[_COMMUNITY_Community 1180|Community 1180]]
 - [[_COMMUNITY_Community 1181|Community 1181]]
-- [[_COMMUNITY_Community 1182|Community 1182]]
 - [[_COMMUNITY_Community 1185|Community 1185]]
 - [[_COMMUNITY_Community 1188|Community 1188]]
-- [[_COMMUNITY_Community 1194|Community 1194]]
+- [[_COMMUNITY_Community 1198|Community 1198]]
 - [[_COMMUNITY_Community 1204|Community 1204]]
-- [[_COMMUNITY_Community 1215|Community 1215]]
 - [[_COMMUNITY_Community 1216|Community 1216]]
 - [[_COMMUNITY_Community 1219|Community 1219]]
 - [[_COMMUNITY_Community 1220|Community 1220]]
@@ -409,12 +398,8 @@
 - [[_COMMUNITY_Community 1224|Community 1224]]
 - [[_COMMUNITY_Community 1225|Community 1225]]
 - [[_COMMUNITY_Community 1226|Community 1226]]
-- [[_COMMUNITY_Community 1234|Community 1234]]
 - [[_COMMUNITY_Community 1235|Community 1235]]
-- [[_COMMUNITY_Community 1236|Community 1236]]
-- [[_COMMUNITY_Community 1240|Community 1240]]
 - [[_COMMUNITY_Community 1241|Community 1241]]
-- [[_COMMUNITY_Community 1243|Community 1243]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `User` - 260 edges
@@ -422,7 +407,7 @@
 3. `Party` - 158 edges
 4. `Invoice` - 149 edges
 5. `Project` - 139 edges
-6. `FinancialReportService` - 132 edges
+6. `FinancialReportService` - 133 edges
 7. `AccountingDocument` - 128 edges
 8. `Opportunity` - 101 edges
 9. `ChartAccount` - 100 edges
@@ -443,11 +428,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (1245 total, 216 thin omitted)
+## Communities (1053 total, 199 thin omitted)
+
+### Community 0 - "Treasury Banking"
+Cohesion: 0.09
+Nodes (3): gregorianToJalaliDate(), FinancialReportService, FinancialReportContext
 
 ### Community 1 - "Accounting Engine"
-Cohesion: 0.05
-Nodes (12): opportunityFormOptions(), CrmLeadRepository, CrmLeadService, CrmReportRepository, Lead, LeadConversionService, LeadSource, Index (+4 more)
+Cohesion: 0.06
+Nodes (11): CrmLeadRepository, CrmLeadService, CrmModel, CrmReportRepository, Lead, LeadConversionService, LeadSource, Index (+3 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.06
@@ -455,103 +444,107 @@ Nodes (5): B, gn, remove(), un, z
 
 ### Community 4 - "HR Payroll Attendance"
 Cohesion: 0.03
-Nodes (12): BelongsTo, AttendanceCalculation, AttendanceSummary, BomLine, EmploymentOrderLine, InsurancePaymentLine, InventoryDocumentLine, InvoiceContractorAllocation (+4 more)
+Nodes (10): BelongsTo, AttendanceCalculation, AttendanceSummary, BomLine, EmploymentOrderLine, InsurancePaymentLine, InventoryDocumentLine, InvoiceContractorAllocation (+2 more)
 
 ### Community 5 - "HR Workforce"
-Cohesion: 0.08
-Nodes (17): formatJalaliDateSafe(), jalaliMonthRangeGregorianSafe(), jalaliToGregorianDateSafe(), SeedOfficeWorkLogs1404MehrEsfand, SeedOfficeWorkLogs1405FarKhordadTeam, SeedOfficeWorkLogs1405FarOrdib, CalculatorShamsiSeeder, NewAttendancePayrollWorkflowSeeder (+9 more)
+Cohesion: 0.06
+Nodes (11): jalaliToGregorianDateSafe(), SeedOfficeWorkLogs1404MehrEsfand, SeedOfficeWorkLogs1405FarKhordadTeam, SeedOfficeWorkLogs1405FarOrdib, CalculatorShamsiSeeder, WorkShift, self, Breadcrumb (+3 more)
 
 ### Community 6 - "HTTP Controllers"
-Cohesion: 0.10
-Nodes (7): formatMoney(), DashboardController, ManagementReportController, ReportCenterController, Request, ManagementReportService, View
+Cohesion: 0.08
+Nodes (10): formatMoney(), DashboardController, InsurancePaymentController, ManagementReportController, NumberingSettingController, ReportCenterController, Request, ManagementReportService (+2 more)
+
+### Community 9 - "HR Payroll Attendance"
+Cohesion: 0.15
+Nodes (6): formatJalaliDateSafe(), getCurrentPersianMonth(), getCurrentPersianYear(), Calculations, Summaries, WithPagination
 
 ### Community 10 - "Treasury Banking"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (6): Index, Contact, CrmContactRepository, CrmContactService, CrmRelationGuardService, CrmRemovalResult
 
 ### Community 11 - "Community 11"
 Cohesion: 0.08
 Nodes (33): P(), S(), at(), b(), be(), ce(), e(), Ee() (+25 more)
 
+### Community 12 - "HR Payroll Attendance"
+Cohesion: 0.18
+Nodes (3): MigrateTreasuryPaymentsToFinancialExpenses, ReclassifyTreasuryPaymentsAsProjectExpense, ProjectCostingService
+
 ### Community 13 - "HR Payroll Attendance"
-Cohesion: 0.13
-Nodes (6): WorkGroupController, WorkGroup, WorkGroupEmployee, RequiredWorkingTimeService, WorkGroupAssignmentService, Assignments
+Cohesion: 0.05
+Nodes (12): getPersianMonthName(), Command, AssignActiveEmployeeWorkLogsByYear, AuditErpUiFramework, PurgeEmployeeAttendanceYear, RemoveContractorPayrollFromProject, ReopenPayrollPeriods, RepairBankLedgerDetails (+4 more)
 
 ### Community 14 - "HR Payroll Attendance"
-Cohesion: 0.10
-Nodes (13): CompleteWonOpportunityTasks, closeTaskModal(), openTaskModal(), parseTaskDueAt(), resetTaskForm(), saveTask(), taskFormOptions(), CrmModel (+5 more)
+Cohesion: 0.08
+Nodes (12): CompleteWonOpportunityTasks, closeTaskModal(), openTaskModal(), parseTaskDueAt(), resetTaskForm(), saveTask(), taskFormOptions(), CrmTaskService (+4 more)
 
 ### Community 15 - "HR Payroll Attendance"
-Cohesion: 0.06
-Nodes (7): LoginRequest, PartnerCurrentAccountController, SalesReportController, FormRequest, SalesReportRequest, StorePartnerCurrentAccountTransferRequest, SalesReportService
+Cohesion: 0.05
+Nodes (9): LoginRequest, PartnerCurrentAccountController, SalesReportController, FormRequest, ProfileUpdateRequest, SalesReportRequest, StoreAccountingDocumentRequest, StorePartnerCurrentAccountTransferRequest (+1 more)
 
 ### Community 16 - "Livewire UI Layer"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (11): ensureErpDeleteConfirm(), ERP_FLASH_TIMEOUTS, filterSearchSelectOptions(), handleErpDeleteSubmit(), jalaliMonthNames, jalaliWeekdays, money(), normalizeSearchText() (+3 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.16
 Nodes (28): ae(), ce(), D(), de(), ee(), Gt(), He(), I() (+20 more)
 
-### Community 18 - "HR Workforce"
-Cohesion: 0.06
-Nodes (9): PartyController, CrmPartyMatchRepository, PartyCreationService, Party, PartyType, Index, BusinessCoreSeeder, PartnerShareholdersSeeder (+1 more)
+### Community 19 - "Inventory Warehouse"
+Cohesion: 0.16
+Nodes (3): Index, ContractorServicePurchaseRepository, ContractorServicePurchaseService
 
 ### Community 20 - "Inventory Warehouse"
-Cohesion: 0.05
-Nodes (10): persianNumberToWords(), WorkLogExcelController, DOMDocument, DOMElement, InvoiceExcelTemplateService, SimpleXMLElement, StreamedResponse, SimpleXlsxExporter (+2 more)
+Cohesion: 0.07
+Nodes (8): persianNumberToWords(), DOMDocument, DOMElement, InvoiceExcelTemplateService, StreamedResponse, SimpleXlsxExporter, TaxElectronicBooksExcelExporter, ZipArchive
 
 ### Community 22 - "Financial Reports"
-Cohesion: 0.12
-Nodes (5): down(), up(), InsurancePayment, PayrollAccountingSetting, InsurancePaymentService
+Cohesion: 0.08
+Nodes (3): InsurancePayment, MorphMany, InsurancePaymentService
 
 ### Community 23 - "Accounting Engine"
-Cohesion: 0.10
-Nodes (6): UserFactory, Factory, self, static, Breadcrumb, Result
+Cohesion: 0.16
+Nodes (16): closeOpportunityModal(), closeQuickContactModal(), closeQuickCustomerModal(), normalizeOpportunityMoneyFields(), openOpportunityCreate(), openOpportunityEdit(), openQuickContactModal(), openQuickCustomerModal() (+8 more)
 
 ### Community 24 - "Treasury Banking"
 Cohesion: 0.07
-Nodes (5): EmployeeDocument, Job, Position, MorphMany, SoftDeletes
+Nodes (5): RepairInvoiceDocuments, AccountingDocumentController, AccountingDocument, AccountingDocumentPolicy, AccountingDocumentRepository
 
 ### Community 25 - "Treasury Banking"
 Cohesion: 0.04
-Nodes (5): Pipeline, HasMany, HasOne, OrganizationUnit, MorphOne
+Nodes (5): Pipeline, HasMany, Job, OrganizationUnit, Position
 
 ### Community 26 - "Inventory Warehouse"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (4): F(), hi, removeDataAttribute(), setDataAttribute()
 
 ### Community 28 - "Treasury Banking"
-Cohesion: 0.07
-Nodes (8): BaseRepository, CrmAuditService, HasFactory, Model, CostCenter, PayrollImportLog, ProjectCostSnapshot, EmployeeHistoryService
+Cohesion: 0.05
+Nodes (12): BaseRepository, BelongsToMany, CrmAuditService, Tag, HasFactory, Model, CostCenter, EmployeeDocument (+4 more)
 
 ### Community 29 - "HR Payroll Attendance"
 Cohesion: 0.19
 Nodes (14): dispatchSearchSelectValueEvents(), erpMoneyRawValue(), extractJalaliTimeSuffix(), formatErpMoneyInput(), formatJalaliDateInput(), formatJalaliDateTimeInput(), isJalaliDateTimeInput(), normalizeDigits() (+6 more)
 
 ### Community 30 - "HR Payroll Attendance"
-Cohesion: 0.10
-Nodes (4): CrmCustomerRepository, LengthAwarePaginator, EmploymentOrderRepository, InvoiceRepository
+Cohesion: 0.09
+Nodes (8): Builder, CrmCustomerRepository, CrmScopeService, CrmSoldDeviceRepository, CrmTaskRepository, LengthAwarePaginator, InvoiceRepository, Index
 
 ### Community 32 - "Community 32"
 Cohesion: 0.14
 Nodes (4): pt, trigger(), W, U()
 
 ### Community 33 - "HR Payroll Attendance"
-Cohesion: 0.08
-Nodes (4): InvoiceController, CrmProformaController, Invoice, AccountingDocumentService
+Cohesion: 0.05
+Nodes (9): CompanySettingController, InvoiceController, CrmCustomerInvoiceController, CrmProformaController, CompanySetting, Invoice, PdfDocument, AccountingDocumentService (+1 more)
 
 ### Community 34 - "Treasury Banking"
-Cohesion: 0.16
-Nodes (3): InsuranceLiability, InsurancePeriod, InsuranceLiabilityService
-
-### Community 35 - "Accounting Engine"
-Cohesion: 0.13
-Nodes (3): Index, CrmActivityRepository, CrmTaskRepository
+Cohesion: 0.11
+Nodes (4): Periods, InsuranceLiability, InsurancePeriod, InsuranceLiabilityService
 
 ### Community 36 - "HR Payroll Attendance"
-Cohesion: 0.17
-Nodes (9): convertToPersian(), erp_report_url(), erp_with_return_to(), formatJalaliDateTime(), formatNumber(), formatQuantity(), getPersianDate(), getPersianMonthRange() (+1 more)
+Cohesion: 0.10
+Nodes (12): convertToPersian(), erp_report_url(), erp_with_return_to(), formatJalaliDateTime(), formatNumber(), formatQuantity(), getPersianDate(), getPersianMonthRange() (+4 more)
 
 ### Community 37 - "HR Payroll Attendance"
 Cohesion: 0.07
@@ -570,24 +563,32 @@ Cohesion: 0.14
 Nodes (4): Carbon, SeedActiveOrderWorkLogs1405FarMordad, CrmBusinessHoursService, AttendanceDayCalculatorService
 
 ### Community 42 - "Inventory Warehouse"
-Cohesion: 0.10
-Nodes (3): RepairInvoiceDocuments, AccountingDocument, AccountingDocumentPolicy
+Cohesion: 0.26
+Nodes (3): BaseController, CrmAttachmentController, JsonResponse
+
+### Community 44 - "HR Payroll Attendance"
+Cohesion: 0.08
+Nodes (7): WorkGroupController, WorkGroup, WorkGroupEmployee, RequiredWorkingTimeService, WorkGroupAssignmentService, Assignments, Index
 
 ### Community 46 - "HR Payroll Attendance"
 Cohesion: 0.13
 Nodes (8): Ai, focusableChildren(), L(), N(), off(), on(), one(), x()
 
 ### Community 47 - "HR Payroll Attendance"
-Cohesion: 0.05
-Nodes (20): AuthenticatedSessionController, ConfirmablePasswordController, EmailVerificationNotificationController, EmailVerificationPromptController, NewPasswordController, PasswordController, PasswordResetLinkController, RegisteredUserController (+12 more)
+Cohesion: 0.06
+Nodes (18): AuthenticatedSessionController, ConfirmablePasswordController, EmailVerificationNotificationController, EmailVerificationPromptController, NewPasswordController, PasswordController, PasswordResetLinkController, RegisteredUserController (+10 more)
 
 ### Community 48 - "HR Payroll Attendance"
-Cohesion: 0.10
-Nodes (5): Index, normalizeJalaliFilterDate(), Index, Index, BaseListPage
+Cohesion: 0.09
+Nodes (6): Index, normalizeJalaliFilterDate(), Index, Index, Index, BaseListPage
 
 ### Community 50 - "Accounting Engine"
-Cohesion: 0.14
-Nodes (5): Collection, PayrollLineBasisCalculator, AttendanceDailyDetailRepository, ContractorServicePurchaseRepository, TaxElectronicBooksWorkbookService
+Cohesion: 0.20
+Nodes (3): Intelligence, AISalesAnalyticsService, SalesDashboardService
+
+### Community 51 - "Financial Reports"
+Cohesion: 0.11
+Nodes (3): CrmSoldDeviceService, SoldDevice, Index
 
 ### Community 52 - "Livewire UI Layer"
 Cohesion: 0.11
@@ -598,60 +599,44 @@ Cohesion: 0.21
 Nodes (6): getDataAttributes(), xn, Yi(), A(), O(), R()
 
 ### Community 55 - "Database Schema"
-Cohesion: 0.10
-Nodes (4): InventoryDocumentController, Index, InventoryDocument, RelatedDocumentDeletionService
+Cohesion: 0.12
+Nodes (3): InventoryDocumentController, InventoryDocument, RelatedDocumentDeletionService
 
 ### Community 56 - "Community 56"
-Cohesion: 0.10
-Nodes (5): Leaves, SelfService, AttendanceLeave, LeaveBalance, LeaveManagementService
+Cohesion: 0.14
+Nodes (3): Leaves, AttendanceLeave, LeaveManagementService
 
 ### Community 57 - "Community 57"
-Cohesion: 0.08
-Nodes (8): updatedFormPipelineId(), CrmOpportunityService, CrmPipelineWorkflowService, CrmProformaAccessService, CrmProformaInvoiceService, Opportunity, PipelineStage, Kanban
+Cohesion: 0.06
+Nodes (14): deleteOpportunity(), opportunityFormOptions(), reopenFromWon(), CrmOpportunityRepository, CrmOpportunityService, CrmPipelineWorkflowService, CrmProformaInvoiceService, Opportunity (+6 more)
 
 ### Community 58 - "HR Payroll Attendance"
 Cohesion: 0.25
 Nodes (7): Architecture, Employment Order Rules (احکام کارگزینی), Forbidden, Purpose, Salary Items, Status Flow, UI
 
 ### Community 60 - "Treasury Banking"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (3): Activity, Audit, CrmTimelineService
 
-### Community 62 - "Inventory Warehouse"
-Cohesion: 0.10
-Nodes (6): AttendancePrerequisiteException, PayrollPrerequisiteException, Index, Item, RuntimeException, InventoryPostingService
-
 ### Community 64 - "HR Workforce"
-Cohesion: 0.07
-Nodes (14): EmploymentOrder, InsuranceRecord, MonthlyAttendance, PayrollAccountingEntry, PayrollCalculation, PayrollItem, PayrollPeriod, Payslip (+6 more)
-
-### Community 66 - "HTTP Controllers"
-Cohesion: 0.14
-Nodes (4): Builder, CrmScopeService, PartyStatementGuard, FinancialReportRepository
+Cohesion: 0.05
+Nodes (15): PayslipController, EmploymentOrder, InsuranceRecord, MonthlyAttendance, PayrollAccountingEntry, PayrollAudit, PayrollItem, PayrollPayment (+7 more)
 
 ### Community 67 - "HR Workforce"
-Cohesion: 0.24
-Nodes (3): BaseController, CrmAttachmentController, JsonResponse
+Cohesion: 0.27
+Nodes (4): FinancialReportExport, UsersExport, FromCollection, WithHeadings
 
 ### Community 69 - "Financial Reports"
 Cohesion: 0.42
 Nodes (9): backfillFiscalYearCounters(), backfillFiscalYearIds(), down(), dropUniqueIndexIfExists(), indexExists(), maxSequenceForYear(), replaceDocumentNumberUniques(), restoreDocumentNumberUniques() (+1 more)
 
 ### Community 70 - "Treasury Banking"
-Cohesion: 0.13
-Nodes (3): Missions, AttendanceMission, MissionManagementService
-
-### Community 72 - "Financial Reports"
-Cohesion: 0.06
-Nodes (10): Command, AssignActiveEmployeeWorkLogsByYear, AuditErpUiFramework, PurgeEmployeeAttendanceYear, ReassignProjectFiscalYearCosts, RemoveContractorPayrollFromProject, ReopenPayrollPeriods, WorkLogController (+2 more)
+Cohesion: 0.10
+Nodes (4): Missions, AttendanceMission, LeaveBalance, MissionManagementService
 
 ### Community 73 - "Community 73"
-Cohesion: 0.11
-Nodes (5): NumberingSettingController, FiscalYearNumberingCounter, NumberingSetting, NumberingService, NumberingSettingService
-
-### Community 74 - "Financial Reports"
-Cohesion: 0.27
-Nodes (4): FinancialReportExport, UsersExport, FromCollection, WithHeadings
+Cohesion: 0.06
+Nodes (11): PartyController, UserFactory, Factory, FiscalYearNumberingCounter, NumberingSetting, PartyType, BusinessCoreSeeder, PartnerShareholdersSeeder (+3 more)
 
 ### Community 77 - "Community 77"
 Cohesion: 0.22
@@ -666,12 +651,12 @@ Cohesion: 0.22
 Nodes (9): scripts, dev, post-autoload-dump, post-create-project-cmd, post-root-package-install, post-update-cmd, pre-package-uninstall, setup (+1 more)
 
 ### Community 80 - "HR Workforce"
-Cohesion: 0.09
-Nodes (6): Note, AccountingAttachment, AccountingAudit, EmployeeHistory, PayrollAudit, MorphTo
+Cohesion: 0.10
+Nodes (4): AccountingAttachment, AccountingAudit, EmployeeHistory, MorphTo
 
 ### Community 81 - "HTTP Controllers"
-Cohesion: 0.07
-Nodes (5): EmployeeController, InsuranceExemptionResolver, Employee, EmploymentContractResolver, NewAttendanceEngineService
+Cohesion: 0.06
+Nodes (6): EmployeeController, InsuranceExemptionResolver, Employee, AttendanceDailyDetailRepository, EmployeeHistoryService, EmploymentContractResolver
 
 ### Community 82 - "Database Schema"
 Cohesion: 0.39
@@ -694,8 +679,8 @@ Cohesion: 0.11
 Nodes (18): Can Void, Draft, Soft-Deleted, Reversed, or Generated Documents Enter?, Customer Statement Balance Bug Health Check, Customer / supplier statement, Executive Summary, Filters used, Findings, How the Statement Currently Finds Ledger Lines, Manual accounting documents (+10 more)
 
 ### Community 89 - "Community 89"
-Cohesion: 0.12
-Nodes (5): BaseDTO, BaseService, EmploymentOrderLineDTO, EmploymentOrderSummaryDTO, EmploymentOrderCalculationService
+Cohesion: 0.14
+Nodes (4): BaseDTO, EmploymentOrderLineDTO, EmploymentOrderSummaryDTO, EmploymentOrderCalculationService
 
 ### Community 90 - "HR Workforce"
 Cohesion: 0.11
@@ -718,8 +703,8 @@ Cohesion: 0.33
 Nodes (6): autoload, files, psr-4, App\\, Database\\Factories\\, Database\\Seeders\\
 
 ### Community 97 - "HTTP Controllers"
-Cohesion: 0.11
-Nodes (3): WarehouseController, MeasurementUnit, Warehouse
+Cohesion: 0.09
+Nodes (4): WarehouseController, MeasurementUnit, Warehouse, Index
 
 ### Community 99 - "Treasury Banking"
 Cohesion: 0.33
@@ -758,8 +743,8 @@ Cohesion: 0.53
 Nodes (4): addIndexes(), safeIndex(), seedPermissions(), up()
 
 ### Community 110 - "Community 110"
-Cohesion: 0.18
-Nodes (4): jalaliDateInputValue(), moneyInputValue(), openOpportunityEdit(), Form
+Cohesion: 0.14
+Nodes (7): jalaliDateInputValue(), jalaliToGregorianDate(), jalaliToGregorianDateTime(), normalizeMoneyValue(), normalizePersianDigits(), Form, SelfService
 
 ### Community 111 - "Livewire UI Layer"
 Cohesion: 0.25
@@ -770,8 +755,8 @@ Cohesion: 0.60
 Nodes (3): UsersImport, ToModel, WithHeadingRow
 
 ### Community 113 - "HR Workforce"
-Cohesion: 0.06
-Nodes (10): Index, Index, ResetsPaginationOnFilterChange, Index, BaseReportPage, Index, WithPagination, Index (+2 more)
+Cohesion: 0.07
+Nodes (6): Index, Index, Index, ResetsPaginationOnFilterChange, Index, Index
 
 ### Community 114 - "Livewire UI Layer"
 Cohesion: 0.50
@@ -826,44 +811,48 @@ Cohesion: 0.12
 Nodes (15): closeConvertModal, closeLeadDetail, convert, deleteLead({{ $lead->id }}), openConvert({{ $detailLead->id }}), openConvert({{ $lead->id }}), openEdit({{ $detailLead->id }}), openEdit({{ $lead->id }}) (+7 more)
 
 ### Community 136 - "Community 136"
-Cohesion: 0.08
-Nodes (8): BelongsToMany, AccessRoleController, Permission, Role, AppServiceProvider, AccessControlSeeder, CrmSeeder, ServiceProvider
+Cohesion: 0.05
+Nodes (11): AccessRoleController, AccessUserController, ComprehensiveDemoSeeder, Permission, Role, AppServiceProvider, Index, AccessControlSeeder (+3 more)
 
 ### Community 140 - "Community 140"
-Cohesion: 0.09
-Nodes (18): closeOpportunityModal(), closeQuickContactModal(), closeQuickCustomerModal(), deleteOpportunity(), normalizeOpportunityMoneyFields(), openOpportunityCreate(), openQuickContactModal(), openQuickCustomerModal() (+10 more)
+Cohesion: 0.15
+Nodes (4): Index, CrmActivityRepository, CrmActivityService, ManagesCrmActivities
 
 ### Community 144 - "Community 144"
-Cohesion: 0.06
-Nodes (8): MergeContractorIntoEmployeeParties, MergeParties, SplitEmployeeContractorParties, AccountingDocumentLine, PaymentVoucher, ReceiptVoucher, TreasuryTransaction, TreasuryService
+Cohesion: 0.33
+Nodes (3): down(), up(), PayrollAccountingSetting
 
 ### Community 146 - "Commerce Invoicing"
-Cohesion: 0.17
-Nodes (13): bind(), bindErpSearchSelect(), findBySelectId(), getSelectBindingKey(), observeLookupMirrorDisabledState(), parseNativeSelectOptions(), refreshFromSelect(), releaseErpSearchSelect() (+5 more)
+Cohesion: 0.15
+Nodes (14): bind(), bindErpSearchSelect(), findBySelectId(), getSelectBindingKey(), observeLookupMirrorDisabledState(), parseNativeSelectOptions(), refreshFromSelect(), releaseErpSearchSelect() (+6 more)
 
 ### Community 149 - "Inventory Warehouse"
 Cohesion: 0.33
 Nodes (5): clearFilters, closeModal, delete({{ $document->id }}), show({{ $document->id }}), showFull({{ $document->id }})
+
+### Community 150 - "Treasury Banking"
+Cohesion: 0.13
+Nodes (3): Collection, PayrollLineBasisCalculator, TaxElectronicBooksWorkbookService
 
 ### Community 151 - "HR Workforce"
 Cohesion: 0.12
 Nodes (16): 10) `app/Services/AccountingPostingService.php::replaceLines`, 1) `app/Services/TreasuryService.php::deleteAccountingDocument`, 2) `app/Services/ProjectDeletionService.php` accounting deletion helpers, 3) `app/Services/PayrollCalculationService.php::deletePeriod`, 4) `app/Services/FiscalPeriodService.php::removeGeneratedClosingArtifacts`, 5) `app/Services/RelatedDocumentDeletionService.php::deleteInventoryDocumentWithRelated`, 6) `app/Http/Controllers/InvoiceController.php::deleteDownstreamDocuments`, 7) `app/Services/AccountingPostingService.php::deleteFinancialTransactionDocument` (+8 more)
 
 ### Community 154 - "HR Payroll Attendance"
-Cohesion: 0.06
-Nodes (8): Index, CrmActivityService, CrmCustomerService, CustomerProfile, Show, ManagesCrmActivities, ManagesCrmOpportunities, Index
+Cohesion: 0.09
+Nodes (7): CrmCustomerCascadeService, CrmCustomerService, CrmPartyMatchRepository, CustomerProfile, Note, Party, SoftDeletes
 
 ### Community 155 - "HR Payroll Attendance"
-Cohesion: 0.06
-Nodes (7): Index, BankAccountController, ChartAccountController, FinancialTransactionController, PayrollAccountingSettingController, ChartAccount, FinancialTransaction
+Cohesion: 0.05
+Nodes (9): Index, BankAccountController, ChartAccountController, FinancialTransactionController, BankAccount, Cashbox, ChartAccount, FinancialTransaction (+1 more)
 
 ### Community 156 - "HR Payroll Attendance"
 Cohesion: 0.12
 Nodes (15): Buttons, Colors, Components, Dark Mode, Empty State, Forms, Icons, Layout (+7 more)
 
 ### Community 160 - "Treasury Banking"
-Cohesion: 0.05
-Nodes (19): BaseLivewire, Component, AppLayout, GuestLayout, Index, Index, Index, BaseActionMenu (+11 more)
+Cohesion: 0.04
+Nodes (20): BaseLivewire, Component, AppLayout, GuestLayout, Index, TopNavigation, Index, BaseActionMenu (+12 more)
 
 ### Community 162 - "Accounting Engine"
 Cohesion: 0.25
@@ -877,24 +866,20 @@ Nodes (9): bulkAssignProject({{ $projectItem->id }}), closeBulkProjectModal, clo
 Cohesion: 0.33
 Nodes (5): cancelEdit, livewire.partials.flash, startEdit({{ $calculation->id }}), saveEdit(false), saveEdit(true)
 
-### Community 218 - "Community 218"
-Cohesion: 0.10
-Nodes (5): CompanySettingController, CrmCustomerInvoiceController, CompanySetting, PdfDocument, PersianPdf
-
 ### Community 274 - "Community 274"
 Cohesion: 0.24
 Nodes (11): changeJalaliMonth(), isGregorianLeap(), isJalaliLeapYear(), jalaliMonthLength(), jalaliToGregorian(), jalaliWeekday(), parseJalaliDate(), positionJalaliPicker() (+3 more)
 
 ### Community 278 - "Community 278"
-Cohesion: 0.17
-Nodes (4): CarbonInterface, FiscalPeriod, FiscalPeriodPolicy, FiscalPeriodValidator
+Cohesion: 0.11
+Nodes (5): CarbonInterface, FiscalPeriod, FiscalPeriodPolicy, FiscalPeriodService, FiscalPeriodValidator
 
 ### Community 294 - "Financial Reports"
 Cohesion: 0.25
 Nodes (7): Case: بیمه کوثر / SI-00064, COGS unit cost priority (products only), Currency, Gross profit (SalesProfitCalculationService), Invoice math (InvoiceCalculationService), Non-goals of this layer, Sales Profit Rules (Audit 2026-09-16)
 
 ### Community 323 - "Livewire UI Layer"
-Cohesion: 0.16
+Cohesion: 0.19
 Nodes (4): deleteCrmAttachment(), Attachment, CrmAttachmentService, UploadedFile
 
 ### Community 324 - "Livewire UI Layer"
@@ -975,7 +960,7 @@ Nodes (9): Bank, Bank Transfer, Cashbox, Cheques, Forbidden, Payment, Receipt, R
 
 ### Community 391 - "Community 391"
 Cohesion: 0.12
-Nodes (3): FiscalPeriodController, FiscalYear, FiscalPeriodService
+Nodes (3): FiscalPeriodController, FiscalYear, SalesReportFilters
 
 ### Community 392 - "Community 392"
 Cohesion: 0.22
@@ -1122,16 +1107,16 @@ Cohesion: 0.25
 Nodes (7): complete({{ $task->id }}), openEdit({{ $task->id }}), clearFilters, closeTaskModal, livewire.crm.partials.task-form, openCreate, storeTask
 
 ### Community 457 - "Community 457"
-Cohesion: 0.33
-Nodes (6): bindAll(), enableErpLookupSelects(), enableErpSearchSelects(), resolveSearchSelectOptions(), syncGlobalSearchSelectOptionSources(), syncLookupMirrorStates()
+Cohesion: 0.43
+Nodes (7): bindAll(), enableErpAutoFilters(), enableErpLookupSelects(), enableErpSearchSelects(), erpDomRoot(), syncGlobalSearchSelectOptionSources(), syncLookupMirrorStates()
 
-### Community 512 - "Community 512"
-Cohesion: 0.16
-Nodes (5): jalaliToGregorianDate(), jalaliToGregorianDateTime(), normalizeMoneyValue(), normalizePersianDigits(), Index
+### Community 615 - "Community 615"
+Cohesion: 0.07
+Nodes (5): todayJalaliDate(), EmploymentOrderController, Index, IranLaborEmploymentOrderCatalog, EmploymentOrderService
 
 ### Community 616 - "Community 616"
-Cohesion: 0.21
-Nodes (3): getPersianMonthName(), Intelligence, SalesDashboardService
+Cohesion: 0.16
+Nodes (3): Executive, DashboardShortcutService, ExecutiveDashboardService
 
 ### Community 644 - "Community 644"
 Cohesion: 0.29
@@ -1158,48 +1143,56 @@ Cohesion: 0.29
 Nodes (6): openEdit({{ $device->id }}), remove({{ $device->id }}), clearFilters, closeModal, openCreate, save
 
 ### Community 1010 - "Community 1010"
-Cohesion: 0.03
-Nodes (17): Authenticatable, AccessUserController, CrmCustomerInvoiceAccessService, CrmReportService, ComprehensiveDemoSeeder, User, Notifiable, EmploymentContractPolicy (+9 more)
+Cohesion: 0.04
+Nodes (14): Authenticatable, CrmCustomerInvoiceAccessService, CrmDashboardService, CrmProformaAccessService, CrmReportService, User, EmploymentContractPolicy, EmploymentOrderPolicy (+6 more)
 
 ### Community 1038 - "Community 1038"
-Cohesion: 0.12
-Nodes (8): Closure, EnsureActiveApp, EnsureFiscalPeriodDatesAreValid, EnsureUserHasPermission, HandleBreadcrumbContext, Response, WithinActiveFiscalPeriod, ValidationRule
-
-### Community 1041 - "Community 1041"
-Cohesion: 0.14
-Nodes (4): Index, RepairBankLedgerDetails, BankAccount, BankAccountCodingService
+Cohesion: 0.10
+Nodes (9): Closure, ExcelController, EnsureActiveApp, EnsureFiscalPeriodDatesAreValid, EnsureUserHasPermission, HandleBreadcrumbContext, Response, WithinActiveFiscalPeriod (+1 more)
 
 ### Community 1129 - "Community 1129"
 Cohesion: 0.33
 Nodes (9): jalaliDateTimeInputValue(), afterActivitySaved(), closeActivityModal(), openActivityEdit(), openActivityModal(), parseActivityDueAt(), resetActivityForm(), saveActivity() (+1 more)
+
+### Community 1181 - "Community 1181"
+Cohesion: 0.12
+Nodes (6): AttendancePrerequisiteException, PayrollPrerequisiteException, InvoiceLine, Item, RuntimeException, ItemSalePriceService
 
 ### Community 1185 - "Community 1185"
 Cohesion: 0.60
 Nodes (3): migrateEmployeesToParties(), seedPermissions(), up()
 
 ### Community 1216 - "Community 1216"
-Cohesion: 0.19
-Nodes (4): getCurrentPersianMonth(), getCurrentPersianYear(), Calculations, Summaries
+Cohesion: 0.06
+Nodes (6): HasOne, PayrollCalculation, MorphOne, Payments, Periods, PayrollAdjustmentService
+
+### Community 1219 - "Community 1219"
+Cohesion: 0.09
+Nodes (9): WorkCalendarController, NewAttendancePayrollWorkflowSeeder, WorkCalendar, Seeder, DatabaseSeeder, SmallBusinessHrSeeder, StandardPayrollSeeder, WorkCalendarSeeder (+1 more)
+
+### Community 1241 - "Community 1241"
+Cohesion: 0.06
+Nodes (10): MergeContractorIntoEmployeeParties, MergeParties, SplitEmployeeContractorParties, AccountingDocumentLine, PaymentVoucher, ReceiptVoucher, TreasuryTransaction, TreasuryRepository (+2 more)
 
 ## Knowledge Gaps
-- **853 isolated node(s):** `@mimo-ai/plugin`, `$schema`, `name`, `type`, `description` (+848 more)
+- **854 isolated node(s):** `@mimo-ai/plugin`, `$schema`, `name`, `type`, `description` (+849 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **216 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **199 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `User` connect `Community 1010` to `Accounting Engine`, `HR Payroll Attendance`, `Community 391`, `Community 135`, `Projects Manufacturing`, `Treasury Banking`, `Community 136`, `Community 140`, `HR Payroll Attendance`, `HR Workforce`, `Inventory Warehouse`, `Community 278`, `Treasury Banking`, `Treasury Banking`, `HR Payroll Attendance`, `Treasury Banking`, `Community 1181`, `HR Payroll Attendance`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Accounting Engine`, `Inventory Warehouse`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Financial Reports`, `Community 57`, `Treasury Banking`, `Treasury Banking`, `HR Workforce`, `HTTP Controllers`, `Livewire UI Layer`, `Financial Reports`, `HR Workforce`, `Community 1107`, `Community 1240`, `Community 867`, `Community 616`, `Community 112`, `HR Workforce`?**
+- **Why does `User` connect `Community 1010` to `Accounting Engine`, `Community 135`, `Community 136`, `Treasury Banking`, `HR Payroll Attendance`, `Community 140`, `HR Payroll Attendance`, `Community 1038`, `HR Payroll Attendance`, `Inventory Warehouse`, `Community 278`, `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `HR Payroll Attendance`, `Community 932`, `Community 934`, `HR Payroll Attendance`, `Accounting Engine`, `Financial Reports`, `Community 57`, `Treasury Banking`, `HR Workforce`, `Community 1216`, `Livewire UI Layer`, `HR Workforce`, `Community 1219`, `Community 616`, `Community 112`, `HR Workforce`?**
   _High betweenness centrality (0.071) - this node is a cross-community bridge._
-- **Why does `Party` connect `HR Workforce` to `Accounting Engine`, `HR Workforce`, `Community 135`, `Projects Manufacturing`, `Treasury Banking`, `Community 140`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Community 144`, `Inventory Warehouse`, `Inventory Warehouse`, `Community 1045`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Treasury Banking`, `Treasury Banking`, `HR Payroll Attendance`, `Accounting Engine`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Community 1185`, `Accounting Engine`, `Inventory Warehouse`, `HR Payroll Attendance`, `Accounting Engine`, `Financial Reports`, `Accounting Engine`, `Community 57`, `Treasury Banking`, `Treasury Banking`, `Inventory Warehouse`, `HR Workforce`, `HTTP Controllers`, `Livewire UI Layer`, `Community 839`, `Financial Reports`, `HR Workforce`, `Community 1235`, `HR Payroll Attendance`, `Community 110`, `Community 1010`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
-- **Why does `ChartAccount` connect `HR Payroll Attendance` to `Treasury Banking`, `HR Payroll Attendance`, `Community 391`, `Community 144`, `Community 1041`, `HR Workforce`, `Community 1045`, `Financial Reports`, `Community 278`, `HR Payroll Attendance`, `Treasury Banking`, `Treasury Banking`, `Community 1180`, `Community 1181`, `Accounting Engine`, `HR Payroll Attendance`, `Accounting Engine`, `Accounting Engine`, `Inventory Warehouse`, `Community 1215`, `HR Workforce`, `HR Payroll Attendance`, `HTTP Controllers`, `Community 839`, `Financial Reports`, `Community 1107`, `Community 1010`, `Community 1146`?**
-  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `Party` connect `HR Payroll Attendance` to `Accounting Engine`, `HR Workforce`, `Community 135`, `Community 136`, `Projects Manufacturing`, `Treasury Banking`, `Community 140`, `HR Payroll Attendance`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Inventory Warehouse`, `Inventory Warehouse`, `Community 1045`, `Accounting Engine`, `Treasury Banking`, `Treasury Banking`, `HR Payroll Attendance`, `Treasury Banking`, `HR Payroll Attendance`, `Accounting Engine`, `HR Payroll Attendance`, `Community 1185`, `Inventory Warehouse`, `HR Payroll Attendance`, `Financial Reports`, `Community 57`, `Treasury Banking`, `Inventory Warehouse`, `HR Workforce`, `Community 1216`, `HTTP Controllers`, `Livewire UI Layer`, `Community 1219`, `Community 73`, `Financial Reports`, `Community 1235`, `Community 1241`, `HR Payroll Attendance`, `Community 110`, `Community 1010`?**
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
+- **Why does `ChartAccount` connect `HR Payroll Attendance` to `Treasury Banking`, `HR Payroll Attendance`, `Community 391`, `Community 136`, `Projects Manufacturing`, `HR Payroll Attendance`, `Community 144`, `Community 1045`, `Treasury Banking`, `Treasury Banking`, `Community 409`, `HR Payroll Attendance`, `Treasury Banking`, `Treasury Banking`, `Accounting Engine`, `Community 429`, `HR Payroll Attendance`, `Inventory Warehouse`, `HR Workforce`, `HR Payroll Attendance`, `HTTP Controllers`, `Community 73`, `Community 1241`, `Community 91`, `Community 502`?**
+  _High betweenness centrality (0.032) - this node is a cross-community bridge._
 - **What connects `@mimo-ai/plugin`, `$schema`, `name` to the rest of the system?**
-  _853 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _854 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Treasury Banking` be split into smaller, more focused modules?**
-  _Cohesion score 0.12156862745098039 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08581752484191509 - nodes in this community are weakly interconnected._
 - **Should `Accounting Engine` be split into smaller, more focused modules?**
-  _Cohesion score 0.054563492063492064 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06328320802005012 - nodes in this community are weakly interconnected._
 - **Should `Treasury Banking` be split into smaller, more focused modules?**
   _Cohesion score 0.10144927536231885 - nodes in this community are weakly interconnected._

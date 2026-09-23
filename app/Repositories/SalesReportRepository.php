@@ -277,12 +277,18 @@ class SalesReportRepository
 
     public function receivableSummary(array $filters): array
     {
-        $today = Carbon::today();
+        $today = Carbon::today()->startOfDay();
 
-        $rows = $this->baseInvoiceQuery($filters)
+        // مطالبات باز همیشه بدون محدودیت بازه زمانی داشبورد محاسبه می‌شود.
+        $openFilters = collect($filters)
+            ->except(['date_from', 'date_to', 'date_preset', 'fiscal_year_id'])
+            ->all();
+
+        $rows = $this->baseInvoiceQuery($openFilters)
             ->where('status', 'confirmed')
             ->whereNull('settled_at')
-            ->get(['id', 'invoice_date', 'total_amount']);
+            ->with(['party:id,name'])
+            ->get(['id', 'party_id', 'invoice_date', 'total_amount']);
 
         $buckets = [
             'current' => 0.0,
@@ -292,11 +298,15 @@ class SalesReportRepository
             'over_90' => 0.0,
         ];
 
+        $parties = [];
+
         foreach ($rows as $invoice) {
-            $days = $invoice->invoice_date
-                ? $today->diffInDays($invoice->invoice_date->copy()->startOfDay())
-                : 0;
-            $amount = (float) $invoice->total_amount;
+            $days = 0;
+            if ($invoice->invoice_date) {
+                $days = (int) abs($today->diffInDays($invoice->invoice_date->copy()->startOfDay()));
+            }
+
+            $amount = abs((float) $invoice->total_amount);
 
             if ($days <= 0) {
                 $buckets['current'] += $amount;
@@ -309,9 +319,32 @@ class SalesReportRepository
             } else {
                 $buckets['over_90'] += $amount;
             }
+
+            $partyId = (int) ($invoice->party_id ?? 0);
+            if ($partyId <= 0) {
+                continue;
+            }
+
+            if (! isset($parties[$partyId])) {
+                $parties[$partyId] = [
+                    'party_id' => $partyId,
+                    'party_name' => (string) ($invoice->party?->name ?: '—'),
+                    'outstanding_amount' => 0.0,
+                    'invoice_count' => 0,
+                    'days' => 0,
+                ];
+            }
+
+            $parties[$partyId]['outstanding_amount'] += $amount;
+            $parties[$partyId]['invoice_count']++;
+            $parties[$partyId]['days'] = max((int) $parties[$partyId]['days'], $days);
         }
 
         $total = array_sum($buckets);
+        $partyRows = collect($parties)
+            ->sortByDesc('outstanding_amount')
+            ->values()
+            ->all();
 
         return [
             'total_receivables' => $total,
@@ -320,6 +353,7 @@ class SalesReportRepository
             'over_90' => $buckets['over_90'],
             'invoice_count' => $rows->count(),
             'buckets' => $buckets,
+            'parties' => $partyRows,
         ];
     }
 

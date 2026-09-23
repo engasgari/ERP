@@ -42,11 +42,11 @@
             </div>
             <div>
                 <label class="mb-1 block text-xs text-slate-600">از تاریخ (جلالی)</label>
-                <input type="text" name="date_from" value="{{ request('date_from') }}" class="w-full rounded border-slate-300 text-sm" placeholder="1405/01/01" dir="ltr">
+                <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from')" placeholder="1405/01/01" class="w-full" />
             </div>
             <div>
                 <label class="mb-1 block text-xs text-slate-600">تا تاریخ (جلالی)</label>
-                <input type="text" name="date_to" value="{{ request('date_to') }}" class="w-full rounded border-slate-300 text-sm" placeholder="1405/02/31" dir="ltr">
+                <x-erp.ui.jalali-date-input name="date_to" :value="request('date_to')" placeholder="1405/02/31" class="w-full" />
             </div>
             <div class="flex items-end gap-4 md:col-span-2">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700">

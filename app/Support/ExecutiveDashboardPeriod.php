@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Carbon\Carbon;
+use Hekmatinasser\Verta\Verta;
 
 class ExecutiveDashboardPeriod
 {
@@ -34,17 +35,54 @@ class ExecutiveDashboardPeriod
             ];
         }
 
+        if ($preset === 'today') {
+            $today = Carbon::today()->toDateString();
+
+            return [
+                'preset' => 'today',
+                'label' => self::PRESETS['today'],
+                'date_from' => $today,
+                'date_to' => $today,
+            ];
+        }
+
+        if ($preset === 'this_week') {
+            $from = Carbon::today()->startOfWeek(Carbon::SATURDAY);
+            $to = $from->copy()->addDays(6);
+
+            return [
+                'preset' => 'this_week',
+                'label' => self::PRESETS['this_week'],
+                'date_from' => $from->toDateString(),
+                'date_to' => $to->toDateString(),
+            ];
+        }
+
+        if ($preset === 'this_month') {
+            $now = Verta::now();
+            $range = getPersianMonthRange((int) $now->year, (int) $now->month);
+
+            return [
+                'preset' => 'this_month',
+                'label' => self::PRESETS['this_month'],
+                'date_from' => $range['start']->toDateString(),
+                'date_to' => $range['end']->toDateString(),
+            ];
+        }
+
         if ($preset === 'this_quarter') {
-            $today = Carbon::today();
-            $month = (int) $today->month;
-            $quarterStartMonth = (int) (floor(($month - 1) / 3) * 3 + 1);
-            $from = $today->copy()->month($quarterStartMonth)->startOfMonth();
+            $now = Verta::now();
+            $month = (int) $now->month;
+            $seasonStartMonth = (int) (floor(($month - 1) / 3) * 3 + 1);
+            $seasonEndMonth = $seasonStartMonth + 2;
+            $from = getPersianMonthRange((int) $now->year, $seasonStartMonth)['start'];
+            $to = getPersianMonthRange((int) $now->year, $seasonEndMonth)['end'];
 
             return [
                 'preset' => 'this_quarter',
                 'label' => self::PRESETS['this_quarter'],
                 'date_from' => $from->toDateString(),
-                'date_to' => $today->toDateString(),
+                'date_to' => $to->toDateString(),
             ];
         }
 
@@ -59,14 +97,13 @@ class ExecutiveDashboardPeriod
             ];
         }
 
-        $range = SalesReportFilters::resolvePreset($preset);
         $today = Carbon::today();
 
         return [
             'preset' => $preset,
             'label' => self::PRESETS[$preset] ?? $preset,
-            'date_from' => $range['date_from'] ?? $today->toDateString(),
-            'date_to' => $range['date_to'] ?? $today->toDateString(),
+            'date_from' => $today->toDateString(),
+            'date_to' => $today->toDateString(),
         ];
     }
 

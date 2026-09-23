@@ -160,7 +160,7 @@ body {
 .erp-shell main a.btn,
 .erp-shell main button.btn,
 .erp-shell main button[type="submit"],
-.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]),
+.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]):not(.exec-kpi-card):not(.exec-liquidity-tile):not(.erp-modal-close),
 .erp-shell main input[type="submit"],
 .erp-shell main a.inline-flex[class*="px-"],
 .erp-shell main a.inline-block[class*="px-"] {
@@ -190,7 +190,7 @@ body {
 .erp-shell main button[class*="bg-"]:hover,
 .erp-shell main .btn:hover,
 .erp-shell main button[type="submit"]:hover,
-.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]):hover,
+.erp-shell main button[type="button"]:not(.line-remove):not([aria-label]):not(.exec-kpi-card):not(.exec-liquidity-tile):not(.erp-modal-close):hover,
 .erp-shell main input[type="submit"]:hover,
 .erp-shell main a.inline-flex[class*="px-"]:hover,
 .erp-shell main a.inline-block[class*="px-"]:hover {

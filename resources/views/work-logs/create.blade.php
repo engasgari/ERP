@@ -53,9 +53,14 @@
                         <!-- انتخاب تاریخ -->
                         <div class="mb-6 max-w-xs mx-auto">
                             <label for="work_date" class="block text-sm font-medium text-gray-700 mb-2">تاریخ *</label>
-                            <input type="text" id="work_date" name="work_date" inputmode="numeric" dir="ltr" placeholder="1403/03/17" required
-                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 @error('work_date') border-red-500 @enderror"
-                                   value="{{ old('work_date') ? jalaliDateInputValue(old('work_date')) : todayJalaliDate() }}">
+                            <x-erp.ui.jalali-date-input
+                                id="work_date"
+                                name="work_date"
+                                :value="old('work_date') ? jalaliDateInputValue(old('work_date')) : todayJalaliDate()"
+                                placeholder="1403/03/17"
+                                required
+                                class="w-full"
+                            />
                             @error('work_date')
                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror

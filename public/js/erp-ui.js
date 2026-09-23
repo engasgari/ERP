@@ -67,13 +67,24 @@ function isErpDateField(input) {
         return false;
     }
 
+    if (input.type === 'time' || input.type === 'datetime-local' || input.type === 'month' || input.type === 'week') {
+        return false;
+    }
+
     if (input.dataset.jalaliReady === '1' || input.dataset.jalaliDatepicker === '1' || input.hasAttribute('data-jalali-datepicker')) {
         return true;
     }
 
     const haystack = erpInputBindingHaystack(input);
+    const compact = haystack.replace(/[^a-z0-9]+/g, '');
 
-    return /(^|[\[\]_.-])(date|date_from|date_to|start_date|end_date|document_date|transaction_date|invoice_date|work_date|effective_date|planned_start_date|planned_end_date|actual_start_date|actual_end_date|leave_date|mission_date|payment_date|hire_date|termination_date|issued_at|expires_at|start_date_fa|end_date_fa|from_date|to_date|period_date|due_date|delivery_date|due_at|expected_close_date|close_date|sold_at)(?=$|[\s\[\]_.-])/i.test(haystack);
+    if (!compact || /(candidate|validate|invalidate|mandate|updatedat|createdat)/.test(compact)) {
+        return false;
+    }
+
+    return /(^|[\[\]_.\s-])(date|date_from|date_to|start_date|end_date|document_date|transaction_date|invoice_date|work_date|effective_date|planned_start_date|planned_end_date|actual_start_date|actual_end_date|leave_date|mission_date|payment_date|hire_date|termination_date|issued_at|expires_at|start_date_fa|end_date_fa|from_date|to_date|period_date|due_date|delivery_date|due_at|expected_close_date|close_date|sold_at|leave_start_date|leave_end_date|mission_start_date|mission_end_date|paymentdate|startdatefa|enddatefa)(?=$|[\s\[\]_.-])/i.test(haystack)
+        || /(?:^|_)(?:\w*date(?:from|to|fa)?|date(?:from|to)?)\w*(?:_|$)/.test(`_${compact}_`)
+        || /(?:start|end|from|to|work|hire|due|close|sold|issue|expir|transaction|document|invoice|leave|mission|payment|birth|period|effective|planned|actual|delivery|expectedclose)date/.test(compact);
 }
 
 function jalaliDatePlaceholderFor(input) {
@@ -89,11 +100,14 @@ function jalaliDatePlaceholderFor(input) {
 
 function normalizeErpDateField(input) {
     input.dataset.jalaliReady = '1';
+    input.setAttribute('data-jalali-datepicker', '');
     input.setAttribute('autocomplete', 'off');
     input.setAttribute('inputmode', 'numeric');
     input.setAttribute('placeholder', input.getAttribute('placeholder') || jalaliDatePlaceholderFor(input));
+    input.setAttribute('title', input.getAttribute('title') || 'سال/ماه/روز — با کلیک تقویم شمسی باز می‌شود');
     input.dir = 'ltr';
     input.classList.add('erp-jalali-date-input');
+    input.classList.remove('text-right');
 }
 
 function isErpMoneyField(input) {
@@ -186,6 +200,7 @@ function erpMoneyRawValue(value) {
 function syncLivewireInput(input) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new Event('blur', { bubbles: true }));
 
     const componentEl = input.closest('[wire\\:id]');
 
@@ -318,35 +333,21 @@ function enableJalaliDatepickers() {
         });
 
         input.addEventListener('keydown', (event) => {
-            // Keep typing usable; only open calendar with Alt+ArrowDown / F4.
             if (event.key === 'F4' || (event.altKey && event.key === 'ArrowDown')) {
                 event.preventDefault();
                 showJalaliPicker(input);
             }
         });
 
-        input.addEventListener('click', () => showJalaliPicker(input));
+        // Click on the field opens the Jalali calendar; typing still works with YYYY/MM/DD mask.
+        input.addEventListener('click', () => {
+            showJalaliPicker(input);
+        });
     });
 
+    // Legacy calendar-icon triggers (if any remain in old markup).
     document.querySelectorAll('[data-jalali-datepicker-trigger]').forEach((trigger) => {
-        if (trigger.__erpJalaliTriggerBound) {
-            return;
-        }
-        trigger.__erpJalaliTriggerBound = true;
-
-        trigger.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const root = trigger.closest('div, label, td, .relative') || trigger.parentElement;
-            const input = root?.querySelector('input[data-jalali-datepicker], input.erp-jalali-date-input')
-                || trigger.previousElementSibling;
-
-            if (input && input.tagName === 'INPUT') {
-                input.focus({ preventScroll: true });
-                showJalaliPicker(input);
-            }
-        });
+        trigger.remove();
     });
 
     document.removeEventListener('click', handleJalaliOutsideClick);
@@ -703,7 +704,7 @@ function showJalaliPicker(input) {
 function handleJalaliOutsideClick(event) {
     const picker = document.querySelector('.erp-jalali-picker');
 
-    if (!picker || event.target.closest('.erp-jalali-picker') || event.target.closest('input[data-jalali-datepicker], input.erp-jalali-date-input, input[type="text"][name*="date"], input[type="text"][id*="date"], [data-jalali-datepicker-trigger]')) {
+    if (!picker || event.target.closest('.erp-jalali-picker') || event.target.closest('input[data-jalali-datepicker], input.erp-jalali-date-input, input[type="text"][name*="date"], input[type="text"][id*="date"]')) {
         return;
     }
 
@@ -844,10 +845,10 @@ function extractJalaliTimeSuffix(value) {
 }
 
 function setJalaliInputDate(input, year, month, day) {
-    const dateValue = `${year}/${pad2(month)}/${pad2(day)}`;
+    const dateValue = toPersianNumber(`${year}/${pad2(month)}/${pad2(day)}`);
     input.value = isJalaliDateTimeInput(input)
         ? `${dateValue}${extractJalaliTimeSuffix(input.value)}`
-        : toPersianNumber(dateValue);
+        : dateValue;
     syncJalaliInputWithLivewire(input);
 }
 
@@ -1886,17 +1887,23 @@ function bootstrapErpUiListeners() {
     document.addEventListener('DOMContentLoaded', enableJalaliDatepickers);
     document.addEventListener('DOMContentLoaded', enableErpDeleteConfirms);
     document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
+    document.addEventListener('DOMContentLoaded', bindErpShellObservers);
 
     document.addEventListener('livewire:init', () => {
         enableErpFlashMessages();
         enableLivewireValidationToasts();
         enableJalaliDatepickers();
         enableErpMoneyInputs();
+        bindLivewireJalaliHooks();
 
         if (window.Livewire?.hook && !window.__erpUiElementInitHookBound) {
             window.__erpUiElementInitHookBound = true;
             window.Livewire.hook('element.init', ({ el }) => {
                 enableErpSearchSelects(el);
+                if (el?.matches?.('input') || el?.querySelector?.('input')) {
+                    enableJalaliDatepickers();
+                    enableErpMoneyInputs();
+                }
             });
         }
     });
@@ -1911,41 +1918,72 @@ function bootstrapErpUiListeners() {
         enableJalaliDatepickers();
         enableErpDeleteConfirms();
         enableErpFlashMessages();
+        bindErpShellObservers();
     });
 
-    document.addEventListener('livewire:update', hydrateErpTables);
-
-    document.addEventListener('livewire:morphed', () => {
+    document.addEventListener('livewire:update', () => {
         hydrateErpTables();
-        enableErpSearchSelects();
-        enableErpMoneyInputs();
-        enableJalaliDatepickers();
-        enableErpDeleteConfirms();
-        enableErpFlashMessages();
+        window.requestAnimationFrame(() => {
+            enableJalaliDatepickers();
+            enableErpMoneyInputs();
+        });
+    });
+}
+
+function bindLivewireJalaliHooks() {
+    if (!window.Livewire?.hook || window.__erpJalaliLivewireHooksBound) {
+        return;
+    }
+
+    window.__erpJalaliLivewireHooksBound = true;
+
+    window.Livewire.hook('morphed', () => {
+        window.requestAnimationFrame(() => {
+            enableJalaliDatepickers();
+            enableErpMoneyInputs();
+            enableErpDeleteConfirms();
+            enableErpFlashMessages();
+            hydrateErpTables();
+            enableErpSearchSelects();
+        });
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const shell = document.querySelector('.erp-shell');
-
-        if (!shell || !window.MutationObserver || window.__erpUiShellObserversBound) {
-            return;
-        }
-
-        window.__erpUiShellObserversBound = true;
-
-        new MutationObserver(scheduleErpHydration).observe(shell, {
-            childList: true,
-            subtree: true,
+    window.Livewire.hook('commit', ({ succeed }) => {
+        succeed(() => {
+            window.requestAnimationFrame(() => {
+                enableJalaliDatepickers();
+                enableErpMoneyInputs();
+            });
         });
+    });
+}
 
-        new MutationObserver(() => {
+function bindErpShellObservers() {
+    const shell = document.querySelector('.erp-shell');
+
+    if (!shell || !window.MutationObserver || window.__erpUiShellObserversBound) {
+        return;
+    }
+
+    window.__erpUiShellObserversBound = true;
+
+    let jalaliTimer = null;
+
+    new MutationObserver(scheduleErpHydration).observe(shell, {
+        childList: true,
+        subtree: true,
+    });
+
+    new MutationObserver(() => {
+        window.clearTimeout(jalaliTimer);
+        jalaliTimer = window.setTimeout(() => {
             enableErpSearchSelects();
             enableErpMoneyInputs();
             enableJalaliDatepickers();
-        }).observe(shell, {
-            childList: true,
-            subtree: true,
-        });
+        }, 30);
+    }).observe(shell, {
+        childList: true,
+        subtree: true,
     });
 }
 
@@ -1961,4 +1999,8 @@ if (document.readyState !== 'loading') {
     enableJalaliDatepickers();
     enableErpDeleteConfirms();
     enableErpFlashMessages();
+    bindErpShellObservers();
+    if (window.Livewire) {
+        bindLivewireJalaliHooks();
+    }
 }

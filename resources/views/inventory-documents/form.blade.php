@@ -50,7 +50,7 @@
                 </select>
             </label>
             <label>تاریخ
-                <input name="document_date" type="text" inputmode="numeric" dir="ltr" data-jalali-datepicker value="{{ $documentDateValue }}" required class="w-full">
+                <x-erp.ui.jalali-date-input name="document_date" :value="$documentDateValue" required class="w-full" />
             </label>
             <label>ساعت ثبت
                 <input name="document_time" type="time" value="{{ old('document_time', $document->document_time ? \Illuminate\Support\Carbon::parse($document->document_time)->format('H:i') : now()->format('H:i')) }}" class="w-full">

@@ -18,10 +18,10 @@
         <form method="get" class="erp-ui-filter-bar">
             <div class="erp-filter-row erp-filter-row-3">
                 <label class="erp-filter-field">از تاریخ
-                    <input name="date_from" inputmode="numeric" dir="ltr" placeholder="1405/01/01" value="{{ request('date_from') ? jalaliDateInputValue(request('date_from')) : '' }}">
+                    <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from') ? jalaliDateInputValue(request('date_from')) : ''" placeholder="1405/01/01" class="w-full" />
                 </label>
                 <label class="erp-filter-field">تا تاریخ
-                    <input name="date_to" inputmode="numeric" dir="ltr" placeholder="1405/12/29" value="{{ request('date_to') ? jalaliDateInputValue(request('date_to')) : '' }}">
+                    <x-erp.ui.jalali-date-input name="date_to" :value="request('date_to') ? jalaliDateInputValue(request('date_to')) : ''" placeholder="1405/12/29" class="w-full" />
                 </label>
                 <x-filter-actions :reset-route="route('financial-reports.account-statement', $account)" />
             </div>
