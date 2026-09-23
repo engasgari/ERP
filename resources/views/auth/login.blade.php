@@ -1,71 +1,99 @@
-<x-guest-layout>
-    <div class="mb-5 text-right">
-        <h1 class="text-lg font-bold text-slate-800 opacity-80">ورود به {{ $appLabel }}</h1>
-        <p class="mt-1 text-xs font-medium text-slate-500 opacity-70">برای ادامه اطلاعات حساب کاربری خود را وارد کنید.</p>
+<x-guest-layout portal>
+    <div class="guest-portal__main guest-portal__main--login">
+        <div class="guest-portal__brand guest-portal__brand--compact">
+            <div class="guest-portal__logo-shell guest-portal__logo-shell--sm">
+                <img
+                    src="{{ asset('logo-aale.png') }}"
+                    alt="لوگوی بیکران پایش آله"
+                    class="guest-portal__logo"
+                    width="72"
+                    height="72"
+                >
+            </div>
+            <h1 class="guest-portal__company guest-portal__company--sm">بیکران پایش آله</h1>
+            <p class="guest-portal__date">{{ todayJalaliDate() }}</p>
+        </div>
+
+        <section class="guest-login-card">
+            <header class="guest-login-card__head">
+                <h2 class="guest-login-card__title">ورود به {{ $appLabel }}</h2>
+            </header>
+
+            <x-auth-session-status class="guest-login-card__status" :status="session('status')" />
+
+            <form
+                method="POST"
+                action="{{ $app === 'crm' ? route('crm.login.store') : route('login') }}"
+                class="guest-login-card__form"
+            >
+                @csrf
+                <input type="hidden" name="app" value="{{ $app }}">
+
+                <label class="guest-login-field">
+                    <span class="guest-login-field__label">ایمیل</span>
+                    <input
+                        id="email"
+                        class="guest-login-field__input"
+                        dir="ltr"
+                        type="email"
+                        name="email"
+                        value="{{ old('email') }}"
+                        required
+                        autofocus
+                        autocomplete="username"
+                        placeholder="example@aale.ir"
+                    >
+                    <x-input-error :messages="$errors->get('email')" class="guest-login-field__error" />
+                </label>
+
+                <label class="guest-login-field">
+                    <span class="guest-login-field__label">رمز عبور</span>
+                    <input
+                        id="password"
+                        class="guest-login-field__input"
+                        dir="ltr"
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="رمز عبور"
+                    >
+                    <x-input-error :messages="$errors->get('password')" class="guest-login-field__error" />
+                </label>
+
+                <div class="guest-login-card__row">
+                    <label for="remember_me" class="guest-login-remember">
+                        <input
+                            id="remember_me"
+                            type="checkbox"
+                            class="guest-login-remember__input"
+                            name="remember"
+                        >
+                        <span>مرا به خاطر بسپار</span>
+                    </label>
+
+                    @if (Route::has('password.request'))
+                        <a class="guest-login-link" href="{{ route('password.request') }}">
+                            فراموشی رمز
+                        </a>
+                    @endif
+                </div>
+
+                <button type="submit" class="guest-login-submit">
+                    ورود
+                </button>
+            </form>
+
+            <div class="guest-login-card__foot">
+                <a href="{{ route('home') }}" class="guest-login-link">بازگشت به انتخاب برنامه</a>
+            </div>
+        </section>
     </div>
 
-    <x-auth-session-status class="mb-4" :status="session('status')" />
-
-    <form method="POST"
-          action="{{ $app === 'crm' ? route('crm.login.store') : route('login') }}"
-          class="space-y-4">
-        @csrf
-        <input type="hidden" name="app" value="{{ $app }}">
-
-        <div>
-            <x-input-label for="email" value="ایمیل" class="mb-1 text-right font-bold text-slate-700" />
-            <x-text-input id="email"
-                          class="block w-full text-left"
-                          dir="ltr"
-                          type="email"
-                          name="email"
-                          :value="old('email')"
-                          required
-                          autofocus
-                          autocomplete="username"
-                          placeholder="example@aale.ir" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <div>
-            <x-input-label for="password" value="رمز عبور" class="mb-1 text-right font-bold text-slate-700" />
-            <x-text-input id="password"
-                          class="block w-full text-left"
-                          dir="ltr"
-                          type="password"
-                          name="password"
-                          required
-                          autocomplete="current-password"
-                          placeholder="رمز عبور" />
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-between gap-3">
-            <label for="remember_me" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
-                <input id="remember_me"
-                       type="checkbox"
-                       class="rounded border-slate-300 text-slate-700 shadow-sm focus:ring-slate-500"
-                       name="remember">
-                <span>مرا به خاطر بسپار</span>
-            </label>
-
-            @if (Route::has('password.request'))
-                <a class="text-sm font-bold text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
-                   href="{{ route('password.request') }}">
-                    فراموشی رمز عبور
-                </a>
-            @endif
-        </div>
-
-        <button type="submit"
-                class="mt-2 inline-flex items-center justify-center rounded-md bg-slate-100 px-5 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2">
-            ورود به {{ $appLabel }}
-        </button>
-    </form>
-
-    <div class="mt-4 text-center">
-        <a href="{{ route('home') }}" class="text-xs font-medium text-slate-500 hover:text-slate-800">
-            بازگشت به انتخاب برنامه
-        </a>
-    </div>
+    <footer class="guest-portal__footer">
+        <p>
+            طراحی و پیاده‌سازی توسط شرکت بیکران پایش آله انجام شده و تمامی حقوق برنامه‌ها برای این شرکت محفوظ است.
+            <span class="guest-portal__footer-year">سال ۱۴۰۵</span>
+        </p>
+    </footer>
 </x-guest-layout>

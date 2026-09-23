@@ -5109,7 +5109,7 @@ body.crm-nav-open {
     }
 }
 
-/* Executive dashboard — neutral slate, subtle motion */
+/* Executive dashboard ? neutral slate, subtle motion */
 @keyframes execHeroIn {
     from { opacity: 0; transform: translateY(18px); }
     to { opacity: 1; transform: translateY(0); }
@@ -5266,7 +5266,7 @@ body.crm-nav-open {
     margin: 0;
     --exec-notch-x: 0%;
     --exec-notch-y: 38%;
-    /* فرورفتگی نرم و بزرگ‌تر */
+    /* ???????? ??? ? ??????? */
     -webkit-mask-image: radial-gradient(
         ellipse var(--exec-notch-rx) var(--exec-notch-ry) at left var(--exec-notch-y),
         transparent 0 28%,
@@ -5543,7 +5543,7 @@ body.crm-nav-open {
     border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-/* شیشه شفاف — تصویر پشت مشخص بماند */
+/* ???? ???? ? ????? ??? ???? ????? */
 .exec-dashboard .exec-kpi-card,
 .exec-dashboard .exec-panel:not(.exec-panel--flat),
 .exec-dashboard .exec-liquidity-tile,
@@ -5710,7 +5710,7 @@ body.crm-nav-open {
     color: rgba(255, 255, 255, 0.55);
 }
 
-/* پس‌زمینه‌های سفید/روشن — متن تیره */
+/* ???????????? ????/???? ? ??? ???? */
 .exec-dashboard-page .exec-dash-modal__panel,
 .exec-dashboard-page .erp-jalali-picker,
 .exec-dashboard-page .exec-alerts__chip,
@@ -7993,5 +7993,436 @@ a.sales-intel__kpi:hover {
     .sales-intel__kpi,
     .sales-intel__panel {
         background: rgba(255, 255, 255, 0.94);
+    }
+}
+
+/* Guest portal ? ERP / CRM chooser */
+.guest-portal-body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0f172a;
+}
+
+.guest-portal {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem 1.25rem;
+    overflow: hidden;
+}
+
+.guest-portal__stage {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 70% 55% at 50% 20%, rgba(148, 163, 184, 0.22), transparent 60%),
+        radial-gradient(ellipse 50% 40% at 15% 85%, rgba(71, 85, 105, 0.35), transparent 55%),
+        radial-gradient(ellipse 45% 35% at 90% 75%, rgba(100, 116, 139, 0.28), transparent 50%),
+        linear-gradient(165deg, #1e293b 0%, #0f172a 55%, #020617 100%);
+}
+
+.guest-portal__stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.guest-portal__inner {
+    position: relative;
+    z-index: 1;
+    width: min(100%, 22rem);
+    min-height: calc(100vh - 2.5rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.guest-portal__main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    width: 100%;
+    padding-top: 1rem;
+}
+
+.guest-portal__tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 17.5rem;
+}
+
+.guest-portal__tile {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.65rem 0.45rem;
+    text-decoration: none;
+    border-radius: 0.95rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow:
+        0 10px 28px rgba(2, 6, 23, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.guest-portal__tile-mark {
+    font-size: clamp(1.05rem, 3.8vw, 1.35rem);
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    color: #f8fafc;
+    text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+    line-height: 1;
+}
+
+.guest-portal__tile-sub {
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: rgba(226, 232, 240, 0.72);
+    line-height: 1.35;
+    text-align: center;
+    max-width: 6.5rem;
+}
+
+.guest-portal__brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    text-align: center;
+}
+
+.guest-portal__logo-shell {
+    display: grid;
+    place-items: center;
+    width: 5.25rem;
+    height: 5.25rem;
+    margin-bottom: 0.35rem;
+    padding: 0.45rem;
+    border-radius: 1.35rem;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow:
+        0 12px 32px rgba(2, 6, 23, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(16px) saturate(1.25);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+}
+
+.guest-portal__logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: 0.85rem;
+    background: transparent;
+}
+
+.guest-portal__company {
+    margin: 0;
+    font-size: clamp(1.35rem, 5vw, 1.75rem);
+    font-weight: 900;
+    color: #f8fafc;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
+}
+
+.guest-portal__date {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(226, 232, 240, 0.72);
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.guest-portal__footer {
+    flex: 0 0 auto;
+    width: min(100%, 22rem);
+    margin-top: 2.5rem;
+    padding: 0 0.35rem 0.35rem;
+    text-align: center;
+}
+
+.guest-portal__footer p {
+    margin: 0;
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1.7;
+    color: rgba(203, 213, 225, 0.62);
+}
+
+.guest-portal__footer-year {
+    display: inline-block;
+    margin-inline-start: 0.15rem;
+    white-space: nowrap;
+}
+
+.guest-portal__main--login {
+    width: 100%;
+    max-width: 22rem;
+    gap: 1.15rem;
+}
+
+.guest-portal__brand--compact {
+    gap: 0.3rem;
+}
+
+.guest-portal__logo-shell--sm {
+    width: 4.25rem;
+    height: 4.25rem;
+    margin-bottom: 0.15rem;
+    padding: 0.35rem;
+    border-radius: 1.1rem;
+}
+
+.guest-portal__company--sm {
+    font-size: clamp(1.1rem, 4.2vw, 1.35rem);
+}
+
+.guest-login-card {
+    width: 100%;
+    padding: 1.15rem 1.1rem 1rem;
+    border-radius: 1.15rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow:
+        0 14px 36px rgba(2, 6, 23, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+.guest-login-card__head {
+    margin-bottom: 0.95rem;
+    text-align: center;
+}
+
+.guest-login-card__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #f8fafc;
+    letter-spacing: -0.01em;
+}
+
+.guest-login-card__status {
+    margin-bottom: 0.75rem;
+    color: #bbf7d0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.guest-login-card__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.guest-login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.guest-login-field__label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: rgba(226, 232, 240, 0.82);
+}
+
+.guest-login-field__input {
+    width: 100%;
+    min-height: 2.45rem;
+    border-radius: 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.92);
+    padding: 0.55rem 0.75rem;
+    color: #0f172a;
+    font-size: 0.875rem;
+    font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    caret-color: #0f172a;
+}
+
+.guest-login-field__input::placeholder {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.guest-login-field__input:focus {
+    outline: none;
+    border-color: rgba(148, 163, 184, 0.85);
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.35);
+}
+
+.guest-login-field__error {
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fda4af;
+}
+
+.guest-login-card__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+}
+
+.guest-login-remember {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(226, 232, 240, 0.78);
+    cursor: pointer;
+}
+
+.guest-login-remember__input {
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(15, 23, 42, 0.4);
+    accent-color: #94a3b8;
+}
+
+.guest-login-link {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(226, 232, 240, 0.7);
+    text-decoration: none;
+}
+
+.guest-login-link:hover {
+    color: #f8fafc;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.guest-login-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 2.55rem;
+    margin-top: 0.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.16);
+    color: #f8fafc;
+    font-size: 0.9rem;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow:
+        0 8px 22px rgba(2, 6, 23, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    transition: background 140ms ease, transform 140ms ease;
+}
+
+.guest-login-submit:hover {
+    background: rgba(255, 255, 255, 0.24);
+    transform: translateY(-1px);
+}
+
+.guest-login-card__foot {
+    margin-top: 0.85rem;
+    text-align: center;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .guest-login-card {
+        background: rgba(30, 41, 59, 0.94);
+    }
+}
+
+.guest-portal__hint {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: rgba(226, 232, 240, 0.72);
+}
+
+.guest-portal__tile:hover {
+    transform: translateY(-3px);
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.42);
+    box-shadow:
+        0 14px 32px rgba(2, 6, 23, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.guest-portal__tile:focus-visible {
+    outline: 2px solid rgba(226, 232, 240, 0.7);
+    outline-offset: 3px;
+}
+
+.guest-portal__tile--erp .guest-portal__tile-mark {
+    color: #e2e8f0;
+}
+
+.guest-portal__tile--crm .guest-portal__tile-mark {
+    color: #f1f5f9;
+}
+
+@media (max-width: 380px) {
+    .guest-portal__tiles {
+        gap: 0.55rem;
+        max-width: 15.5rem;
+    }
+
+    .guest-portal__tile {
+        border-radius: 0.85rem;
+        padding: 0.5rem 0.35rem;
+    }
+
+    .guest-portal__tile-sub {
+        font-size: 0.52rem;
+        max-width: 5.75rem;
+    }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .guest-portal__tile {
+        background: rgba(30, 41, 59, 0.92);
+    }
+
+    .guest-portal__logo-shell {
+        background: rgba(255, 255, 255, 0.92);
     }
 }

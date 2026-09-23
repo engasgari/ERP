@@ -8,25 +8,35 @@
         <title>{{ request()->is('crm*') ? 'CRM' : config('app.name', 'ERP') }}</title>
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
 
-        <!-- Fonts -->
         <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
         <link rel="stylesheet" href="{{ asset('css/style.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}?v={{ @filemtime(public_path('css/erp-ui.css')) ?: 1 }}">
 
-        <!-- Scripts -->
         @vite(['resources/css/app.css'])
     </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center px-4 pt-6 sm:pt-0 bg-slate-100">
-            <div>
-                <a href="/">
-                    <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
-                </a>
+    <body @class([
+        'font-sans text-gray-900 antialiased',
+        'guest-portal-body' => $portal,
+    ])>
+        @if($portal)
+            <div class="guest-portal">
+                <div class="guest-portal__stage" aria-hidden="true"></div>
+                <div class="guest-portal__inner">
+                    {{ $slot }}
+                </div>
             </div>
+        @else
+            <div class="min-h-screen flex flex-col sm:justify-center items-center px-4 pt-6 sm:pt-0 bg-slate-100">
+                <div>
+                    <a href="/">
+                        <x-application-logo class="w-20 h-20 fill-current text-gray-500" />
+                    </a>
+                </div>
 
-            <div class="w-full sm:max-w-md mt-6 overflow-hidden rounded-lg bg-white px-6 py-5 shadow-sm">
-                {{ $slot }}
+                <div class="w-full sm:max-w-md mt-6 overflow-hidden rounded-lg bg-white px-6 py-5 shadow-sm">
+                    {{ $slot }}
+                </div>
             </div>
-        </div>
+        @endif
     </body>
 </html>
