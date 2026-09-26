@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return route('login');
         });
+        $middleware->redirectUsersTo(function (Request $request) {
+            return route('home');
+        });
         $middleware->web(append: [
             \App\Http\Middleware\EnsureFiscalPeriodDatesAreValid::class,
             \App\Http\Middleware\HandleBreadcrumbContext::class,

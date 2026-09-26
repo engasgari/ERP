@@ -6,27 +6,16 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 use Illuminate\Support\Facades\Route;
 
-
-
-Route::middleware('guest')->prefix('crm')->name('crm.')->group(function () {
-
+// Login must stay reachable while authenticated so CRM↔ERP switch can clear session.
+Route::prefix('crm')->name('crm.')->group(function () {
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
-
         ->defaults('app', 'crm')
-
         ->name('login');
 
-
-
     Route::post('login', [AuthenticatedSessionController::class, 'store'])
-
         ->defaults('app', 'crm')
-
         ->name('login.store');
-
 });
-
-
 
 Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.')->group(function () {
 

@@ -30,6 +30,8 @@ class AuthenticatedSessionController extends Controller
             $request->session()->regenerateToken();
         }
 
+        $request->session()->forget('url.intended');
+
         return view('auth.login', [
             'app' => $app,
             'appLabel' => $app === AppAccessService::APP_CRM ? 'CRM' : 'ERP',
@@ -61,8 +63,9 @@ class AuthenticatedSessionController extends Controller
         }
 
         session(['active_app' => $app]);
+        $request->session()->forget('url.intended');
 
-        return redirect()->intended($access->homeRouteForApp($app));
+        return redirect($access->homeRouteForApp($app));
     }
 
     /**

@@ -15,12 +15,12 @@
         </div>
 
         <div class="guest-portal__tiles" role="navigation" aria-label="انتخاب برنامه">
-            <a href="{{ route('login') }}" class="guest-portal__tile guest-portal__tile--erp">
+            <a href="{{ route('app.switch', 'erp') }}" class="guest-portal__tile guest-portal__tile--erp">
                 <span class="guest-portal__tile-mark">ERP</span>
                 <span class="guest-portal__tile-sub">یکپارچه مالی</span>
             </a>
 
-            <a href="{{ route('crm.login') }}" class="guest-portal__tile guest-portal__tile--crm">
+            <a href="{{ route('app.switch', 'crm') }}" class="guest-portal__tile guest-portal__tile--crm">
                 <span class="guest-portal__tile-mark">CRM</span>
                 <span class="guest-portal__tile-sub">مدیریت مشتریان</span>
             </a>

@@ -39,16 +39,17 @@ use App\Http\Controllers\EmploymentContractController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\PayslipController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AppSwitchController;
 use App\Http\Controllers\ProfileController;
 use App\Services\AppAccessService;
 
 Route::get('/', function () {
-    if (auth()->check()) {
-        return redirect(app(AppAccessService::class)->homeRouteForSession());
-    }
-
     return view('app.choose');
 })->name('home');
+
+Route::get('/app/switch/{app}', AppSwitchController::class)
+    ->whereIn('app', ['erp', 'crm'])
+    ->name('app.switch');
 
 
 Route::middleware(['auth', 'active.erp'])->group(function () {

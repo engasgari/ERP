@@ -11,15 +11,21 @@
         .badge { display: inline-flex; border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca; padding: .35rem .8rem; font-size: .85rem; font-weight: 800; color: #b91c1c; }
         h1 { margin: 1rem 0 .5rem; font-size: 1.7rem; font-weight: 900; }
         p { margin: 0; line-height: 1.9; color: #991b1b; }
-        a { display: inline-block; margin-top: 1.25rem; padding: .75rem 1.1rem; border-radius: 12px; background: #b91c1c; color: #fff; text-decoration: none; font-weight: 800; }
+        .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+        a { display: inline-block; padding: .75rem 1.1rem; border-radius: 12px; background: #b91c1c; color: #fff; text-decoration: none; font-weight: 800; }
+        a.secondary { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
     </style>
 </head>
 <body>
     <div class="card">
         <div class="badge">خطا 403</div>
         <h1>شما به این بخش دسترسی ندارید.</h1>
-        <p>برای مشاهده یا انجام این عملیات، باید دسترسی لازم توسط مدیر سیستم برای شما فعال شود.</p>
-        <a href="{{ route('dashboard') }}">بازگشت به داشبورد</a>
+        <p>برای مشاهده یا انجام این عملیات، باید دسترسی لازم توسط مدیر سیستم برای شما فعال شود. اگر بین ERP و CRM جابه‌جا می‌شوید، از صفحه انتخاب برنامه دوباره وارد شوید.</p>
+        <div class="actions">
+            <a href="{{ route('home') }}">انتخاب برنامه</a>
+            <a class="secondary" href="{{ route('login') }}">ورود ERP</a>
+            <a class="secondary" href="{{ route('crm.login') }}">ورود CRM</a>
+        </div>
     </div>
 </body>
 </html>

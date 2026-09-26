@@ -16,19 +16,21 @@ class EnsureActiveApp
      */
     public function handle(Request $request, Closure $next, string $app): Response
     {
-        if (! in_array($app, ['erp', 'crm'], true)) {
+        if (! in_array($app, [AppAccessService::APP_ERP, AppAccessService::APP_CRM], true)) {
             abort(500, 'Invalid application context.');
         }
 
         $user = $request->user();
         abort_unless($user, 403);
 
-        if (session('active_app') !== $app) {
-            abort(403, 'دسترسی به این برنامه مجاز نیست. از درگاه ورود همان برنامه وارد شوید.');
-        }
-
         if (! $this->access->canAccessApp($user, $app)) {
             abort(403, 'شما به این برنامه دسترسی ندارید.');
+        }
+
+        if (session('active_app') !== $app) {
+            // Clear stale app context (e.g. CRM session opening ERP) and continue.
+            session(['active_app' => $app]);
+            $request->session()->forget('url.intended');
         }
 
         return $next($request);
