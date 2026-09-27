@@ -207,6 +207,7 @@ class CrmDashboardService
                 'value' => number_format($metrics['tasks_due_today']),
                 'pastel' => 'butter',
                 'route' => 'crm.tasks.index',
+                'params' => ['filter' => 'due_today'],
                 'permission' => 'crm.tasks.view',
             ],
             [
@@ -214,6 +215,7 @@ class CrmDashboardService
                 'value' => number_format($metrics['overdue_tasks']),
                 'pastel' => 'coral',
                 'route' => 'crm.tasks.index',
+                'params' => ['filter' => 'overdue'],
                 'permission' => 'crm.tasks.view',
             ],
             [
@@ -221,6 +223,7 @@ class CrmDashboardService
                 'value' => number_format($metrics['today_activities']),
                 'pastel' => 'aqua',
                 'route' => 'crm.activities.index',
+                'params' => ['filter' => 'today'],
                 'permission' => 'crm.activities.view',
             ],
         ];

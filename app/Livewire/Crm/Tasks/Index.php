@@ -20,12 +20,15 @@ class Index extends BaseListPage
 
     public string $priority = '';
 
+    public string $filter = '';
+
     public string $form_party_id = '';
 
     protected array $queryString = [
         'search' => ['except' => ''],
         'status' => ['except' => ''],
         'priority' => ['except' => ''],
+        'filter' => ['except' => ''],
     ];
 
     public function openCreate(): void
@@ -41,7 +44,7 @@ class Index extends BaseListPage
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'status', 'priority']);
+        $this->reset(['search', 'status', 'priority', 'filter']);
         $this->resetPage();
     }
 
@@ -67,15 +70,20 @@ class Index extends BaseListPage
             'search' => $this->search !== '' ? $this->search : null,
             'status' => $this->status !== '' ? $this->status : null,
             'priority' => $this->priority !== '' ? $this->priority : null,
+            'filter' => $this->filter !== '' ? $this->filter : null,
         ]);
 
         $items = $tasks->paginate($filters, auth()->user(), $this->perPage);
         $statusOptions = CrmModel::STATUSES_TASK;
         $priorityOptions = CrmModel::PRIORITIES_TASK;
+        $filterOptions = [
+            'due_today' => 'موعد امروز',
+            'overdue' => 'معوق',
+        ];
         $customers = Party::query()->customers()->orderBy('name')->limit(300)->get(['id', 'name', 'code']);
 
         return view('livewire.crm.tasks.index', array_merge(
-            compact('items', 'statusOptions', 'priorityOptions', 'customers'),
+            compact('items', 'statusOptions', 'priorityOptions', 'filterOptions', 'customers'),
             $this->taskFormOptions(),
         ));
     }

@@ -58,6 +58,13 @@ class CrmActivityRepository
             $query->where('party_id', $filters['party_id']);
         }
 
+        if (($filters['filter'] ?? '') === 'today') {
+            $query->where(function (Builder $inner) {
+                $inner->whereDate('due_at', today())
+                    ->orWhereDate('completed_at', today());
+            });
+        }
+
         return $query;
     }
 }

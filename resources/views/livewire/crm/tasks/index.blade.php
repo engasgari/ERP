@@ -60,6 +60,22 @@
 
                 </label>
 
+                <label class="erp-filter-field">فیلتر سریع
+
+                    <select wire:model.live="filter">
+
+                        <option value="">همه</option>
+
+                        @foreach($filterOptions as $key => $label)
+
+                            <option value="{{ $key }}">{{ $label }}</option>
+
+                        @endforeach
+
+                    </select>
+
+                </label>
+
                 <div class="erp-filter-actions">
 
                     <button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلترها</button>

@@ -43,6 +43,49 @@
                             <a href="{{ route('financial-reports.show', ['report' => $reportKey]) }}" class="erp-action-btn erp-action-detail">پاک کردن</a>
                         </div>
                     </x-erp.ui.filter-bar>
+                @elseif($reportKey === 'cash-statement')
+                    <x-erp.ui.filter-bar method="GET" class="mt-4">
+                        <div class="erp-filter-row">
+                            <label class="erp-filter-field">از تاریخ
+                                <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from') ? jalaliDateInputValue(request('date_from')) : ''" placeholder="1403/01/01" />
+                            </label>
+                            <label class="erp-filter-field">تا تاریخ
+                                <x-erp.ui.jalali-date-input name="date_to" :value="request('date_to') ? jalaliDateInputValue(request('date_to')) : ''" placeholder="1403/12/29" />
+                            </label>
+                            <label class="erp-filter-field">سال مالی
+                                <select name="fiscal_year_id" class="rounded-md border-slate-300">
+                                    <option value="">همه</option>
+                                    @foreach($fiscalYears ?? [] as $year)
+                                        <option value="{{ $year->id }}" @selected(request('fiscal_year_id') == $year->id)>{{ $year->title }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="erp-filter-field">صندوق
+                                <select name="cashbox_id" class="rounded-md border-slate-300">
+                                    <option value="">همه</option>
+                                    @foreach($cashboxes ?? [] as $cashbox)
+                                        <option value="{{ $cashbox->id }}" @selected(request('cashbox_id') == $cashbox->id)>{{ $cashbox->code }} - {{ $cashbox->name }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                            <label class="erp-filter-field" style="flex: 0 0 5.5rem; min-width: 5.5rem">تعداد در صفحه
+                                <select name="per_page" class="rounded-md border-slate-300">
+                                    @foreach([10, 25, 50, 100] as $size)
+                                        <option value="{{ $size }}" @selected((int) request('per_page', 25) === $size)>{{ $size }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        </div>
+                        <div class="erp-filter-row">
+                            <label class="erp-filter-field" style="flex: 1 1 auto">جستجو
+                                <input type="text" name="search" value="{{ request('search') }}" class="rounded-md border-slate-300" placeholder="شماره سند، نام، شرح...">
+                            </label>
+                            <div class="erp-filter-actions">
+                                <button class="erp-action-btn erp-action-detail" type="submit">اعمال فیلتر</button>
+                                <a href="{{ route('financial-reports.show', ['report' => $reportKey]) }}" class="erp-action-btn erp-action-detail">پاک کردن</a>
+                            </div>
+                        </div>
+                    </x-erp.ui.filter-bar>
                 @else
                     <x-erp.ui.filter-bar method="GET" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label class="text-sm font-bold text-slate-700">از تاریخ

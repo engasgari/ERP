@@ -1,16 +1,16 @@
 # Graph Report - ERP  (2026-09-26)
 
 ## Corpus Check
-- 1407 files · ~788,250 words
+- 1426 files · ~799,525 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5793 nodes · 11705 edges · 1104 communities (894 shown, 210 thin omitted)
+- 5812 nodes · 11705 edges · 1122 communities (912 shown, 210 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 513 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d93c3dae`
+- Built from commit: `4009ee33`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -27,7 +27,6 @@
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_Treasury Banking|Treasury Banking]]
 - [[_COMMUNITY_Community 11|Community 11]]
-- [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
 - [[_COMMUNITY_HR Payroll Attendance|HR Payroll Attendance]]
@@ -442,7 +441,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (1104 total, 210 thin omitted)
+## Communities (1122 total, 210 thin omitted)
 
 ### Community 0 - "Treasury Banking"
 Cohesion: 0.10
@@ -466,7 +465,7 @@ Nodes (19): BelongsTo, HasFactory, HasMany, Model, AttendanceSummary, BomLine, C
 
 ### Community 5 - "HR Workforce"
 Cohesion: 0.07
-Nodes (13): formatJalaliDateSafe(), jalaliToGregorianDateSafe(), SeedOfficeWorkLogs1404MehrEsfand, SeedOfficeWorkLogs1405FarKhordadTeam, SeedOfficeWorkLogs1405FarOrdib, WorkCalendarController, CalculatorShamsiSeeder, NewAttendancePayrollWorkflowSeeder (+5 more)
+Nodes (16): formatJalaliDateSafe(), jalaliToGregorianDateSafe(), Command, AuditErpUiFramework, PurgeEmployeeAttendanceYear, RepairBankLedgerDetails, SeedActiveOrderWorkLogs1405FarMordad, SeedOfficeWorkLogs1404MehrEsfand (+8 more)
 
 ### Community 6 - "HTTP Controllers"
 Cohesion: 0.08
@@ -483,10 +482,6 @@ Nodes (6): Index, Contact, CrmContactRepository, CrmContactService, CrmRelationG
 ### Community 11 - "Community 11"
 Cohesion: 0.08
 Nodes (33): P(), S(), at(), b(), be(), ce(), e(), Ee() (+25 more)
-
-### Community 13 - "HR Payroll Attendance"
-Cohesion: 0.10
-Nodes (8): Command, AssignActiveEmployeeWorkLogsByYear, AuditErpUiFramework, ReassignProjectFiscalYearCosts, RemoveContractorPayrollFromProject, ReopenPayrollPeriods, RepairBankLedgerDetails, WorkLog
 
 ### Community 14 - "HR Payroll Attendance"
 Cohesion: 0.07
@@ -505,8 +500,8 @@ Cohesion: 0.16
 Nodes (28): ae(), ce(), D(), de(), ee(), Gt(), He(), I() (+20 more)
 
 ### Community 18 - "HR Workforce"
-Cohesion: 0.09
-Nodes (6): PurgeEmployeeAttendanceYear, AttendanceRawLog, PayrollPeriod, Periods, NewAttendanceEngineService, PayrollCalculationService
+Cohesion: 0.08
+Nodes (8): ReassignProjectFiscalYearCosts, RemoveContractorPayrollFromProject, ReopenPayrollPeriods, AttendanceCalculation, PayrollItem, PayrollPeriod, Periods, PayrollCalculationService
 
 ### Community 20 - "Inventory Warehouse"
 Cohesion: 0.07
@@ -561,8 +556,8 @@ Cohesion: 0.06
 Nodes (3): Migration, CreateEmployeeTransactionsTable, up()
 
 ### Community 41 - "HR Payroll Attendance"
-Cohesion: 0.14
-Nodes (4): Carbon, SeedActiveOrderWorkLogs1405FarMordad, CrmBusinessHoursService, AttendanceDayCalculatorService
+Cohesion: 0.20
+Nodes (3): Carbon, CrmBusinessHoursService, AttendanceDayCalculatorService
 
 ### Community 42 - "Inventory Warehouse"
 Cohesion: 0.11
@@ -629,8 +624,8 @@ Cohesion: 0.14
 Nodes (3): Item, InventoryPostingService, ItemSalePriceService
 
 ### Community 64 - "HR Workforce"
-Cohesion: 0.08
-Nodes (6): InsuranceExemptionResolver, EmploymentOrder, PayrollAccountingEntry, ContractGenerationService, NewPayrollEngineService, PersonnelDecreeService
+Cohesion: 0.05
+Nodes (11): InsuranceExemptionResolver, EmploymentOrder, MonthlyAttendance, PayrollAccountingEntry, PayrollAudit, TaxRecord, AttendanceAdjustmentService, ContractGenerationService (+3 more)
 
 ### Community 67 - "HR Workforce"
 Cohesion: 0.27
@@ -666,7 +661,7 @@ Nodes (5): Note, AccountingAttachment, AccountingAudit, EmployeeHistory, MorphTo
 
 ### Community 81 - "HTTP Controllers"
 Cohesion: 0.05
-Nodes (6): EmployeeController, Employee, AttendanceDailyDetailRepository, EmployeeHistoryService, EmploymentContractResolver, RequiredWorkingTimeService
+Nodes (7): EmployeeController, Employee, AttendanceDailyDetailRepository, EmployeeHistoryService, EmploymentContractResolver, NewAttendanceEngineService, RequiredWorkingTimeService
 
 ### Community 82 - "Database Schema"
 Cohesion: 0.39
@@ -901,8 +896,8 @@ Cohesion: 0.33
 Nodes (5): cancelEdit, livewire.partials.flash, startEdit({{ $calculation->id }}), saveEdit(false), saveEdit(true)
 
 ### Community 270 - "Livewire UI Layer"
-Cohesion: 0.09
-Nodes (7): PayslipController, AttendanceCalculation, MonthlyAttendance, Payslip, AttendanceAdjustmentService, PayslipSnapshotService, stdClass
+Cohesion: 0.25
+Nodes (3): PayslipController, Payslip, PayslipSnapshotService
 
 ### Community 274 - "Community 274"
 Cohesion: 0.24
@@ -1190,11 +1185,11 @@ Nodes (3): migrateEmployeesToParties(), seedPermissions(), up()
 
 ### Community 1216 - "Community 1216"
 Cohesion: 0.05
-Nodes (10): DashboardController, HasOne, PayrollAudit, PayrollCalculation, PayrollItem, PayrollPayment, TaxRecord, MorphOne (+2 more)
+Nodes (9): AssignActiveEmployeeWorkLogsByYear, DashboardController, LeilaPayrollTestSeeder, HasOne, PayrollCalculation, PayrollPayment, MorphOne, Payments (+1 more)
 
 ### Community 1219 - "Community 1219"
-Cohesion: 0.14
-Nodes (5): LeilaPayrollTestSeeder, Seeder, SmallBusinessHrSeeder, StandardPayrollSeeder, WorklogAttendanceSeeder
+Cohesion: 0.09
+Nodes (8): WorkCalendarController, NewAttendancePayrollWorkflowSeeder, WorkCalendar, Seeder, SmallBusinessHrSeeder, StandardPayrollSeeder, WorkCalendarSeeder, WorklogAttendanceSeeder
 
 ### Community 1241 - "Community 1241"
 Cohesion: 0.12
@@ -1208,11 +1203,11 @@ Nodes (4): TreasuryTransaction, TreasuryRepository, TreasuryService, Index
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `User` connect `Community 1010` to `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HTTP Controllers`, `Community 136`, `Projects Manufacturing`, `Treasury Banking`, `Community 140`, `HR Payroll Attendance`, `Community 1038`, `Livewire UI Layer`, `Inventory Warehouse`, `Financial Reports`, `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Accounting Engine`, `HR Payroll Attendance`, `Community 934`, `Inventory Warehouse`, `Community 171`, `HR Payroll Attendance`, `Community 943`, `Accounting Engine`, `Financial Reports`, `Community 947`, `Community 952`, `Community 57`, `Community 956`, `Community 962`, `Livewire UI Layer`, `HR Workforce`, `Community 967`, `HR Workforce`, `Community 616`, `HR Workforce`, `Community 110`, `Community 112`, `HR Workforce`?**
+- **Why does `User` connect `Community 1010` to `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HTTP Controllers`, `Community 136`, `Projects Manufacturing`, `Treasury Banking`, `Community 140`, `HR Payroll Attendance`, `Community 1038`, `HR Workforce`, `Inventory Warehouse`, `Financial Reports`, `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Treasury Banking`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Accounting Engine`, `HR Payroll Attendance`, `Community 934`, `Inventory Warehouse`, `Community 171`, `HR Payroll Attendance`, `Community 943`, `Accounting Engine`, `Financial Reports`, `Community 947`, `Community 952`, `Community 57`, `Community 956`, `Community 962`, `Livewire UI Layer`, `HR Workforce`, `Community 967`, `HR Workforce`, `Community 616`, `HR Workforce`, `Community 110`, `Community 112`, `HR Workforce`?**
   _High betweenness centrality (0.071) - this node is a cross-community bridge._
-- **Why does `ChartAccount` connect `HR Payroll Attendance` to `Treasury Banking`, `HR Payroll Attendance`, `Community 135`, `Community 136`, `Livewire UI Layer`, `Community 1045`, `Financial Reports`, `Community 278`, `Treasury Banking`, `Community 409`, `HR Payroll Attendance`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Inventory Warehouse`, `Community 171`, `HR Payroll Attendance`, `Community 946`, `Inventory Warehouse`, `Community 960`, `HR Payroll Attendance`, `Financial Reports`, `Community 76`, `Community 91`, `HR Workforce`, `Community 110`, `Community 502`?**
+- **Why does `ChartAccount` connect `HR Payroll Attendance` to `Treasury Banking`, `HR Payroll Attendance`, `Community 135`, `Community 136`, `HR Workforce`, `Community 1045`, `Financial Reports`, `Community 278`, `Treasury Banking`, `Community 409`, `HR Payroll Attendance`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Inventory Warehouse`, `Community 171`, `HR Payroll Attendance`, `Community 946`, `Inventory Warehouse`, `Community 960`, `HR Payroll Attendance`, `Financial Reports`, `Community 76`, `Community 91`, `HR Workforce`, `Community 110`, `Community 502`?**
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
-- **Why does `Party` connect `HR Payroll Attendance` to `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HR Workforce`, `Community 135`, `Treasury Banking`, `Community 140`, `Livewire UI Layer`, `HR Payroll Attendance`, `HR Workforce`, `Inventory Warehouse`, `Inventory Warehouse`, `Community 1045`, `Treasury Banking`, `Accounting Engine`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `Community 1185`, `Accounting Engine`, `Inventory Warehouse`, `Community 939`, `Community 171`, `Inventory Warehouse`, `Community 943`, `HR Payroll Attendance`, `Community 57`, `Community 956`, `Inventory Warehouse`, `Treasury Banking`, `Community 960`, `Community 1216`, `Community 1219`, `Community 967`, `Financial Reports`, `Community 76`, `HR Workforce`, `Community 1235`, `Community 1241`, `HR Payroll Attendance`, `HR Workforce`?**
+- **Why does `Party` connect `HR Payroll Attendance` to `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `HR Workforce`, `Community 135`, `Treasury Banking`, `Community 140`, `HR Payroll Attendance`, `HR Workforce`, `Inventory Warehouse`, `Inventory Warehouse`, `Community 1045`, `Treasury Banking`, `Accounting Engine`, `HR Payroll Attendance`, `HR Payroll Attendance`, `Accounting Engine`, `Treasury Banking`, `HR Payroll Attendance`, `Community 1185`, `Accounting Engine`, `Inventory Warehouse`, `Community 939`, `Community 171`, `Inventory Warehouse`, `Community 943`, `HR Payroll Attendance`, `Community 57`, `Community 956`, `Inventory Warehouse`, `Treasury Banking`, `Community 960`, `Community 1216`, `Community 1219`, `Community 967`, `Financial Reports`, `Community 76`, `HR Workforce`, `Community 1235`, `Community 1241`, `HR Payroll Attendance`, `HR Workforce`?**
   _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **What connects `@mimo-ai/plugin`, `$schema`, `name` to the rest of the system?**
   _854 weakly-connected nodes found - possible documentation gaps or missing edges._

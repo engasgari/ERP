@@ -56,6 +56,16 @@ class CrmTaskRepository
             $query->where('party_id', $filters['party_id']);
         }
 
+        if (($filters['filter'] ?? '') === 'due_today') {
+            $query->whereDate('due_at', today())
+                ->where('status', '!=', 'completed');
+        }
+
+        if (($filters['filter'] ?? '') === 'overdue') {
+            $query->where('due_at', '<', now())
+                ->whereNotIn('status', ['completed', 'cancelled']);
+        }
+
         return $query;
     }
 }

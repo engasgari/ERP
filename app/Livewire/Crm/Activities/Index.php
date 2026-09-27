@@ -20,12 +20,15 @@ class Index extends BaseListPage
 
     public string $status = '';
 
+    public string $filter = '';
+
     public string $form_party_id = '';
 
     protected array $queryString = [
         'search' => ['except' => ''],
         'type' => ['except' => ''],
         'status' => ['except' => ''],
+        'filter' => ['except' => ''],
     ];
 
     public function openCreate(): void
@@ -36,7 +39,7 @@ class Index extends BaseListPage
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'type', 'status']);
+        $this->reset(['search', 'type', 'status', 'filter']);
         $this->resetPage();
     }
 
@@ -62,12 +65,16 @@ class Index extends BaseListPage
             'search' => $this->search !== '' ? $this->search : null,
             'type' => $this->type !== '' ? $this->type : null,
             'status' => $this->status !== '' ? $this->status : null,
+            'filter' => $this->filter !== '' ? $this->filter : null,
         ]);
 
         $items = $activities->paginate($filters, auth()->user(), $this->perPage);
         $typeOptions = CrmModel::ACTIVITY_TYPES;
+        $filterOptions = [
+            'today' => 'امروز',
+        ];
         $customers = Party::query()->customers()->orderBy('name')->limit(300)->get(['id', 'name', 'code']);
 
-        return view('livewire.crm.activities.index', compact('items', 'typeOptions', 'customers'));
+        return view('livewire.crm.activities.index', compact('items', 'typeOptions', 'filterOptions', 'customers'));
     }
 }

@@ -1725,7 +1725,7 @@ class FinancialReportService
             title: $title,
             subtitle: $subtitle,
             filters: $filters,
-            summary: ['accounts' => $rows->count()],
+            summary: [],
             sections: [
                 [
                     'title' => $title,
