@@ -29,8 +29,10 @@
         :actions="[['label' => 'بازگشت', 'url' => route('accounting-documents.index'), 'class' => 'erp-action-detail']]"
     >
         <x-slot name="toolbar">
-            @if($document->is_automatic)
-                <span class="erp-action-btn erp-action-detail">سند سیستمی — غیرقابل ویرایش</span>
+            @if($document->is_automatic && $document->status === 'draft')
+                <a href="{{ route('accounting-documents.edit', $document) }}" class="erp-action-btn erp-action-edit text-center">ویرایش سند سیستمی</a>
+            @elseif($document->is_automatic)
+                <span class="erp-action-btn erp-action-detail">سند سیستمی</span>
             @elseif($document->status === 'draft')
                 <a href="{{ route('accounting-documents.edit', $document) }}" class="erp-action-btn erp-action-edit text-center">ویرایش</a>
                 <form method="post" action="{{ route('accounting-documents.destroy', $document) }}" onsubmit="return confirm('آیا از حذف این سند حسابداری مطمئن هستید؟')">
@@ -41,13 +43,13 @@
             @endif
             <a href="{{ route('accounting-documents.print', $document) }}" target="_blank" class="erp-action-btn erp-action-edit text-center">چاپ</a>
             <a href="{{ route('accounting-documents.pdf', $document) }}" class="erp-action-btn erp-action-detail text-center" data-no-spa>PDF</a>
-            @if($document->status === 'draft' && ! $document->is_automatic)
+            @if($document->status === 'draft')
                 <form method="post" action="{{ route('accounting-documents.post', $document) }}">
                     @csrf
                     <button type="submit" class="erp-action-btn erp-action-edit">ثبت قطعی</button>
                 </form>
-            @elseif($document->status === 'posted' && ! $document->is_automatic && ! $document->voided_at)
-                <form method="post" action="{{ route('accounting-documents.unpost', $document) }}" onsubmit="return confirm('سند به پیش‌نویس برگردد و قابل ویرایش شود؟')">
+            @elseif($document->status === 'posted' && ! $document->voided_at)
+                <form method="post" action="{{ route('accounting-documents.unpost', $document) }}" onsubmit="return confirm('{{ $document->is_automatic ? 'سند سیستمی به پیش‌نویس برگردد؟ تا ثبت قطعی دوباره، در گزارش‌ها و مانده‌ها محاسبه نمی‌شود.' : 'سند به پیش‌نویس برگردد و قابل ویرایش شود؟' }}')">
                     @csrf
                     <button type="submit" class="erp-action-btn erp-action-detail">برگشت به پیش‌نویس</button>
                 </form>

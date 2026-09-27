@@ -18,6 +18,7 @@ use App\Models\ReceiptVoucher;
 use App\Models\TreasuryTransaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 class AccountingPostingService
@@ -121,6 +122,63 @@ class AccountingPostingService
             ]);
             $this->replaceLines($document, $lines);
             $this->audit($document, 'edit', $old, $document->refresh()->load('lines')->toArray(), $userId);
+
+            return $document;
+        });
+    }
+
+    /**
+     * System documents must stay consistent with their source record, so only classification
+     * (accounts, party, project, descriptions, date) may change; amounts and treasury lines are locked.
+     */
+    public function updateAutomatic(AccountingDocument $document, array $data, array $lines, ?int $userId = null): AccountingDocument
+    {
+        return DB::transaction(function () use ($document, $data, $lines, $userId) {
+            if ($document->status !== 'draft') {
+                throw ValidationException::withMessages(['document' => 'برای ویرایش سند سیستمی ابتدا آن را به پیش‌نویس برگردانید.']);
+            }
+
+            $this->periods->assertOpen($data['document_date'] ?? $document->document_date);
+
+            $existing = $document->lines()->orderBy('id')->get()->keyBy('id');
+            $submitted = collect($lines)->keyBy(fn (array $line) => (int) ($line['id'] ?? 0));
+
+            if ($submitted->keys()->sort()->values()->all() !== $existing->keys()->sort()->values()->all()) {
+                throw ValidationException::withMessages(['lines' => 'در سند سیستمی نمی‌توان ردیف اضافه یا حذف کرد.']);
+            }
+
+            $old = $document->load('lines')->toArray();
+
+            foreach ($existing as $id => $line) {
+                $input = $submitted->get($id);
+
+                if (round((float) ($input['debit'] ?? 0), 2) !== round((float) $line->debit, 2)
+                    || round((float) ($input['credit'] ?? 0), 2) !== round((float) $line->credit, 2)) {
+                    throw ValidationException::withMessages(['lines' => 'مبلغ ردیف‌های سند سیستمی قابل تغییر نیست؛ برای تغییر مبلغ، سند مادر را ویرایش کنید.']);
+                }
+
+                $detailAccountId = ! empty($input['detail_account_id']) ? (int) $input['detail_account_id'] : null;
+                $isTreasuryLine = $line->bank_account_id || $line->cashbox_id;
+
+                if ($isTreasuryLine && ((int) $input['chart_account_id'] !== (int) $line->chart_account_id || $detailAccountId !== ($line->detail_account_id ? (int) $line->detail_account_id : null))) {
+                    throw ValidationException::withMessages(['lines' => 'حساب ردیف‌های بانک و صندوق در سند سیستمی قابل تغییر نیست.']);
+                }
+
+                $line->update([
+                    'chart_account_id' => (int) $input['chart_account_id'],
+                    'detail_account_id' => $detailAccountId,
+                    'party_id' => ! empty($input['party_id']) ? (int) $input['party_id'] : null,
+                    'project_id' => ! empty($input['project_id']) ? (int) $input['project_id'] : null,
+                    'description' => $input['description'] ?? null,
+                ]);
+            }
+
+            $document->update([
+                'document_date' => $data['document_date'] ?? $document->document_date,
+                'description' => $data['description'] ?? $document->description,
+                'notes' => $data['notes'] ?? $document->notes,
+            ]);
+            $this->audit($document, 'edit_automatic', $old, $document->refresh()->load('lines')->toArray(), $userId);
 
             return $document;
         });
@@ -802,6 +860,10 @@ class AccountingPostingService
 
         if (! $account) {
             throw new RuntimeException("حساب با کد {$accountCode} پیدا نشد.");
+        }
+
+        if ($cashboxId && ! $detailAccountId) {
+            $detailAccountId = \App\Models\Cashbox::withTrashed()->whereKey($cashboxId)->value('detail_account_id');
         }
 
         return [

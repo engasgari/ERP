@@ -45,6 +45,7 @@ class StoreAccountingDocumentRequest extends FormRequest
             'status' => ['required', 'in:draft,posted'],
             'currency' => ['nullable', 'string', 'max:10'],
             'lines' => ['required', 'array', 'min:2'],
+            'lines.*.id' => ['nullable', 'integer'],
             'lines.*.chart_account_id' => ['required', 'exists:chart_accounts,id'],
             'lines.*.detail_account_id' => ['nullable', 'exists:chart_accounts,id'],
             'lines.*.party_id' => ['nullable', 'exists:parties,id'],

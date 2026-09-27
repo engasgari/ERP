@@ -70,10 +70,6 @@ class AccountingDocumentController extends Controller
             return $redirect;
         }
 
-        if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
-            return $redirect;
-        }
-
         return view('accounting-documents.form', $this->formData($accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project'])));
     }
 
@@ -83,8 +79,15 @@ class AccountingDocumentController extends Controller
             return $redirect;
         }
 
-        if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
-            return $redirect;
+        if ($accountingDocument->is_automatic) {
+            $this->posting->updateAutomatic(
+                $accountingDocument,
+                $request->safe()->except('lines'),
+                $request->validated('lines'),
+                $request->user()->id
+            );
+
+            return redirect()->route('accounting-documents.show', $accountingDocument)->with('success', 'سند سیستمی ویرایش شد. برای اعمال در گزارش‌ها آن را ثبت قطعی کنید.');
         }
 
         $this->posting->updateManual(
@@ -121,10 +124,6 @@ class AccountingDocumentController extends Controller
 
     public function unpost(Request $request, AccountingDocument $accountingDocument)
     {
-        if ($redirect = $this->redirectIfAutomatic($accountingDocument)) {
-            return $redirect;
-        }
-
         if ($redirect = $this->redirectIfNotPosted($accountingDocument, 'فقط اسناد ثبت قطعی را می‌توان به پیش‌نویس برگرداند.')) {
             return $redirect;
         }
@@ -140,9 +139,16 @@ class AccountingDocumentController extends Controller
 
     private function formData(AccountingDocument $document): array
     {
+        $usedAccountIds = $document->relationLoaded('lines')
+            ? $document->lines->pluck('chart_account_id')->merge($document->lines->pluck('detail_account_id'))->filter()->unique()->all()
+            : [];
+
         return [
             'document' => $document,
-            'accounts' => ChartAccount::where('is_active', true)->orderBy('code')->get(),
+            'accounts' => ChartAccount::query()
+                ->where(fn ($query) => $query->where('is_active', true)->orWhereIn('id', $usedAccountIds))
+                ->orderBy('code')
+                ->get(),
             'parties' => Party::where('is_active', true)->orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
         ];
@@ -169,11 +175,11 @@ class AccountingDocumentController extends Controller
 
         return redirect()
             ->route('accounting-documents.show', $document)
-            ->with('error', 'این سند حسابداری به صورت خودکار توسط سیستم ثبت شده و از این صفحه قابل ویرایش یا حذف نیست.')
+            ->with('error', 'این سند حسابداری به صورت خودکار توسط سیستم ثبت شده و از این صفحه قابل حذف نیست.')
             ->with('error_details', [
                 'سند حسابداری: ' . $document->number,
                 'منبع مرتبط: ' . ($document->source_type ? class_basename($document->source_type) . ' #' . $document->source_id : 'ثبت سیستمی'),
-                'برای تغییر یا حذف، سند مادر را بررسی کنید.',
+                'برای حذف، سند مادر را حذف کنید.',
             ]);
     }
 

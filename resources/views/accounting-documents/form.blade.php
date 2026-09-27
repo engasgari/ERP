@@ -1,5 +1,6 @@
 @php
     $isEdit = $document->exists;
+    $isAutomatic = $isEdit && $document->is_automatic;
 @endphp
 
 <x-app-layout>
@@ -25,6 +26,13 @@
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
+                </div>
+            @endif
+
+            @if($isAutomatic)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">
+                    این سند سیستمی است. تاریخ، شرح، حساب، تفصیل، شخص و پروژه قابل تغییر است؛ مبالغ و حساب ردیف‌های بانک/صندوق برای هماهنگی با سند مادر قفل هستند.
+                    اگر سند مادر بعداً ویرایش شود، این سند دوباره از روی آن ساخته می‌شود.
                 </div>
             @endif
 
@@ -97,11 +105,21 @@
                         </tr>
                         </thead>
                         <tbody>
-                        @for($i = 0; $i < max(8, count($lines)); $i++)
-                            @php($line = $lines[$i] ?? [])
+                        @for($i = 0; $i < ($isAutomatic ? count($lines) : max(8, count($lines))); $i++)
+                            @php
+                                $line = $lines[$i] ?? [];
+                                $lockAccount = $isAutomatic && (! empty($line['bank_account_id']) || ! empty($line['cashbox_id']));
+                            @endphp
                             <tr class="align-top odd:bg-white even:bg-slate-50/60 hover:bg-slate-50">
                                 <td>
-                                    <select name="lines[{{ $i }}][chart_account_id]" class="w-full max-w-[135px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[150px] md:px-3 md:text-sm">
+                                    @if(! empty($line['id']))
+                                        <input type="hidden" name="lines[{{ $i }}][id]" value="{{ $line['id'] }}">
+                                    @endif
+                                    @if($lockAccount)
+                                        <input type="hidden" name="lines[{{ $i }}][chart_account_id]" value="{{ $line['chart_account_id'] ?? '' }}">
+                                        <input type="hidden" name="lines[{{ $i }}][detail_account_id]" value="{{ $line['detail_account_id'] ?? '' }}">
+                                    @endif
+                                    <select @if($lockAccount) disabled @else name="lines[{{ $i }}][chart_account_id]" @endif class="w-full max-w-[135px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[150px] md:px-3 md:text-sm">
                                         <option value="">انتخاب حساب</option>
                                         @foreach($accounts as $account)
                                             <option value="{{ $account->id }}" @selected(($line['chart_account_id'] ?? null) == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
@@ -109,7 +127,7 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select name="lines[{{ $i }}][detail_account_id]" class="w-full max-w-[125px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[140px] md:px-3 md:text-sm">
+                                    <select @if($lockAccount) disabled @else name="lines[{{ $i }}][detail_account_id]" @endif class="w-full max-w-[125px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[140px] md:px-3 md:text-sm">
                                         <option value="">انتخاب تفصیل</option>
                                         @foreach($accounts as $account)
                                             @if($account->level === 'detail')
@@ -142,6 +160,7 @@
                                         name="lines[{{ $i }}][debit]"
                                         :value="old('lines.'.$i.'.debit', $line['debit'] ?? null)"
                                         :decimals="2"
+                                        :readonly="$isAutomatic"
                                         class="w-full rounded-md border-emerald-300 bg-emerald-50 px-3 py-3 text-left text-base font-extrabold tracking-wide text-emerald-900 shadow-sm ring-1 ring-emerald-100 focus:border-emerald-500 focus:ring-emerald-500"
                                     />
                                 </td>
@@ -150,6 +169,7 @@
                                         name="lines[{{ $i }}][credit]"
                                         :value="old('lines.'.$i.'.credit', $line['credit'] ?? null)"
                                         :decimals="2"
+                                        :readonly="$isAutomatic"
                                         class="w-full rounded-md border-amber-300 bg-amber-50 px-3 py-3 text-left text-base font-extrabold tracking-wide text-amber-900 shadow-sm ring-1 ring-amber-100 focus:border-amber-500 focus:ring-amber-500"
                                     />
                                 </td>

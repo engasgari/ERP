@@ -74,10 +74,12 @@ class ChartOfAccountsStandardizationService
      */
     public function execute(?int $userId = null, bool $backup = true): array
     {
-        $backupTable = $backup ? $this->backup() : null;
+        $hasPending = collect($this->plan())->contains('status', 'pending');
+        $backupTable = $backup && $hasPending ? $this->backup() : null;
 
         return DB::transaction(function () use ($userId, $backupTable) {
             $before = $this->ledgerSnapshot();
+            $blockingBefore = $this->structuralIssues()['blocking'];
             $applied = [];
 
             foreach ($this->operations() as $operation) {
@@ -99,9 +101,10 @@ class ChartOfAccountsStandardizationService
             }
 
             $structure = $this->structuralIssues();
+            $newBlocking = array_values(array_diff($structure['blocking'], $blockingBefore));
 
-            if ($structure['blocking'] !== []) {
-                throw new RuntimeException('ساختار حساب‌ها پس از اصلاح نامعتبر است: '.implode(' | ', $structure['blocking']));
+            if ($newBlocking !== []) {
+                throw new RuntimeException('ساختار حساب‌ها پس از اصلاح نامعتبر است: '.implode(' | ', $newBlocking));
             }
 
             return [
@@ -226,8 +229,9 @@ class ChartOfAccountsStandardizationService
                 if ($account) {
                     $result['status'] = 'done';
                 } elseif (! ChartAccount::query()->where('code', $operation['parent'])->exists()) {
-                    $result['status'] = 'pending';
-                    $result['note'] = 'والد در همین اجرا ساخته می‌شود';
+                    $createdInRun = $this->parentResolvable($operation['parent']);
+                    $result['status'] = $createdInRun ? 'pending' : 'skipped';
+                    $result['note'] = $createdInRun ? 'والد در همین اجرا ساخته می‌شود' : 'والد وجود ندارد';
                 }
                 break;
 
@@ -313,6 +317,17 @@ class ChartOfAccountsStandardizationService
         return $result;
     }
 
+    private function parentResolvable(string $code): bool
+    {
+        if (ChartAccount::query()->where('code', $code)->exists()) {
+            return true;
+        }
+
+        $create = collect($this->operations())->where('action', 'CREATE')->firstWhere('code', $code);
+
+        return $create !== null && $this->parentResolvable($create['parent']);
+    }
+
     /**
      * Children that are themselves unused and scheduled for deletion do not block the parent.
      *
@@ -348,7 +363,7 @@ class ChartOfAccountsStandardizationService
             case 'CREATE':
                 $parentId = ChartAccount::query()->where('code', $operation['parent'])->value('id');
                 if (! $parentId) {
-                    throw new RuntimeException("والد {$operation['parent']} برای حساب {$operation['code']} پیدا نشد.");
+                    return array_merge($operation, ['status' => 'skipped', 'note' => 'والد وجود ندارد']);
                 }
                 $account = ChartAccount::query()->create([
                     'parent_id' => $parentId,
