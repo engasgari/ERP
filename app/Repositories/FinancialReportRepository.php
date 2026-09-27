@@ -295,7 +295,29 @@ class FinancialReportRepository
             return;
         }
 
-        $query->where('accounting_document_lines.cashbox_id', $cashboxId);
+        $detailAccountId = (int) ($cashbox->detail_account_id ?? 0);
+        $ledgerAccountId = (int) ($cashbox->chart_account_id ?: 0);
+        $ownsLedger = $ledgerAccountId > 0
+            && Cashbox::query()->where('chart_account_id', $ledgerAccountId)->count() === 1;
+
+        $query->where(function (Builder $scope) use ($cashboxId, $detailAccountId, $ledgerAccountId, $ownsLedger) {
+            $scope->where('accounting_document_lines.cashbox_id', $cashboxId);
+
+            if ($detailAccountId > 0) {
+                $scope->orWhere('accounting_document_lines.detail_account_id', $detailAccountId)
+                    ->orWhere('accounting_document_lines.chart_account_id', $detailAccountId);
+            }
+
+            // Manual documents posted on the cash ledger without a detail belong to the only cashbox using that ledger.
+            if ($ownsLedger) {
+                $scope->orWhere(function (Builder $nested) use ($ledgerAccountId) {
+                    $nested->where('accounting_document_lines.chart_account_id', $ledgerAccountId)
+                        ->whereNull('accounting_document_lines.detail_account_id')
+                        ->whereNull('accounting_document_lines.cashbox_id')
+                        ->whereNull('accounting_document_lines.bank_account_id');
+                });
+            }
+        });
     }
 
     private function accountAndDescendantIds(int $accountId): array
