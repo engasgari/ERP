@@ -31,7 +31,7 @@
 
             @if($isAutomatic)
                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">
-                    این سند سیستمی است. تاریخ، شرح، حساب، تفصیل، شخص و پروژه قابل تغییر است؛ مبالغ و حساب ردیف‌های بانک/صندوق برای هماهنگی با سند مادر قفل هستند.
+                    این سند سیستمی است. تاریخ، شرح، حساب، تفصیل، شخص و پروژه قابل تغییر است؛ مبالغ و حساب معین ردیف‌های بانک/صندوق قفل هستند (تفصیل آن‌ها قابل اصلاح است).
                     اگر سند مادر بعداً ویرایش شود، این سند دوباره از روی آن ساخته می‌شود.
                 </div>
             @endif
@@ -117,7 +117,6 @@
                                     @endif
                                     @if($lockAccount)
                                         <input type="hidden" name="lines[{{ $i }}][chart_account_id]" value="{{ $line['chart_account_id'] ?? '' }}">
-                                        <input type="hidden" name="lines[{{ $i }}][detail_account_id]" value="{{ $line['detail_account_id'] ?? '' }}">
                                     @endif
                                     <select @if($lockAccount) disabled @else name="lines[{{ $i }}][chart_account_id]" @endif class="w-full max-w-[135px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[150px] md:px-3 md:text-sm">
                                         <option value="">انتخاب حساب</option>
@@ -127,10 +126,10 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <select @if($lockAccount) disabled @else name="lines[{{ $i }}][detail_account_id]" @endif class="w-full max-w-[125px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[140px] md:px-3 md:text-sm">
+                                    <select name="lines[{{ $i }}][detail_account_id]" class="w-full max-w-[125px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[140px] md:px-3 md:text-sm">
                                         <option value="">انتخاب تفصیل</option>
                                         @foreach($accounts as $account)
-                                            @if($account->level === 'detail')
+                                            @if($account->level === 'detail' && (! $lockAccount || (int) $account->parent_id === (int) ($line['chart_account_id'] ?? 0) || (int) $account->id === (int) ($line['detail_account_id'] ?? 0)))
                                                 <option value="{{ $account->id }}" @selected(($line['detail_account_id'] ?? null) == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
                                             @endif
                                         @endforeach

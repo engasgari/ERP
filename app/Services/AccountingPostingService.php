@@ -160,8 +160,13 @@ class AccountingPostingService
                 $detailAccountId = ! empty($input['detail_account_id']) ? (int) $input['detail_account_id'] : null;
                 $isTreasuryLine = $line->bank_account_id || $line->cashbox_id;
 
-                if ($isTreasuryLine && ((int) $input['chart_account_id'] !== (int) $line->chart_account_id || $detailAccountId !== ($line->detail_account_id ? (int) $line->detail_account_id : null))) {
-                    throw ValidationException::withMessages(['lines' => 'حساب ردیف‌های بانک و صندوق در سند سیستمی قابل تغییر نیست.']);
+                if ($isTreasuryLine && (int) $input['chart_account_id'] !== (int) $line->chart_account_id) {
+                    throw ValidationException::withMessages(['lines' => 'حساب معین ردیف‌های بانک و صندوق در سند سیستمی قابل تغییر نیست؛ فقط تفصیل قابل اصلاح است.']);
+                }
+
+                if ($isTreasuryLine && $detailAccountId && $detailAccountId !== (int) $line->detail_account_id
+                    && ! ChartAccount::query()->whereKey($detailAccountId)->where('parent_id', $line->chart_account_id)->exists()) {
+                    throw ValidationException::withMessages(['lines' => 'تفصیل ردیف بانک/صندوق باید زیرمجموعه همان حساب معین ردیف باشد.']);
                 }
 
                 $line->update([
