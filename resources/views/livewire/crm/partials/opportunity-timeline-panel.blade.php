@@ -66,6 +66,12 @@
 
                     پیش‌فاکتور: {{ $opportunity->invoice->number }}
 
+                    @if($opportunity->invoice->status === 'cancelled')
+
+                        <span class="text-rose-600">(ابطال‌شده)</span>
+
+                    @endif
+
                 </span>
 
             @endif

@@ -17,6 +17,7 @@ class CrmOpportunityService
         private readonly NumberingService $numbering,
         private readonly CrmAuditService $audit,
         private readonly CrmPipelineWorkflowService $pipelineWorkflow,
+        private readonly CrmProformaInvoiceService $proformas,
     ) {}
 
     /**
@@ -140,6 +141,14 @@ class CrmOpportunityService
         ]);
 
         $this->audit->log($opportunity, 'stage_changed', ['stage_id' => $oldStageId], ['stage_id' => $stage->id], $opportunity->party_id);
+
+        if ($status === 'lost') {
+            $this->proformas->cancelForOpportunity(
+                $opportunity->fresh(['invoice']),
+                $actor,
+                $opportunity->lost_reason ?: 'فرصت از دست رفت'
+            );
+        }
 
         if ($oldStageId !== $stage->id) {
             $this->pipelineWorkflow->logStageChangeActivity($opportunity, $stage, $actor);
@@ -299,6 +308,8 @@ class CrmOpportunityService
                 'lost_reason' => $reason,
                 'updated_by' => $actor->id,
             ]);
+
+            $this->proformas->cancelForOpportunity($opportunity->fresh(['invoice']), $actor, $reason);
 
             $this->audit->log(
                 $opportunity,

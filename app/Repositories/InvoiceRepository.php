@@ -30,6 +30,11 @@ class InvoiceRepository
             }
         }
 
+        // ابطال‌شده‌ها فقط وقتی صریحاً فیلتر وضعیت «لغوشده» انتخاب شود در ERP دیده می‌شوند.
+        if (empty($filters['status'])) {
+            $query->where('status', '!=', 'cancelled');
+        }
+
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
             $query->where(fn (Builder $builder) => $builder

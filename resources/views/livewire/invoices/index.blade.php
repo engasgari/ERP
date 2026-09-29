@@ -30,9 +30,10 @@
                 </label>
                 <label class="erp-filter-field">وضعیت
                     <select wire:model.live="status">
-                        <option value="">همه</option>
+                        <option value="">همه (به‌جز ابطال‌شده)</option>
                         <option value="draft">موقت</option>
                         <option value="confirmed">تایید شده</option>
+                        <option value="cancelled">ابطال‌شده</option>
                     </select>
                 </label>
                 <label class="erp-filter-field">از تاریخ
@@ -61,8 +62,20 @@
             @php
                 $statusLabel = $invoice->settled_at
                     ? 'تسویه شده'
-                    : ($invoice->status === 'draft' ? 'موقت' : ($invoice->status === 'confirmed' ? 'تایید شده' : $invoice->status));
-                $statusTone = $invoice->settled_at ? 'success' : ($invoice->status === 'draft' ? 'warning' : 'info');
+                    : match ($invoice->status) {
+                        'draft' => 'موقت',
+                        'confirmed' => 'تایید شده',
+                        'cancelled' => 'ابطال‌شده',
+                        default => $invoice->status,
+                    };
+                $statusTone = $invoice->settled_at
+                    ? 'success'
+                    : match ($invoice->status) {
+                        'draft' => 'warning',
+                        'confirmed' => 'info',
+                        'cancelled' => 'danger',
+                        default => 'info',
+                    };
                 $typeLabel = ($invoice->direction === 'sale' ? 'فروش' : 'خرید') . ' / ' . ($invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور');
             @endphp
             <tr wire:key="invoice-{{ $invoice->id }}" data-invoice-row="{{ $invoice->id }}">
@@ -82,12 +95,12 @@
                         <x-erp.ui.row-action icon="view" label="جزئیات" wire:click="show({{ $invoice->id }})" />
                         <x-erp.ui.row-action icon="expand" label="نمایش کامل" data-invoice-show="{{ $invoice->id }}" />
                         <x-erp.ui.row-action icon="edit" label="ویرایش" data-invoice-edit="{{ $invoice->id }}" />
-                        @if($invoice->document_type === 'proforma')
+                        @if($invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
                             <form method="POST" action="{{ route('invoices.convert', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="convert" label="تبدیل به فاکتور" />
                             </form>
-                        @elseif($invoice->status === 'draft')
+                        @elseif($invoice->document_type !== 'proforma' && $invoice->status === 'draft')
                             <form method="POST" action="{{ route('invoices.confirm', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="confirm" label="تایید و سند" tone="success" />

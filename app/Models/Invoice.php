@@ -125,7 +125,14 @@ class Invoice extends Model
 
     public function getSettlementStatusLabelAttribute(): string
     {
-        return $this->settled_at ? 'تسویه شده' : ($this->status === 'confirmed' ? 'باز' : ($this->status === 'draft' ? 'موقت' : $this->status));
+        return $this->settled_at
+            ? 'تسویه شده'
+            : match ($this->status) {
+                'confirmed' => 'باز',
+                'draft' => 'موقت',
+                'cancelled' => 'ابطال‌شده',
+                default => $this->status,
+            };
     }
 
     public function getIsSettledAttribute(): bool

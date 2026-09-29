@@ -17,7 +17,13 @@
         $taxTotal = (float) $invoice->tax_amount;
         $finalTotal = (float) $invoice->total_amount;
         $emptyRows = max(0, 8 - $invoice->lines->count());
-        $statusLabel = $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? 'تایید نهایی' : 'ثبت موقت');
+        $statusLabel = $invoice->settled_at
+            ? 'تسویه شده'
+            : match ($invoice->status) {
+                'confirmed' => 'تایید نهایی',
+                'cancelled' => 'ابطال‌شده',
+                default => 'ثبت موقت',
+            };
     @endphp
 
         <div class="invoice-print-actions">
@@ -45,12 +51,12 @@
             <button type="submit">حذف فاکتور</button>
         </form>
 
-        @if($invoice->document_type === 'proforma')
+        @if($invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
             <form method="POST" action="{{ route('invoices.convert', $invoice) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit">تبدیل به فاکتور</button>
             </form>
-        @elseif($invoice->status === 'draft')
+        @elseif($invoice->document_type !== 'proforma' && $invoice->status === 'draft')
             <form method="POST" action="{{ route('invoices.confirm', $invoice) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">{{ $invoice->direction === 'purchase' ? 'تایید نهایی و ثبت رسید انبار' : 'تایید نهایی و ثبت حواله انبار' }}</button>

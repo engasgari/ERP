@@ -69,6 +69,9 @@
                                             <div class="crm-kanban-card-proforma">
                                                 <button type="button" data-crm-proforma-show="{{ $opp->invoice->id }}">
                                                     پیش‌فاکتور {{ $opp->invoice->number }}
+                                                    @if($opp->invoice->status === 'cancelled')
+                                                        (ابطال‌شده)
+                                                    @endif
                                                 </button>
                                             </div>
                                         @endif
@@ -108,7 +111,7 @@
                                                     class="crm-kanban-icon-btn"
                                                 />
                                             @endif
-                                            @if(! $opp->invoice && (int) ($opp->stage?->sort_order ?? 0) >= 5)
+                                            @if(! $opp->invoice && (int) ($opp->stage?->sort_order ?? 0) >= 5 && $opp->status === 'open')
                                                 <x-erp.ui.row-action
                                                     icon="issue"
                                                     label="صدور پیش‌فاکتور"

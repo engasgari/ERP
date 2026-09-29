@@ -12,6 +12,7 @@ use App\Models\PartyType;
 use App\Models\Project;
 use App\Models\Warehouse;
 use App\Services\AccountingDocumentService;
+use App\Services\Crm\CrmProformaInvoiceService;
 use App\Services\FiscalPeriodService;
 use App\Services\InventoryPostingService;
 use App\Services\InvoiceCalculationService;
@@ -42,6 +43,8 @@ class InvoiceController extends Controller
 
     public function edit(Request $request, Invoice $invoice)
     {
+        abort_if($invoice->status === 'cancelled', 422, 'سند ابطال‌شده قابل ویرایش نیست.');
+
         $data = $this->formData(
             direction: $invoice->direction,
             documentType: $invoice->document_type,
@@ -176,6 +179,8 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice, InventoryPostingService $inventory)
     {
+        abort_if($invoice->status === 'cancelled', 422, 'سند ابطال‌شده قابل ویرایش نیست.');
+
         $payload = $this->validatedPayload($request, $invoice);
 
         try {
@@ -343,34 +348,44 @@ class InvoiceController extends Controller
         return back()->with('success', 'فاکتور از حالت تسویه خارج شد و به وضعیت تایید شده برگشت.');
     }
 
-    public function convert(Request $request, Invoice $invoice, NumberingService $numbering)
+    public function convert(Request $request, Invoice $invoice, NumberingService $numbering, CrmProformaInvoiceService $proformas)
     {
-        abort_if($invoice->document_type !== 'proforma', 422);
+        abort_if($invoice->document_type !== 'proforma', 422, 'فقط پیش‌فاکتور قابل تبدیل است.');
+        abort_if($invoice->status === 'cancelled', 422, 'پیش‌فاکتور ابطال‌شده قابل تبدیل نیست.');
 
-        $new = $invoice->replicate(['number', 'document_type', 'status', 'accounting_document_id', 'confirmed_at', 'settled_at', 'settled_by']);
-        $new->number = $numbering->next(
-            $invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
-            null,
-            $invoice->fiscal_year_id
-        );
-        $new->document_type = 'invoice';
-        $new->status = 'draft';
-        $new->converted_from_id = $invoice->id;
-        $new->save();
+        $new = DB::transaction(function () use ($invoice, $numbering, $proformas, $request) {
+            $invoice->loadMissing('lines');
 
-        foreach ($invoice->lines as $line) {
-            $new->lines()->create($line->only(['item_id', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_rate', 'tax_amount', 'line_total']));
-        }
+            $new = $invoice->replicate(['number', 'document_type', 'status', 'accounting_document_id', 'confirmed_at', 'settled_at', 'settled_by']);
+            $new->number = $numbering->next(
+                $invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
+                null,
+                $invoice->fiscal_year_id
+            );
+            $new->document_type = 'invoice';
+            $new->status = 'draft';
+            $new->converted_from_id = null;
+            $new->save();
+
+            foreach ($invoice->lines as $line) {
+                $new->lines()->create($line->only(['item_id', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_rate', 'tax_amount', 'line_total']));
+            }
+
+            // حذف پیش‌فاکتور از ERP؛ لینک فرصت CRM به فاکتور جدید منتقل می‌شود.
+            $proformas->finalizeConversion($invoice, $new, $request->user());
+
+            return $new->fresh(['lines', 'party']);
+        });
 
         if ($request->expectsJson()) {
             return $this->invoiceJsonPayload(
-                $new->fresh(),
-                'پیش‌فاکتور به فاکتور تبدیل شد.',
+                $new,
+                'پیش‌فاکتور به فاکتور تبدیل شد و پیش‌فاکتور از سیستم حذف شد.',
                 reloadShowId: $new->id
             );
         }
 
-        return redirect()->route('invoices.show', $new)->with('success', 'پیش‌فاکتور به فاکتور تبدیل شد.');
+        return redirect()->route('invoices.show', $new)->with('success', 'پیش‌فاکتور به فاکتور تبدیل شد و پیش‌فاکتور از سیستم حذف شد.');
     }
 
     public function destroy(Request $request, Invoice $invoice)
