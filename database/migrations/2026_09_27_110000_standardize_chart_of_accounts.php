@@ -19,7 +19,16 @@ return new class extends Migration
             return;
         }
 
-        $result = app(ChartOfAccountsStandardizationService::class)->execute();
+        $result = app(ChartOfAccountsStandardizationService::class)->execute(
+            userId: null,
+            backup: true,
+        );
+
+        if (collect($result['applied'])->contains('status', 'blocked')) {
+            throw new \RuntimeException(
+                'اصلاح کدینگ حساب‌ها به‌خاطر عملیات مسدود متوقف شد. لاگ را ببینید: Chart of accounts standardization'
+            );
+        }
 
         $summary = collect($result['applied'])->countBy('status')->all();
         Log::info('Chart of accounts standardization migration finished.', [

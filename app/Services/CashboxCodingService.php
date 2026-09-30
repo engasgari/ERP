@@ -5,11 +5,16 @@ namespace App\Services;
 use App\Models\Cashbox;
 use App\Models\ChartAccount;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CashboxCodingService
 {
     public function syncDetailAccount(Cashbox $cashbox): Cashbox
     {
+        if (! Schema::hasColumn('cashboxes', 'detail_account_id')) {
+            return $cashbox;
+        }
+
         return DB::transaction(function () use ($cashbox) {
             $cashbox->loadMissing('account', 'detailAccount');
 

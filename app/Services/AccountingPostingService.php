@@ -18,6 +18,7 @@ use App\Models\ReceiptVoucher;
 use App\Models\TreasuryTransaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -867,7 +868,7 @@ class AccountingPostingService
             throw new RuntimeException("حساب با کد {$accountCode} پیدا نشد.");
         }
 
-        if ($cashboxId && ! $detailAccountId) {
+        if ($cashboxId && ! $detailAccountId && Schema::hasColumn('cashboxes', 'detail_account_id')) {
             $detailAccountId = \App\Models\Cashbox::withTrashed()->whereKey($cashboxId)->value('detail_account_id');
         }
 

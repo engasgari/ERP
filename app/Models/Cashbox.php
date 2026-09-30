@@ -6,6 +6,7 @@ use App\Services\CashboxCodingService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 class Cashbox extends Model
 {
@@ -21,6 +22,10 @@ class Cashbox extends Model
     protected static function booted(): void
     {
         static::saved(function (Cashbox $cashbox): void {
+            if (! Schema::hasColumn('cashboxes', 'detail_account_id')) {
+                return;
+            }
+
             if ($cashbox->wasChanged(['code', 'name', 'chart_account_id', 'is_active']) || $cashbox->wasRecentlyCreated || ! $cashbox->detail_account_id) {
                 app(CashboxCodingService::class)->syncDetailAccount($cashbox);
             }
