@@ -91,7 +91,7 @@ class CrmTimelineService
             'assignedUser',
             'party',
             'pipeline',
-            'invoice',
+            'invoice.createdBy',
             'attachments' => fn ($q) => $q->latest('id'),
         ]);
         $group = $this->buildOpportunityGroup($opportunity, $limit);
@@ -269,6 +269,18 @@ class CrmTimelineService
                 }
             }
 
+            if (($child['timeline_anchor'] ?? null) === 'last_milestone') {
+                $lastMilestone = $milestones->last(
+                    fn (array $milestone) => in_array($milestone['badge'] ?? '', ['فرصت برنده', 'بستن فرصت'], true),
+                ) ?? $milestones->last();
+
+                if ($lastMilestone) {
+                    $assignments[$lastMilestone['id']]->push($child);
+
+                    continue;
+                }
+            }
+
             $milestoneIndex = null;
 
             foreach ($milestones as $index => $milestone) {
@@ -353,6 +365,11 @@ class CrmTimelineService
                 $this->mapOpportunityOutcomeEntry($opportunity, 'lost'),
                 $meta,
             ));
+        }
+
+        $invoiceEntry = $this->mapOpportunityInvoiceEntry($opportunity);
+        if ($invoiceEntry) {
+            $entries->push($this->enrichEntry($invoiceEntry, $meta));
         }
 
         return $entries
@@ -599,6 +616,61 @@ class CrmTimelineService
             'summary' => $opp->lost_reason,
             'occurred_at' => $opp->lost_at,
             'user_name' => $opp->assignedUser?->name,
+        ];
+    }
+
+    /**
+     * Linked sale invoice (or proforma) for a won opportunity appears under the last stage.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function mapOpportunityInvoiceEntry(Opportunity $opp): ?array
+    {
+        $opp->loadMissing(['invoice.createdBy']);
+
+        $invoice = $opp->invoice;
+        if (! $invoice) {
+            return null;
+        }
+
+        // Only pin to the final stage after the opportunity is won.
+        if (! $opp->won_at && $opp->status !== 'won') {
+            return null;
+        }
+
+        $isSaleInvoice = $invoice->document_type === 'invoice';
+        $badge = $isSaleInvoice ? 'فاکتور فروش' : 'پیش‌فاکتور';
+
+        $occurredAt = $invoice->confirmed_at
+            ?? ($invoice->invoice_date ? Carbon::parse($invoice->invoice_date)->startOfDay() : null)
+            ?? $opp->won_at
+            ?? $invoice->updated_at
+            ?? $opp->updated_at;
+
+        if (! $occurredAt instanceof Carbon) {
+            return null;
+        }
+
+        // Keep the invoice under the won/last milestone even if the invoice date is earlier.
+        if ($opp->won_at instanceof Carbon && $occurredAt->lt($opp->won_at)) {
+            $occurredAt = $opp->won_at->copy()->addSecond();
+        }
+
+        $statusSuffix = $invoice->status === 'cancelled' ? ' (ابطال‌شده)' : '';
+
+        return [
+            'id' => 'opp-invoice:'.$opp->id.':'.$invoice->id,
+            'source' => 'invoice',
+            'kind' => 'invoice',
+            'badge' => $badge,
+            'title' => $badge.' '.$invoice->number.$statusSuffix,
+            'summary' => formatMoney((float) $invoice->total_amount),
+            'occurred_at' => $occurredAt,
+            'user_name' => $invoice->createdBy?->name,
+            'invoice_id' => $invoice->id,
+            'invoice_document_type' => $invoice->document_type,
+            'invoice_status' => $invoice->status,
+            'timeline_anchor' => 'last_milestone',
         ];
     }
 

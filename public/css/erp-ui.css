@@ -4035,6 +4035,10 @@ body.crm-pipeline-view {
     background: #f59e0b;
 }
 
+.crm-timeline-branch-entry--invoice .crm-timeline-branch-marker {
+    background: #0d9488;
+}
+
 .crm-timeline-branch-entry--pending .crm-timeline-branch-marker {
     background: #f97316;
     box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
@@ -4068,6 +4072,10 @@ body.crm-pipeline-view {
     font-size: 0.8125rem;
     font-weight: 700;
     color: #0f172a;
+}
+
+.crm-timeline-branch-actions {
+    margin-top: 0.45rem;
 }
 
 .bank-statement-description {
