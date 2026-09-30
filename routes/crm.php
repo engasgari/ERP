@@ -53,54 +53,32 @@ Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.
 
 
 
-    Route::middleware('permission:crm.customers.view')->group(function () {
-
+    Route::middleware('permission:crm.customers.view,crm.opportunities.view')->group(function () {
         Route::get('/invoices/{invoice}', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'show'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.show');
 
-
-
         Route::get('/invoices/{invoice}/print', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'print'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.print');
 
-
-
         Route::get('/invoices/{invoice}/pdf', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'downloadPdf'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.pdf');
 
-
-
         Route::get('/invoices/{invoice}/excel', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'downloadExcel'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.excel');
+    });
 
-
-
+    Route::middleware('permission:crm.customers.view')->group(function () {
         Route::get('/invoices/{invoice}/edit', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'edit'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.edit');
 
-
-
         Route::put('/invoices/{invoice}', [\App\Http\Controllers\Crm\CrmCustomerInvoiceController::class, 'update'])
-
             ->whereNumber('invoice')
-
             ->name('invoices.update');
-
     });
 
 

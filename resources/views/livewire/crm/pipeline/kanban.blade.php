@@ -67,12 +67,23 @@
                                         </div>
                                         @if($opp->invoice)
                                             <div class="crm-kanban-card-proforma">
-                                                <button type="button" data-crm-proforma-show="{{ $opp->invoice->id }}">
-                                                    پیش‌فاکتور {{ $opp->invoice->number }}
-                                                    @if($opp->invoice->status === 'cancelled')
-                                                        (ابطال‌شده)
-                                                    @endif
-                                                </button>
+                                                @if($opp->invoice->document_type === 'invoice')
+                                                    <button
+                                                        type="button"
+                                                        data-invoice-show="{{ $opp->invoice->id }}"
+                                                        data-invoice-show-crm="1"
+                                                        data-invoice-show-title="فاکتور فروش {{ $opp->invoice->number }}"
+                                                    >
+                                                        فاکتور فروش {{ $opp->invoice->number }}
+                                                    </button>
+                                                @else
+                                                    <button type="button" data-crm-proforma-show="{{ $opp->invoice->id }}">
+                                                        پیش‌فاکتور {{ $opp->invoice->number }}
+                                                        @if($opp->invoice->status === 'cancelled')
+                                                            (ابطال‌شده)
+                                                        @endif
+                                                    </button>
+                                                @endif
                                             </div>
                                         @endif
                                         <div class="crm-kanban-card-actions" @click.stop @mousedown.stop>
@@ -397,4 +408,6 @@
         });
     })();
     </script>
+
+    <x-erp.ui.invoice-iframe-modals />
 </x-erp.ui.list-page>

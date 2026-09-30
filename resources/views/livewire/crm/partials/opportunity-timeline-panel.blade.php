@@ -62,9 +62,9 @@
 
             @if($opportunity->invoice)
 
-                <span class="crm-opportunity-timeline-chip crm-opportunity-timeline-chip--proforma" dir="ltr">
+                <span class="crm-opportunity-timeline-chip {{ $opportunity->invoice->document_type === 'invoice' ? 'crm-opportunity-timeline-chip--invoice' : 'crm-opportunity-timeline-chip--proforma' }}" dir="ltr">
 
-                    پیش‌فاکتور: {{ $opportunity->invoice->number }}
+                    {{ $opportunity->invoice->document_type === 'invoice' ? 'فاکتور فروش' : 'پیش‌فاکتور' }}: {{ $opportunity->invoice->number }}
 
                     @if($opportunity->invoice->status === 'cancelled')
 

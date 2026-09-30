@@ -8,9 +8,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserHasPermission
 {
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
-        if (!$request->user()?->hasPermission($permission)) {
+        $keys = collect($permissions)
+            ->flatMap(fn (string $permission) => preg_split('/[|,]/', $permission) ?: [])
+            ->map(fn (string $permission) => trim($permission))
+            ->filter()
+            ->values();
+
+        $user = $request->user();
+        $allowed = $user && $keys->contains(
+            fn (string $permission) => $user->hasPermission($permission)
+        );
+
+        if (! $allowed) {
             return response()->view('errors.no-access', status: 403);
         }
 

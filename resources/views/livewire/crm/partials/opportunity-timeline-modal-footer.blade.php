@@ -1,23 +1,32 @@
 @php
     $opportunity = $opportunityTimelineOverview['opportunity'];
     $canMoveStage = auth()->user()?->hasPermission('crm.opportunities.move_stage');
+    $linkedInvoice = $opportunity->invoice;
+    $isProforma = $linkedInvoice && $linkedInvoice->document_type === 'proforma';
+    $isSaleInvoice = $linkedInvoice && $linkedInvoice->document_type === 'invoice';
+    $documentLabel = $isSaleInvoice ? 'فاکتور فروش' : 'پیش‌فاکتور';
+    $documentTitle = $documentLabel.' '.$linkedInvoice?->number;
 @endphp
 
 <button type="button" class="erp-action-btn" wire:click="closeOpportunityTimeline">بستن</button>
 
-@if($opportunity->invoice)
+@if($linkedInvoice)
     <button
         type="button"
         class="erp-action-btn erp-action-detail"
-        @if(($proformaButtonMode ?? null) === 'kanban')
-            data-crm-proforma-show="{{ $opportunity->invoice->id }}"
+        @if($isProforma && ($proformaButtonMode ?? null) === 'kanban')
+            data-crm-proforma-show="{{ $linkedInvoice->id }}"
         @else
-            data-invoice-show="{{ $opportunity->invoice->id }}"
+            data-invoice-show="{{ $linkedInvoice->id }}"
             data-invoice-show-crm="1"
-            data-invoice-show-title="پیش‌فاکتور {{ $opportunity->invoice->number }}"
+            data-invoice-show-title="{{ $documentTitle }}"
         @endif
     >
-        مشاهده پیش‌فاکتور
+        @if($isSaleInvoice)
+            فاکتور فروش
+        @else
+            مشاهده پیش‌فاکتور
+        @endif
     </button>
 @endif
 
