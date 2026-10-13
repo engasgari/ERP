@@ -84,6 +84,18 @@ class CrmNavigationMenu
 
             [
 
+                'label' => 'پیگیری هوشمند',
+
+                'route' => 'crm.ai.sales-task-planner',
+
+                'active' => ['crm.ai.sales-task-planner'],
+
+                'permission' => 'crm.ai.sales_task_planner.request',
+
+            ],
+
+            [
+
                 'label' => 'مشتریان',
 
                 'route' => 'crm.customers.index',

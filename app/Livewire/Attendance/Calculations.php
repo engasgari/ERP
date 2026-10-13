@@ -75,7 +75,8 @@ class Calculations extends Component
         }
 
         $this->cancelEdit();
-        session()->flash('success', 'محاسبه کارکرد برای ' . formatMoney($rows->count()) . ' نفر انجام شد. می‌توانید اعداد هر نفر را دستی ویرایش کنید.');
+        $count = toPersianDigits($rows->count());
+        session()->flash('success', "محاسبه کارکرد برای {$count} نفر انجام شد. در صورت نیاز، اعداد هر نفر را از ستون عملیات ویرایش کنید.");
     }
 
     public function updated($name): void

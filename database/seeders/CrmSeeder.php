@@ -101,6 +101,10 @@ class CrmSeeder extends Seeder
             ['key' => 'crm.sold_devices.update', 'title' => 'ویرایش گارانتی', 'group' => 'CRM'],
             ['key' => 'crm.sold_devices.delete', 'title' => 'حذف گارانتی', 'group' => 'CRM'],
             ['key' => 'crm.settings.manage', 'title' => 'تنظیمات CRM', 'group' => 'CRM'],
+            ['key' => 'crm.ai.customer_intelligence.request', 'title' => 'درخواست خلاصه هوشمند مشتری', 'group' => 'CRM'],
+            ['key' => 'crm.ai.sales_task_planner.request', 'title' => 'درخواست برنامه پیگیری هوشمند', 'group' => 'CRM'],
+            ['key' => 'crm.ai.sales_task_planner.apply', 'title' => 'تأیید و ایجاد وظیفه از پیشنهاد هوش مصنوعی', 'group' => 'CRM'],
+            ['key' => 'crm.ai.runs.view', 'title' => 'مشاهده گزارش اجرای هوش مصنوعی', 'group' => 'CRM'],
         ];
 
         foreach ($permissions as $permission) {
@@ -119,6 +123,9 @@ class CrmSeeder extends Seeder
                 'crm.activities.view', 'crm.activities.create', 'crm.activities.update',
                 'crm.tasks.view', 'crm.tasks.create', 'crm.tasks.update', 'crm.reports.view',
                 'crm.sold_devices.view', 'crm.sold_devices.create', 'crm.sold_devices.update',
+                'crm.ai.customer_intelligence.request',
+                'crm.ai.sales_task_planner.request',
+                'crm.ai.sales_task_planner.apply',
                 'commerce.view',
             ])->pluck('id')],
             'crm_viewer' => ['title' => 'مشاهده‌گر CRM', 'description' => 'فقط مشاهده CRM', 'permissions' => Permission::whereIn('key', [

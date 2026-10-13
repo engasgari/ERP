@@ -12,7 +12,6 @@ use App\Models\EmploymentOrder;
 use App\Models\MonthlyAttendance;
 use App\Models\PayrollPeriod;
 use App\Models\WorkGroup;
-use App\Models\WorkGroupEmployee;
 use App\Models\WorkLog;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -23,8 +22,8 @@ class NewAttendanceEngineService
     public function __construct(
         private readonly AttendanceDayCalculatorService $dayCalculator,
         private readonly EmploymentContractResolver $contractResolver,
-    )
-    {
+        private readonly WorkGroupAssignmentResolver $workGroupResolver,
+    ) {
     }
 
     public function processPeriod(PayrollPeriod $period, ?int $employeeId = null, bool $includeAllActive = false): Collection
@@ -218,7 +217,7 @@ class NewAttendanceEngineService
                 'work_days' => $presentDays,
                 'present_days' => $presentDays,
                 'absence_days' => $absenceDays,
-                'required_hours' => round($plannedMinutes / 60, 2),
+                'required_hours' => $monthRequiredTime['required_hours'],
                 'normal_hours' => round($workedMinutes / 60, 2),
                 'worked_hours' => round($workedMinutes / 60, 2),
                 'break_minutes' => $breakMinutes,
@@ -540,17 +539,7 @@ class NewAttendanceEngineService
 
     private function workGroupForDate(Employee $employee, Carbon $date): ?WorkGroup
     {
-        $assignments = $employee->workGroupAssignments ?? collect();
-
-        return $assignments
-            ->filter(function (WorkGroupEmployee $assignment) use ($date): bool {
-                return (! $assignment->start_date || $assignment->start_date->lte($date))
-                    && (! $assignment->end_date || $assignment->end_date->gte($date));
-            })
-            ->sortByDesc(fn (WorkGroupEmployee $assignment) => $assignment->start_date?->timestamp ?? 0)
-            ->sortByDesc('id')
-            ->first()
-            ?->workGroup;
+        return $this->workGroupResolver->resolve($employee, $date);
     }
 
     private function nightMinutesForLogs(Carbon $date, Collection $logs): int

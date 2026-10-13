@@ -263,6 +263,7 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::view('work-groups/assignments', 'work-groups.assignments')->middleware('permission:worklogs.manage')->name('work-groups.assignments');
     Route::resource('work-groups', WorkGroupController::class)->except(['show'])->middleware('permission:worklogs.manage');
     Route::view('attendance/calculations', 'attendance.calculations')->middleware('permission:attendance.view')->name('attendance.calculations');
+    Route::view('attendance/daily-summary', 'attendance.daily-summary')->middleware('permission:attendance.view')->name('attendance.daily-summary');
     Route::view('attendance/leaves', 'attendance.leaves')->middleware('permission:attendance.view')->name('attendance.leaves');
     Route::view('attendance/missions', 'attendance.missions')->middleware('permission:attendance.view')->name('attendance.missions');
     Route::view('attendance/summaries', 'attendance.summaries')->middleware('permission:attendance.view')->name('attendance.summaries');

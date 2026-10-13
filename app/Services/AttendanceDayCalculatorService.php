@@ -8,6 +8,7 @@ use App\Models\AttendanceRawLog;
 use App\Models\WorkGroup;
 use App\Models\WorkLog;
 use App\Models\WorkShift;
+use App\Support\WorkCalendarDefaults;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -31,8 +32,14 @@ class AttendanceDayCalculatorService
         $shift = $workGroup?->shift;
         $calendar = $workGroup?->calendar;
         $config = $this->resolvedShiftConfig($shift, $workGroup?->payroll_rules ?? []);
-        $isWorkingDay = $this->isWorkingDay($date, $calendar);
-        $plannedMinutes = $isWorkingDay ? $this->plannedMinutes($config['start_time'], $config['end_time']) - (int) $config['break_minutes'] : 0;
+        $isWorkingDay = $workGroup && $calendar
+            ? $this->isWorkingDay($date, $calendar)
+            : false;
+        // بدون گروه/شیفت موظفی ساخته نمی‌شود (قبلاً هر روز غیرجمعه ۹ ساعت می‌شد).
+        $hasSchedule = $shift !== null || $this->hasExplicitSchedule($workGroup?->payroll_rules ?? []);
+        $plannedMinutes = ($isWorkingDay && $hasSchedule)
+            ? $this->plannedMinutes($config['start_time'], $config['end_time']) - (int) $config['break_minutes']
+            : 0;
         $plannedMinutes = max(0, $plannedMinutes);
 
         $workMetrics = $this->logMetrics($date, $logs, $config, $plannedMinutes);
@@ -79,7 +86,19 @@ class AttendanceDayCalculatorService
 
         $holidayMinutes = $isWorkingDay ? 0 : $workedMinutes;
         $absenceMinutes = max(0, $plannedMinutes - $workedMinutes - $requestCoverageMinutes);
-        $overtimeMinutes = $isWorkingDay ? max(0, $workedMinutes - $plannedMinutes) : $workedMinutes;
+
+        // اگر تأخیر+تعجیل از کارکرد بیشتر باشد، روز غیبت محسوب می‌شود (قانون کار اداری).
+        $delayAndEarlyExceedWork = $isWorkingDay
+            && $plannedMinutes > 0
+            && ($delayMinutes + $earlyMinutes) > $workedMinutes;
+
+        if ($delayAndEarlyExceedWork) {
+            $absenceMinutes = max($absenceMinutes, max(0, $plannedMinutes - $requestCoverageMinutes));
+        }
+
+        $overtimeMinutes = $delayAndEarlyExceedWork
+            ? 0
+            : ($isWorkingDay ? max(0, $workedMinutes - $plannedMinutes) : $workedMinutes);
         $attendanceDeductionMinutes = min(
             $plannedMinutes,
             max($absenceMinutes, $delayMinutes + $earlyMinutes)
@@ -90,7 +109,7 @@ class AttendanceDayCalculatorService
         $absenceFrom = null;
         $absenceTo = null;
         if ($isWorkingDay && $absenceMinutes > 0) {
-            if (! $firstLog || ! $lastLog) {
+            if (! $firstLog || ! $lastLog || $delayAndEarlyExceedWork) {
                 $absenceFrom = $scheduledStart->format('H:i');
                 $absenceTo = $scheduledEnd->format('H:i');
             } elseif ($delayMinutes > 0 || $earlyMinutes > 0) {
@@ -218,24 +237,46 @@ class AttendanceDayCalculatorService
 
     private function isWorkingDay(Carbon $date, ?\App\Models\WorkCalendar $calendar): bool
     {
-        $jalaliDate = formatJalaliDateSafe($date, '');
-        $holidays = $calendar?->holidays ?: [];
-        if (in_array($date->toDateString(), $holidays, true) || in_array($jalaliDate, $holidays, true)) {
+        $holidays = collect($calendar?->holidays ?: [])
+            ->map(fn ($holiday) => normalizePersianDigits((string) $holiday))
+            ->filter()
+            ->all();
+
+        $gregorian = $date->toDateString();
+        $jalali = normalizePersianDigits(formatJalaliDateSafe($date, ''));
+
+        if (in_array($gregorian, $holidays, true) || in_array($jalali, $holidays, true)) {
             return false;
         }
 
         $dayOfWeek = (int) $date->dayOfWeek;
-        $weekends = $calendar?->weekend_days ?: [];
+        $weekends = WorkCalendarDefaults::normalizeDayList(
+            $calendar?->weekend_days,
+            WorkCalendarDefaults::weekendDays()
+        );
+
         if (in_array($dayOfWeek, $weekends, true)) {
             return false;
         }
 
-        $workingDays = $calendar?->working_days ?: [];
-        if ($workingDays !== []) {
-            return in_array($dayOfWeek, $workingDays, true);
-        }
+        $workingDays = WorkCalendarDefaults::normalizeDayList(
+            $calendar?->working_days,
+            WorkCalendarDefaults::workingDays()
+        );
 
-        return $dayOfWeek !== Carbon::FRIDAY;
+        return in_array($dayOfWeek, $workingDays, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payrollRules
+     */
+    private function hasExplicitSchedule(array $payrollRules): bool
+    {
+        return isset($payrollRules['start_time'], $payrollRules['end_time'])
+            && is_string($payrollRules['start_time'])
+            && is_string($payrollRules['end_time'])
+            && $payrollRules['start_time'] !== ''
+            && $payrollRules['end_time'] !== '';
     }
 
     /**

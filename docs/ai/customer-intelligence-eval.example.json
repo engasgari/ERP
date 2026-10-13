@@ -1,0 +1,20 @@
+{
+    "_comment": "Template only. Copy outside the repository, replace with ~20 approved, non-sensitive reference customers. party_id must exist in the target database.",
+    "cases": [
+        {
+            "party_id": 0,
+            "reference": {
+                "expected_identity": "matched",
+                "expected_name_keywords": ["<public company name>"],
+                "expected_industry_keywords": ["<industry keyword>"],
+                "expected_website_domain": "<example.ir>"
+            }
+        },
+        {
+            "party_id": 0,
+            "reference": {
+                "expected_identity": "ambiguous"
+            }
+        }
+    ]
+}

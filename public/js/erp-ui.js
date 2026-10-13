@@ -156,6 +156,11 @@ function isErpMoneyField(input) {
         return false;
     }
 
+    // سال/ماه شمسی و فیلدهای مشابه مبلغ نیستند (جلوگیری از جداکننده هزارتایی مثل ۱٬۴۰۵)
+    if (/(jalali_year|persian_year|(^|[\[\]_.-])(year|month)(?=$|[\[\]_.-]))/i.test(haystack)) {
+        return false;
+    }
+
     return input.type === 'number'
         || input.inputMode === 'decimal'
         || input.inputMode === 'numeric'

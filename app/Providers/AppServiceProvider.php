@@ -4,6 +4,12 @@ namespace App\Providers;
 
 use App\Models\Permission;
 use App\Policies\FinancialReportPolicy;
+use App\Services\Ai\Contracts\AiGateway;
+use App\Services\Ai\Gateways\FakeAiGateway;
+use App\Services\Ai\Gateways\NullAiGateway;
+use App\Services\Ai\Gateways\OpenAiCompatibleGateway;
+use App\Services\Ai\WebSearch\Contracts\WebSearchProvider;
+use App\Services\Ai\WebSearch\NullWebSearchProvider;
 use App\Services\NavigationBreadcrumbService;
 use App\Support\FinancialReportContext;
 use Illuminate\Support\Facades\App;
@@ -18,7 +24,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(AiGateway::class, fn () => match (config('crm_ai.driver')) {
+            'fake' => new FakeAiGateway,
+            'openai' => OpenAiCompatibleGateway::fromConfig(),
+            default => new NullAiGateway,
+        });
+
+        $this->app->singleton(WebSearchProvider::class, fn () => match (config('crm_ai.web_search.driver')) {
+            default => new NullWebSearchProvider,
+        });
     }
 
     /**

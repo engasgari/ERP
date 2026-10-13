@@ -5,10 +5,12 @@ namespace App\Livewire\Crm\Customers;
 use App\Livewire\Crm\Concerns\ManagesCrmActivities;
 use App\Livewire\Crm\Concerns\ManagesCrmOpportunities;
 use App\Livewire\Crm\Concerns\ManagesCrmTasks;
+use App\Models\Crm\Contact;
 use App\Models\Crm\CrmModel;
 use App\Models\Crm\Opportunity;
 use App\Models\Party;
 use App\Repositories\Crm\CrmCustomerRepository;
+use App\Services\Crm\CrmContactService;
 use App\Services\Crm\CrmCustomerService;
 use App\Services\Crm\CrmTimelineService;
 use Livewire\Component;
@@ -19,6 +21,11 @@ class Show extends Component
     use ManagesCrmOpportunities;
     use ManagesCrmTasks;
 
+    private const TABS = [
+        'overview', 'activities', 'tasks', 'contacts',
+        'leads', 'opportunities', 'timeline', 'commerce',
+    ];
+
     public int $partyId;
 
     public string $activeTab = 'overview';
@@ -27,14 +34,123 @@ class Show extends Component
 
     public ?int $showingOpportunityTimelineId = null;
 
-    public function mount(int $partyId): void
+    public bool $showContactModal = false;
+
+    public ?int $editingContactId = null;
+
+    public string $contact_first_name = '';
+
+    public string $contact_last_name = '';
+
+    public string $contact_mobile = '';
+
+    public string $contact_email = '';
+
+    public string $contact_job_title = '';
+
+    public function mount(int $partyId, string $activeTab = 'overview'): void
     {
         $this->partyId = $partyId;
+
+        if (in_array($activeTab, self::TABS, true)) {
+            $this->activeTab = $activeTab;
+        }
     }
 
     public function setTab(string $tab): void
     {
-        $this->activeTab = $tab;
+        if (in_array($tab, self::TABS, true)) {
+            $this->activeTab = $tab;
+        }
+    }
+
+    public function openContactCreate(): void
+    {
+        abort_unless(auth()->user()?->hasPermission('crm.contacts.create'), 403);
+        $this->resetContactForm();
+        $this->showContactModal = true;
+    }
+
+    public function openContactEdit(int $id): void
+    {
+        abort_unless(auth()->user()?->hasPermission('crm.contacts.update'), 403);
+
+        $contact = Contact::query()
+            ->where('party_id', $this->partyId)
+            ->findOrFail($id);
+
+        $this->editingContactId = $contact->id;
+        $this->contact_first_name = $contact->first_name;
+        $this->contact_last_name = $contact->last_name ?? '';
+        $this->contact_mobile = $contact->mobile ?? '';
+        $this->contact_email = $contact->email ?? '';
+        $this->contact_job_title = $contact->job_title ?? '';
+        $this->showContactModal = true;
+    }
+
+    public function closeContactModal(): void
+    {
+        $this->showContactModal = false;
+        $this->resetContactForm();
+    }
+
+    public function saveContact(CrmContactService $contacts): void
+    {
+        $isEdit = $this->editingContactId !== null;
+        abort_unless(
+            auth()->user()?->hasPermission($isEdit ? 'crm.contacts.update' : 'crm.contacts.create'),
+            403
+        );
+
+        $this->validate([
+            'contact_first_name' => ['required', 'string', 'max:255'],
+            'contact_last_name' => ['nullable', 'string', 'max:255'],
+            'contact_mobile' => ['nullable', 'string', 'max:20'],
+            'contact_email' => ['nullable', 'email', 'max:255'],
+            'contact_job_title' => ['nullable', 'string', 'max:255'],
+        ], [], [
+            'contact_first_name' => 'نام',
+            'contact_last_name' => 'نام خانوادگی',
+            'contact_mobile' => 'موبایل',
+            'contact_email' => 'ایمیل',
+            'contact_job_title' => 'سمت',
+        ]);
+
+        $data = [
+            'party_id' => $this->partyId,
+            'first_name' => $this->contact_first_name,
+            'last_name' => $this->contact_last_name,
+            'mobile' => $this->contact_mobile ?: null,
+            'email' => $this->contact_email ?: null,
+            'job_title' => $this->contact_job_title ?: null,
+        ];
+
+        $actor = auth()->user();
+
+        if ($isEdit) {
+            $contact = Contact::query()
+                ->where('party_id', $this->partyId)
+                ->findOrFail($this->editingContactId);
+            $contacts->update($contact, $data, $actor);
+            session()->flash('success', 'مخاطب به‌روزرسانی شد.');
+        } else {
+            $contacts->create($data, $actor);
+            session()->flash('success', 'مخاطب جدید ثبت شد.');
+        }
+
+        $this->closeContactModal();
+    }
+
+    public function removeContact(int $id, CrmContactService $contacts): void
+    {
+        abort_unless(auth()->user()?->hasPermission('crm.contacts.delete'), 403);
+
+        $contact = Contact::query()
+            ->where('party_id', $this->partyId)
+            ->findOrFail($id);
+
+        $result = $contacts->remove($contact, auth()->user());
+        session()->flash('success', $result->flashMessage());
     }
 
     public function openCustomerActivity(): void
@@ -139,5 +255,24 @@ class Show extends Component
             $this->opportunityFormOptions(),
             $this->taskFormOptions(),
         ));
+    }
+
+    private function resetContactForm(): void
+    {
+        $this->editingContactId = null;
+        $this->reset([
+            'contact_first_name',
+            'contact_last_name',
+            'contact_mobile',
+            'contact_email',
+            'contact_job_title',
+        ]);
+        $this->resetValidation([
+            'contact_first_name',
+            'contact_last_name',
+            'contact_mobile',
+            'contact_email',
+            'contact_job_title',
+        ]);
     }
 }

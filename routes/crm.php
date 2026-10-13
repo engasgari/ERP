@@ -41,7 +41,13 @@ Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.
 
         ->name('customers.index');
 
+    Route::get('/customers/create', [\App\Http\Controllers\Crm\CrmCustomerPartyController::class, 'create'])
+        ->middleware('permission:crm.customers.view')
+        ->name('customers.create');
 
+    Route::post('/customers', [\App\Http\Controllers\Crm\CrmCustomerPartyController::class, 'store'])
+        ->middleware('permission:crm.customers.view')
+        ->name('customers.store');
 
     Route::view('/customers/{party}', 'crm.customers.show')
 
@@ -244,6 +250,14 @@ Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.
         ->middleware('permission:crm.tasks.view')
 
         ->name('tasks.index');
+
+
+
+    Route::view('/ai/sales-task-planner', 'crm.ai.sales-task-planner')
+
+        ->middleware('permission:crm.ai.sales_task_planner.request')
+
+        ->name('ai.sales-task-planner');
 
 
 

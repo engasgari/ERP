@@ -104,6 +104,11 @@ class ReportCenterService
                         'route' => route('management-reports.attendance-exceptions'),
                     ],
                     [
+                        'title' => 'خلاصه کارکرد روزانه',
+                        'description' => 'ریز روزبه‌روز پرسنل با تردد، تأخیر، تعجیل و ثبت مرخصی/ماموریت',
+                        'route' => route('attendance.daily-summary'),
+                    ],
+                    [
                         'title' => 'محاسبات کارکرد',
                         'description' => 'ورود مستقیم به بخش محاسبات حضور و غیاب',
                         'route' => route('attendance.calculations'),

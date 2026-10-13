@@ -125,6 +125,15 @@ class CrmDashboardService
             ];
         }
 
+        if ($user->hasPermission('crm.ai.sales_task_planner.request') && Route::has('crm.ai.sales-task-planner')) {
+            $shortcuts[] = [
+                'label' => 'پیگیری هوشمند',
+                'url' => route('crm.ai.sales-task-planner'),
+                'tone' => 'lavender',
+                'icon' => 'task',
+            ];
+        }
+
         return $shortcuts;
     }
 

@@ -47,9 +47,9 @@
                         <input class="form-control form-control-sm" value="{{ $calendar->name }}" wire:change="updateField({{ $calendar->id }}, 'name', $event.target.value)">
                     </td>
                     <td>
-                        <input type="number" min="1300" max="1500" class="form-control form-control-sm" value="{{ $calendar->jalali_year }}" wire:change="updateField({{ $calendar->id }}, 'jalali_year', $event.target.value)">
+                        <input type="text" inputmode="numeric" maxlength="4" data-erp-money="0" data-erp-number="0" dir="ltr" class="form-control form-control-sm" value="{{ $calendar->jalali_year }}" wire:change="updateField({{ $calendar->id }}, 'jalali_year', $event.target.value)">
                     </td>
-                    <td>{{ implode('، ', $calendar->weekend_days ?: []) ?: '-' }}</td>
+                    <td>{{ \App\Support\WorkCalendarDefaults::formatDayLabels($calendar->weekend_days) }}</td>
                     <td>
                         <select class="form-select form-select-sm" wire:change="updateField({{ $calendar->id }}, 'is_default', $event.target.value)">
                             <option value="1" @selected($calendar->is_default)>بله</option>

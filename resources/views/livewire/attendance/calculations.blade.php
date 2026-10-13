@@ -1,110 +1,107 @@
-<div dir="rtl" class="space-y-6">
-    @include('livewire.partials.flash')
-
-    <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div class="max-w-3xl">
-                <h3 class="text-lg font-bold text-slate-900">محاسبه کارکرد</h3>
-                <p class="mt-1 text-sm leading-7 text-slate-500">
-                    ابتدا کارکرد را محاسبه کنید؛ سپس می‌توانید برای هر نفر روز کارکرد، روز غیبت، تأخیر، تعجیل، اضافه‌کاری، ماموریت و سایر موارد را دستی اصلاح کنید.
-                </p>
-                <div class="mt-3 grid grid-cols-1 gap-2 text-xs leading-6 text-slate-600 md:grid-cols-2">
-                    <div class="rounded-md bg-slate-50 p-3">
-                        <span class="font-semibold text-slate-800">ماهانه:</span>
-                        ساعت موظف از تقویم کاری و شیفت می‌آید؛ بعد از محاسبه، ویرایش دستی روی همان رکورد ذخیره می‌شود.
-                    </div>
-                    <div class="rounded-md bg-emerald-50 p-3 text-emerald-800">
-                        <span class="font-semibold">نکته:</span>
-                        محاسبه مجدد کارکرد، مقادیر سیستمی را بازنویسی می‌کند. اگر دستی اصلاح کرده‌اید، بعد از محاسبه دوباره ویرایش کنید.
-                    </div>
-                </div>
-            </div>
-
-            <form wire:submit.prevent="calculate" class="grid grid-cols-1 gap-3 sm:grid-cols-6 xl:min-w-[900px]">
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">سال</span>
-                    <select wire:model.live="year" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                        @for($y = (int) getCurrentPersianYear(); $y >= 1400; $y--)
-                            <option value="{{ $y }}" @selected((int) $year === $y)>{{ toPersianDigits($y) }}</option>
-                        @endfor
-                    </select>
-                </label>
-
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">ماه</span>
-                    <select wire:model.live="month" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                        @for($m = 1; $m <= 12; $m++)
-                            <option value="{{ $m }}" @selected((int) $month === $m)>{{ getPersianMonthName($m) }}</option>
-                        @endfor
-                    </select>
-                </label>
-
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">نوع</span>
-                    <select wire:model.live="salaryType" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                        <option value="">همه</option>
-                        <option value="hourly">ساعتی</option>
-                        <option value="monthly">ماهانه</option>
-                    </select>
-                </label>
-
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">دامنه</span>
-                    <select wire:model.live="scope" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                        <option value="with_data">دارای داده کارکرد</option>
-                        <option value="all">همه پرسنل فعال</option>
-                        <option value="single">یک پرسنل</option>
-                    </select>
-                </label>
-
-                @if($scope === 'single')
-                    <label class="block sm:col-span-2">
-                        <span class="text-sm font-medium text-slate-700">پرسنل</span>
-                        <select wire:model="employee_id" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                            <option value="">انتخاب کنید</option>
-                            @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->employee_code }} - {{ $employee->full_name }}</option>
-                            @endforeach
+<div>
+    <x-erp.ui.list-page
+        title="محاسبه کارکرد"
+        description="برای ماه انتخاب‌شده، کارکرد پرسنل را از روی ترددها محاسبه کنید. بعد از محاسبه می‌توانید اعداد هر نفر را دستی اصلاح کنید."
+        route="attendance.calculations"
+        panel-class="attendance-calc-page"
+    >
+        <x-slot name="filters">
+            <x-erp.ui.filter-bar wire:submit.prevent="calculate">
+                <div class="erp-filter-row erp-filter-row-5">
+                    <label class="erp-filter-field">سال
+                        <select wire:model.live="year">
+                            @for($y = (int) getCurrentPersianYear(); $y >= 1400; $y--)
+                                <option value="{{ $y }}" @selected((int) $year === $y)>{{ toPersianDigits($y) }}</option>
+                            @endfor
                         </select>
                     </label>
+
+                    <label class="erp-filter-field">ماه
+                        <select wire:model.live="month">
+                            @for($m = 1; $m <= 12; $m++)
+                                <option value="{{ $m }}" @selected((int) $month === $m)>{{ getPersianMonthName($m) }}</option>
+                            @endfor
+                        </select>
+                    </label>
+
+                    <label class="erp-filter-field">نوع حقوق
+                        <select wire:model.live="salaryType">
+                            <option value="">همه</option>
+                            <option value="hourly">ساعتی</option>
+                            <option value="monthly">ماهانه</option>
+                        </select>
+                    </label>
+
+                    <label class="erp-filter-field">دامنه محاسبه
+                        <select wire:model.live="scope">
+                            <option value="with_data">دارای داده کارکرد</option>
+                            <option value="all">همه پرسنل فعال</option>
+                            <option value="single">یک پرسنل</option>
+                        </select>
+                    </label>
+
+                    <label class="erp-filter-field">جستجو در لیست
+                        <input wire:model.live.debounce.400ms="search" placeholder="نام یا کد پرسنلی" type="text">
+                    </label>
+                </div>
+
+                @if($scope === 'single')
+                    <div class="erp-filter-row erp-filter-row-5 mt-2">
+                        <label class="erp-filter-field col-span-2">پرسنل
+                            <select wire:model="employee_id">
+                                <option value="">انتخاب کنید</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">
+                                        {{ toPersianDigits($employee->employee_code ?: $employee->personnel_code) }}
+                                        — {{ $employee->full_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </label>
+                    </div>
                 @endif
 
-                <label class="block">
-                    <span class="text-sm font-medium text-slate-700">جستجو</span>
-                    <input wire:model.live.debounce.400ms="search" placeholder="نام یا کد پرسنلی" class="mt-1 w-full rounded-md border-gray-300 text-right">
-                </label>
-
-                <div class="flex items-end">
-                    <button type="submit" wire:loading.attr="disabled" wire:target="calculate" class="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">
-                        محاسبه کارکرد
+                <div class="erp-filter-actions mt-2">
+                    <button
+                        type="submit"
+                        class="erp-action-btn erp-action-primary"
+                        wire:loading.attr="disabled"
+                        wire:target="calculate"
+                    >
+                        <span wire:loading.remove wire:target="calculate">محاسبه کارکرد</span>
+                        <span wire:loading wire:target="calculate">در حال محاسبه…</span>
                     </button>
                 </div>
-            </form>
-        </div>
-    </div>
+            </x-erp.ui.filter-bar>
 
-    <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
-        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h3 class="text-lg font-bold text-slate-900">لیست محاسبه کارکردها</h3>
-                <p class="mt-1 text-sm text-slate-500">
-                    دوره انتخابی: {{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}
-                    @if($period)
-                        ، از {{ formatJalaliDateSafe($period->starts_at) }} تا {{ formatJalaliDateSafe($period->ends_at) }}
-                    @endif
-                </p>
+            <div class="attendance-calc-hint">
+                <span>محاسبه مجدد، مقادیر سیستمی را بازنویسی می‌کند.</span>
+                <span>ویرایش دستی بعد از محاسبه روی همان رکورد ذخیره می‌شود.</span>
             </div>
-            <div wire:loading.delay class="text-sm text-slate-500">در حال به‌روزرسانی...</div>
-        </div>
+        </x-slot>
 
         @if($errors->any())
-            <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {{ $errors->first() }}
             </div>
         @endif
 
-        <div class="overflow-x-auto">
-            <table class="erp-ui-data-table min-w-full">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="text-sm text-slate-600">
+                دوره:
+                <strong class="text-slate-900">{{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}</strong>
+                @if($period)
+                    <span class="text-slate-400">·</span>
+                    {{ formatJalaliDateSafe($period->starts_at) }} تا {{ formatJalaliDateSafe($period->ends_at) }}
+                @endif
+            </div>
+            <div class="text-xs text-slate-500">
+                {{ toPersianDigits($calculations->total()) }} نفر
+            </div>
+        </div>
+
+        <div class="erp-table-wrap table-responsive overflow-x-auto">
+            <table class="erp-ui-data-table w-full attendance-calc-table">
                 <thead>
                 <tr>
                     <th>پرسنل</th>
@@ -121,7 +118,7 @@
                     <th>ماموریت</th>
                     <th>قابل پرداخت</th>
                     <th>وضعیت</th>
-                    <th>عملیات</th>
+                    <th></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -134,9 +131,13 @@
                         $absenceDays = (float) ($calculation->absence_days ?? 0);
                     @endphp
                     <tr wire:key="attendance-calculation-{{ $calculation->id }}">
-                        <td class="font-semibold text-slate-900">{{ $calculation->employee?->full_name }}</td>
+                        <td class="font-semibold text-slate-900 whitespace-nowrap">{{ $calculation->employee?->full_name }}</td>
                         <td>
-                            <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $type === 'hourly' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800' }}">
+                            <span @class([
+                                'attendance-calc-badge',
+                                'attendance-calc-badge--hourly' => $type === 'hourly',
+                                'attendance-calc-badge--monthly' => $type !== 'hourly',
+                            ])>
                                 {{ $type === 'hourly' ? 'ساعتی' : 'ماهانه' }}
                             </span>
                         </td>
@@ -153,9 +154,9 @@
                         <td class="font-semibold text-slate-900">{{ formatMoney((float) $calculation->payable_hours, 2) }}</td>
                         <td>
                             @if($isAdjusted)
-                                <span class="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">اصلاح دستی</span>
+                                <span class="attendance-calc-badge attendance-calc-badge--adjusted">اصلاح دستی</span>
                             @else
-                                <span class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">سیستمی</span>
+                                <span class="attendance-calc-badge attendance-calc-badge--system">سیستمی</span>
                             @endif
                         </td>
                         <td>
@@ -168,57 +169,153 @@
                     </tr>
 
                     @if($isEditing)
-                        <tr class="bg-slate-50" wire:key="attendance-edit-{{ $calculation->id }}">
-                            <td colspan="15" class="p-4">
-                                <div class="mb-3 text-sm font-semibold text-slate-800">
-                                    ویرایش کارکرد: {{ $calculation->employee?->full_name }}
-                                </div>
-                                <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-                                    @foreach([
-                                        'work_days' => 'روز کارکرد',
-                                        'absence_days' => 'روز غیبت',
-                                        'normal_hours' => 'کارکرد عادی',
-                                        'overtime_hours' => 'اضافه‌کاری',
-                                        'delay_hours' => 'تأخیر',
-                                        'early_leave_hours' => 'تعجیل',
-                                        'absence_hours' => 'غیبت',
-                                        'leave_hours' => 'مرخصی',
-                                        'mission_hours' => 'ماموریت',
-                                        'night_hours' => 'شب‌کاری',
-                                        'holiday_hours' => 'تعطیل‌کاری',
-                                        'payable_hours' => 'قابل پرداخت',
-                                        'net_payable_hours' => 'خالص قابل پرداخت',
-                                    ] as $field => $label)
-                                        <label class="block text-xs font-medium text-slate-700">
-                                            {{ $label }}
-                                            <input type="number" step="0.01" min="0" wire:model.blur="editForm.{{ $field }}" data-erp-money="0" data-erp-number="0" class="mt-1 w-full rounded-md border-gray-300 text-sm">
-                                            @error('editForm.'.$field) <span class="text-red-600">{{ $message }}</span> @enderror
-                                        </label>
-                                    @endforeach
-                                </div>
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    <button type="button" wire:click="saveEdit(false)" class="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">
-                                        ذخیره
-                                    </button>
-                                    <button type="button" wire:click="saveEdit(true)" class="rounded-md border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
-                                        محاسبه مجدد قابل‌پرداخت و ذخیره
-                                    </button>
-                                    <button type="button" wire:click="cancelEdit" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white">
-                                        انصراف
-                                    </button>
+                        <tr class="attendance-calc-edit-row" wire:key="attendance-edit-{{ $calculation->id }}">
+                            <td colspan="15">
+                                <div class="attendance-calc-edit">
+                                    <div class="attendance-calc-edit__title">
+                                        ویرایش کارکرد: {{ $calculation->employee?->full_name }}
+                                    </div>
+                                    <div class="attendance-calc-edit__grid">
+                                        @foreach([
+                                            'work_days' => 'روز کارکرد',
+                                            'absence_days' => 'روز غیبت',
+                                            'normal_hours' => 'کارکرد عادی',
+                                            'overtime_hours' => 'اضافه‌کاری',
+                                            'delay_hours' => 'تأخیر',
+                                            'early_leave_hours' => 'تعجیل',
+                                            'absence_hours' => 'غیبت',
+                                            'leave_hours' => 'مرخصی',
+                                            'mission_hours' => 'ماموریت',
+                                            'night_hours' => 'شب‌کاری',
+                                            'holiday_hours' => 'تعطیل‌کاری',
+                                            'payable_hours' => 'قابل پرداخت',
+                                            'net_payable_hours' => 'خالص قابل پرداخت',
+                                        ] as $field => $label)
+                                            <label class="attendance-calc-edit__field">
+                                                {{ $label }}
+                                                <input type="number" step="0.01" min="0" wire:model.blur="editForm.{{ $field }}" data-erp-money="0" data-erp-number="0">
+                                                @error('editForm.'.$field) <span class="text-red-600 text-xs">{{ $message }}</span> @enderror
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                    <div class="attendance-calc-edit__actions">
+                                        <button type="button" wire:click="saveEdit(false)" class="erp-action-btn erp-action-primary">ذخیره</button>
+                                        <button type="button" wire:click="saveEdit(true)" class="erp-action-btn erp-action-detail">محاسبه مجدد قابل‌پرداخت و ذخیره</button>
+                                        <button type="button" wire:click="cancelEdit" class="erp-action-btn">انصراف</button>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
                     @endif
                 @empty
                     <tr>
-                        <td colspan="15" class="py-8 text-center text-slate-500">برای این دوره هنوز محاسبه کارکردی وجود ندارد.</td>
+                        <td colspan="15" class="py-8 text-center text-slate-500">
+                            برای این دوره هنوز محاسبه کارکردی وجود ندارد. فیلترها را تنظیم کنید و «محاسبه کارکرد» را بزنید.
+                        </td>
                     </tr>
                 @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-4">{{ $calculations->links() }}</div>
-    </div>
+        @if($calculations->count() > 0)
+            <div class="mt-4">{{ $calculations->links() }}</div>
+        @endif
+    </x-erp.ui.list-page>
+
+    <style>
+        .attendance-calc-page .attendance-calc-hint {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1rem;
+            margin-top: 0.65rem;
+            padding: 0.55rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }
+        .attendance-calc-page .attendance-calc-hint span + span::before {
+            content: "·";
+            margin-inline-end: 0.75rem;
+            color: #94a3b8;
+        }
+        .attendance-calc-page .attendance-calc-table {
+            font-size: 0.8rem;
+        }
+        .attendance-calc-page .attendance-calc-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 0.15rem 0.55rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .attendance-calc-page .attendance-calc-badge--hourly {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .attendance-calc-page .attendance-calc-badge--monthly {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .attendance-calc-page .attendance-calc-badge--adjusted {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .attendance-calc-page .attendance-calc-badge--system {
+            background: #f1f5f9;
+            color: #475569;
+        }
+        .attendance-calc-page .attendance-calc-edit-row > td {
+            background: #f8fafc !important;
+            padding: 0.85rem !important;
+        }
+        .attendance-calc-page .attendance-calc-edit__title {
+            margin-bottom: 0.65rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .attendance-calc-page .attendance-calc-edit__grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+        @media (min-width: 768px) {
+            .attendance-calc-page .attendance-calc-edit__grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+        @media (min-width: 1280px) {
+            .attendance-calc-page .attendance-calc-edit__grid {
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+            }
+        }
+        .attendance-calc-page .attendance-calc-edit__field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        .attendance-calc-page .attendance-calc-edit__field input {
+            min-height: 2rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.8rem;
+            background: #fff;
+        }
+        .attendance-calc-page .attendance-calc-edit__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.85rem;
+        }
+    </style>
 </div>

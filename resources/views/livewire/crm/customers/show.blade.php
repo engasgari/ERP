@@ -79,6 +79,8 @@
 
         </div>
 
+        <livewire:crm.customers.intelligence-panel :party-id="$party->id" :key="'customer-intelligence-'.$party->id" />
+
     @elseif($activeTab === 'activities')
 
         <div class="flex justify-end mb-3">
@@ -163,7 +165,13 @@
 
     @elseif($activeTab === 'contacts')
 
-        <x-erp.ui.data-table :headers="['نام', 'موبایل', 'ایمیل', 'سمت']" empty-message="مخاطبی ثبت نشده." :colspan="4">
+        @if(auth()->user()?->hasPermission('crm.contacts.create'))
+            <div class="flex justify-end mb-3">
+                <button type="button" wire:click="openContactCreate" class="erp-action-btn erp-action-edit">مخاطب جدید</button>
+            </div>
+        @endif
+
+        <x-erp.ui.data-table :headers="['نام', 'موبایل', 'ایمیل', 'سمت', 'عملیات']" empty-message="مخاطبی ثبت نشده." :colspan="5">
 
             @foreach($party->crmContacts as $contact)
 
@@ -181,6 +189,23 @@
                     <td dir="ltr">{{ $contact->email ?: '-' }}</td>
 
                     <td>{{ $contact->job_title ?: '-' }}</td>
+
+                    <td>
+                        <x-erp.ui.row-actions>
+                            @if(auth()->user()?->hasPermission('crm.contacts.update'))
+                                <x-erp.ui.row-action icon="edit" label="ویرایش" wire:click="openContactEdit({{ $contact->id }})" />
+                            @endif
+                            @if(auth()->user()?->hasPermission('crm.contacts.delete') && $contact->is_active)
+                                <x-erp.ui.row-action
+                                    icon="delete"
+                                    label="غیرفعال"
+                                    tone="danger"
+                                    wire:click="removeContact({{ $contact->id }})"
+                                    wire:confirm="مخاطب غیرفعال شود؟"
+                                />
+                            @endif
+                        </x-erp.ui.row-actions>
+                    </td>
 
                 </tr>
 
@@ -334,6 +359,40 @@
     @endif
 
 
+
+    @if($showContactModal)
+        <x-erp.ui.details-modal :title="$editingContactId ? 'ویرایش مخاطب' : 'مخاطب جدید'">
+            <x-slot name="close">
+                <button type="button" class="erp-modal-close" wire:click="closeContactModal">×</button>
+            </x-slot>
+            <x-slot name="footer">
+                <button type="button" class="erp-action-btn" wire:click="closeContactModal">انصراف</button>
+                <button type="button" class="erp-action-btn erp-action-edit" wire:click="saveContact">ذخیره</button>
+            </x-slot>
+            <div class="erp-filter-row">
+                <label class="erp-filter-field">نام
+                    <input wire:model="contact_first_name">
+                    @error('contact_first_name') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                </label>
+                <label class="erp-filter-field">نام خانوادگی
+                    <input wire:model="contact_last_name">
+                    @error('contact_last_name') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                </label>
+                <label class="erp-filter-field">موبایل
+                    <input wire:model="contact_mobile" dir="ltr">
+                    @error('contact_mobile') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                </label>
+                <label class="erp-filter-field">ایمیل
+                    <input wire:model="contact_email" dir="ltr">
+                    @error('contact_email') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                </label>
+                <label class="erp-filter-field md:col-span-2">سمت
+                    <input wire:model="contact_job_title">
+                    @error('contact_job_title') <span class="text-red-600 text-sm">{{ $message }}</span> @enderror
+                </label>
+            </div>
+        </x-erp.ui.details-modal>
+    @endif
 
     @if($showActivityModal)
 

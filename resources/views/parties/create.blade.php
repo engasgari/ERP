@@ -3,22 +3,32 @@
     $selectedTypeIds = $selectedTypeIds ?? [];
     $shareholderTypeId = $shareholderTypeId ?? null;
     $selectedPartnerCode = $selectedPartnerCode ?? '';
+    $formAction = $formAction ?? ($isEdit ? route('parties.update', $party) : route('parties.store'));
+    $cancelUrl = $cancelUrl ?? route('parties.index');
+    $pageTitle = $pageTitle ?? ($isEdit ? 'ویرایش شخص/شرکت' : 'تعریف شخص/شرکت');
+    $lockCustomerType = (bool) ($lockCustomerType ?? false);
+    $customerTypeId = (int) ($customerTypeId ?? 0);
 @endphp
 
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl">{{ $isEdit ? 'ویرایش شخص/شرکت' : 'تعریف شخص/شرکت' }}</h2>
+        <h2 class="font-semibold text-xl">{{ $pageTitle }}</h2>
     </x-slot>
 
     <form
         method="POST"
-        action="{{ $isEdit ? route('parties.update', $party) : route('parties.store') }}"
+        action="{{ $formAction }}"
         class="bg-white rounded-lg shadow-md p-6 space-y-5"
         x-data="{
             selectedTypes: @js($selectedTypeIds),
             shareholderTypeId: @js($shareholderTypeId),
+            customerTypeId: @js($customerTypeId),
+            lockCustomerType: @js($lockCustomerType),
             toggleType(typeId) {
                 typeId = Number(typeId);
+                if (this.lockCustomerType && typeId === Number(this.customerTypeId)) {
+                    return;
+                }
                 if (this.selectedTypes.includes(typeId)) {
                     this.selectedTypes = this.selectedTypes.filter(id => id !== typeId);
                 } else {
@@ -83,24 +93,39 @@
             <div class="text-sm font-semibold text-gray-700 mb-2">گروه‌ها</div>
             <div class="grid gap-2 md:grid-cols-3">
                 @foreach($types as $type)
-                    @php($isShareholderType = $type->name === 'shareholder')
+                    @php
+                        $isShareholderType = $type->name === 'shareholder';
+                        $isCustomerType = $type->name === 'customer';
+                        $isLockedCustomer = $lockCustomerType && $isCustomerType;
+                    @endphp
                     <label @class([
                         'inline-flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer transition',
                         'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200' => $isShareholderType,
-                        'border-slate-200 bg-slate-50' => ! $isShareholderType,
+                        'border-blue-300 bg-blue-50 ring-1 ring-blue-200' => $isLockedCustomer,
+                        'border-slate-200 bg-slate-50' => ! $isShareholderType && ! $isLockedCustomer,
                     ])>
                         <input
                             type="checkbox"
                             name="types[]"
                             value="{{ $type->id }}"
                             @checked(in_array($type->id, $selectedTypeIds, true))
+                            @if($isLockedCustomer) checked onclick="return false;" @endif
                             @change="toggleType({{ $type->id }})"
                         >
-                        <span @class(['font-semibold text-emerald-900' => $isShareholderType])>{{ $type->title }}</span>
+                        <span @class([
+                            'font-semibold text-emerald-900' => $isShareholderType,
+                            'font-semibold text-blue-900' => $isLockedCustomer,
+                        ])>{{ $type->title }}</span>
                     </label>
                 @endforeach
             </div>
-            <p class="mt-2 text-xs text-slate-500">برای استفاده در «حساب جاری شرکا»، گزینه «سهامدار/شریک» را فعال کنید.</p>
+            <p class="mt-2 text-xs text-slate-500">
+                @if($lockCustomerType)
+                    گروه «مشتری» برای ثبت از CRM الزامی است و قابل حذف نیست.
+                @else
+                    برای استفاده در «حساب جاری شرکا»، گزینه «سهامدار/شریک» را فعال کنید.
+                @endif
+            </p>
         </div>
 
         <div x-show="isShareholder" x-cloak class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
@@ -134,7 +159,7 @@
         </label>
 
         <div class="flex justify-end gap-2">
-            <a href="{{ route('parties.index') }}" class="erp-action-btn">بازگشت</a>
+            <a href="{{ $cancelUrl }}" class="erp-action-btn">بازگشت</a>
             <button class="erp-action-btn erp-action-edit">{{ $isEdit ? 'ذخیره تغییرات' : 'ثبت' }}</button>
         </div>
     </form>

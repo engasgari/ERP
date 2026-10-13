@@ -66,6 +66,51 @@
             border-color: #5eead4;
             color: #115e59;
         }
+        .worklog-page .worklog-tool-btn--primary {
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+            background: #eff6ff;
+        }
+        .worklog-page .worklog-tool-btn--primary:hover:not(:disabled) {
+            background: #dbeafe;
+            border-color: #93c5fd;
+            color: #1e3a8a;
+        }
+        .worklog-manual-modal.erp-ui-modal-panel {
+            width: min(56rem, 96vw) !important;
+            max-width: min(56rem, 96vw) !important;
+        }
+        .worklog-manual-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        .worklog-manual-table th,
+        .worklog-manual-table td {
+            padding: 0.4rem 0.35rem;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+            text-align: right;
+        }
+        .worklog-manual-table th {
+            color: #64748b;
+            font-weight: 600;
+            background: #f8fafc;
+        }
+        .worklog-manual-table select,
+        .worklog-manual-table input[type="time"],
+        .worklog-manual-table .erp-jalali-date-input {
+            width: 100%;
+            min-height: 2.1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.45rem;
+            background: #fff;
+            font-size: 0.8rem;
+        }
+        .worklog-manual-add-row {
+            margin-top: 0.65rem;
+        }
         .worklog-page .worklog-toolbar-count {
             margin-inline-start: 0.15rem;
             font-size: 0.78rem;
@@ -332,6 +377,20 @@
         </x-slot>
 
         <div class="worklog-toolbar">
+            @if($canManageWorkLogs)
+                <button
+                    type="button"
+                    class="worklog-tool-btn worklog-tool-btn--primary"
+                    title="ثبت کارکرد دستی"
+                    wire:click="openManualCreateModal"
+                >
+                    <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 5v14"></path>
+                        <path d="M5 12h14"></path>
+                    </svg>
+                    <span>ثبت دستی</span>
+                </button>
+            @endif
             <button
                 type="button"
                 class="worklog-tool-btn worklog-tool-btn--danger"
@@ -498,6 +557,109 @@
             <div class="mt-4">{{ $workLogs->links() }}</div>
         @endif
     </x-erp.ui.list-page>
+
+    @if($showManualCreateModal)
+        <div class="erp-ui-modal-backdrop" wire:click="closeManualCreateModal">
+            <div class="erp-ui-modal-panel worklog-manual-modal worklog-page" wire:click.stop>
+                <div class="erp-modal-header">
+                    <h3>ثبت کارکرد دستی</h3>
+                    <button type="button" class="erp-modal-close" wire:click="closeManualCreateModal">×</button>
+                </div>
+                <div class="erp-modal-body">
+                    <p class="text-sm text-slate-500 mb-3">برای هر ردیف کارمند، تاریخ، ورود و خروج را وارد کنید. با «افزودن ردیف» می‌توانید چند نفر را یکجا ثبت کنید.</p>
+                    <div class="overflow-x-auto">
+                        <table class="worklog-manual-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:11rem;">کارمند</th>
+                                    <th style="min-width:8rem;">تاریخ</th>
+                                    <th style="min-width:6.5rem;">ورود</th>
+                                    <th style="min-width:6.5rem;">خروج</th>
+                                    <th style="min-width:9rem;">پروژه</th>
+                                    <th style="width:2.5rem;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($manualRows as $index => $row)
+                                    <tr wire:key="manual-row-{{ $index }}">
+                                        <td>
+                                            <select wire:model="manualRows.{{ $index }}.employee_id">
+                                                <option value="">انتخاب کارمند</option>
+                                                @foreach($manageEmployees as $employeeItem)
+                                                    <option value="{{ $employeeItem->id }}">
+                                                        {{ $employeeItem->full_name }}
+                                                        @if($employeeItem->personnel_code || $employeeItem->employee_code)
+                                                            ({{ toPersianDigits($employeeItem->personnel_code ?: $employeeItem->employee_code) }})
+                                                        @endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <x-erp.ui.jalali-date-input
+                                                wire:model="manualRows.{{ $index }}.work_date_fa"
+                                                placeholder="1404/01/01"
+                                            />
+                                        </td>
+                                        <td>
+                                            <input type="time" dir="ltr" step="60" wire:model="manualRows.{{ $index }}.start_time">
+                                        </td>
+                                        <td>
+                                            <input type="time" dir="ltr" step="60" wire:model="manualRows.{{ $index }}.end_time">
+                                        </td>
+                                        <td>
+                                            <select wire:model="manualRows.{{ $index }}.project_id">
+                                                <option value="">بدون پروژه</option>
+                                                @foreach($projects as $projectItem)
+                                                    <option value="{{ $projectItem->id }}">{{ $projectItem->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td class="!text-center">
+                                            <button
+                                                type="button"
+                                                class="worklog-tool-btn worklog-tool-btn--danger"
+                                                title="حذف ردیف"
+                                                wire:click="removeManualRow({{ $index }})"
+                                                @disabled(count($manualRows) <= 1)
+                                            >
+                                                <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="worklog-manual-add-row">
+                        <button type="button" class="worklog-tool-btn" wire:click="addManualRow">
+                            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 5v14"></path>
+                                <path d="M5 12h14"></path>
+                            </svg>
+                            <span>افزودن ردیف</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="erp-modal-actions">
+                    <button type="button" class="erp-action-btn" wire:click="closeManualCreateModal">انصراف</button>
+                    <button
+                        type="button"
+                        class="erp-action-btn erp-action-primary"
+                        wire:click="saveManualEntries"
+                        wire:loading.attr="disabled"
+                        wire:target="saveManualEntries"
+                    >
+                        <span wire:loading.remove wire:target="saveManualEntries">ذخیره</span>
+                        <span wire:loading wire:target="saveManualEntries">در حال ذخیره…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if($showDeleteConfirmModal)
         <div class="erp-ui-modal-backdrop" wire:click="closeDeleteConfirm">

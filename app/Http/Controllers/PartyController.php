@@ -9,10 +9,12 @@ use App\Models\Party;
 use App\Models\PartyType;
 use App\Models\Project;
 use App\Models\TreasuryTransaction;
+use App\Services\Crm\CrmCustomerService;
 use App\Services\Crm\CrmDuplicateGuardService;
 use App\Services\NumberingService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 use Throwable;
 
 class PartyController extends Controller
@@ -24,25 +26,42 @@ class PartyController extends Controller
 
     public function create()
     {
-        return view('parties.create', $this->formData(
-            new Party(['kind' => 'person', 'is_active' => true])
-        ));
+        return $this->createFormView(new Party(['kind' => 'person', 'is_active' => true]));
+    }
+
+    /**
+     * Shared party form view used by ERP and CRM create flows.
+     *
+     * @param  list<int>  $selectedTypeIds
+     */
+    public function createFormView(
+        Party $party,
+        array $selectedTypeIds = [],
+        ?string $formAction = null,
+        ?string $cancelUrl = null,
+        ?string $pageTitle = null,
+        bool $lockCustomerType = false,
+    ): View {
+        $data = $this->formData($party);
+
+        if ($selectedTypeIds !== []) {
+            $data['selectedTypeIds'] = array_map('intval', $selectedTypeIds);
+        }
+
+        $isEdit = $party->exists;
+
+        return view('parties.create', $data + [
+            'formAction' => $formAction ?? ($isEdit ? route('parties.update', $party) : route('parties.store')),
+            'cancelUrl' => $cancelUrl ?? route('parties.index'),
+            'pageTitle' => $pageTitle ?? ($isEdit ? 'ویرایش شخص/شرکت' : 'تعریف شخص/شرکت'),
+            'lockCustomerType' => $lockCustomerType,
+            'customerTypeId' => (int) PartyType::where('name', 'customer')->value('id'),
+        ]);
     }
 
     public function store(Request $request, NumberingService $numbering)
     {
-        $validated = $this->validated($request);
-        $typeIds = $validated['types'] ?? [];
-        $partnerChartAccountCode = $validated['partner_chart_account_code'] ?? null;
-        unset($validated['types'], $validated['partner_chart_account_code']);
-
-        $party = Party::create($validated + [
-            'code' => $numbering->next('party', 'P-'),
-            'detail_code' => $this->resolveDetailCode($typeIds, $partnerChartAccountCode, $numbering),
-            'is_active' => true,
-        ]);
-
-        $party->types()->sync($typeIds);
+        $party = $this->storeParty($request, $numbering);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -59,9 +78,31 @@ class PartyController extends Controller
         return redirect()->route('parties.index')->with('success', 'شخص/شرکت ثبت شد.');
     }
 
+    public function storeParty(Request $request, NumberingService $numbering): Party
+    {
+        $validated = $this->validated($request);
+        $typeIds = $validated['types'] ?? [];
+        $partnerChartAccountCode = $validated['partner_chart_account_code'] ?? null;
+        unset($validated['types'], $validated['partner_chart_account_code']);
+
+        $party = Party::create($validated + [
+            'code' => $numbering->next('party', 'P-'),
+            'detail_code' => $this->resolveDetailCode($typeIds, $partnerChartAccountCode, $numbering),
+            'is_active' => true,
+        ]);
+
+        $party->types()->sync($typeIds);
+
+        if ($this->isCustomerTypeSelected($typeIds) && $request->user()) {
+            app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+        }
+
+        return $party->load('types');
+    }
+
     public function edit(Party $party)
     {
-        return view('parties.create', $this->formData($party->load('types')));
+        return $this->createFormView($party->load('types'));
     }
 
     public function update(Request $request, Party $party)
@@ -81,7 +122,18 @@ class PartyController extends Controller
         $party->update($validated);
         $party->types()->sync($typeIds);
 
+        if ($this->isCustomerTypeSelected($typeIds) && $request->user()) {
+            app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+        }
+
         return redirect()->route('parties.index')->with('success', 'شخص/شرکت ویرایش شد.');
+    }
+
+    private function isCustomerTypeSelected(array $typeIds): bool
+    {
+        $customerTypeId = PartyType::where('name', 'customer')->value('id');
+
+        return $customerTypeId && in_array((int) $customerTypeId, array_map('intval', $typeIds), true);
     }
 
     public function destroy(Party $party)

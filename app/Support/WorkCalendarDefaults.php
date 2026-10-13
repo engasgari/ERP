@@ -4,9 +4,21 @@ namespace App\Support;
 
 final class WorkCalendarDefaults
 {
+    /** Carbon dayOfWeek: Sat=6 … Fri=5 */
     private const WORKING_DAYS = [6, 0, 1, 2, 3];
 
+    /** پنجشنبه و جمعه */
     private const WEEKEND_DAYS = [4, 5];
+
+    private const DAY_LABELS = [
+        6 => 'شنبه',
+        0 => 'یکشنبه',
+        1 => 'دوشنبه',
+        2 => 'سه‌شنبه',
+        3 => 'چهارشنبه',
+        4 => 'پنجشنبه',
+        5 => 'جمعه',
+    ];
 
     public static function workingDays(): array
     {
@@ -16,6 +28,50 @@ final class WorkCalendarDefaults
     public static function weekendDays(): array
     {
         return self::WEEKEND_DAYS;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function dayLabels(): array
+    {
+        return self::DAY_LABELS;
+    }
+
+    public static function dayLabel(int $dayOfWeek): string
+    {
+        return self::DAY_LABELS[$dayOfWeek] ?? (string) $dayOfWeek;
+    }
+
+    /**
+     * @param  array<int, int|string>|null  $days
+     * @return list<int>
+     */
+    public static function normalizeDayList(?array $days, ?array $fallback = null): array
+    {
+        $source = $days ?: ($fallback ?? []);
+
+        return array_values(array_unique(array_map(
+            static fn ($day): int => (int) $day,
+            $source
+        )));
+    }
+
+    /**
+     * @param  array<int, int|string>|null  $days
+     */
+    public static function formatDayLabels(?array $days): string
+    {
+        $normalized = self::normalizeDayList($days);
+
+        if ($normalized === []) {
+            return '-';
+        }
+
+        return implode('، ', array_map(
+            static fn (int $day): string => self::dayLabel($day),
+            $normalized
+        ));
     }
 
     public static function calendar(int $jalaliYear): array

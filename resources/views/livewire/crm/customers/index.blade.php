@@ -2,6 +2,9 @@
     title="مشتریان CRM"
     description="فهرست مشتریان با پروفایل CRM و وضعیت ارتباط."
     route="crm.customers.index"
+    :actions="[
+        ['label' => 'مشتری جدید', 'url' => route('crm.customers.create'), 'class' => 'erp-action-edit'],
+    ]"
 >
     <x-slot name="filters">
         <x-erp.ui.filter-bar wire:submit.prevent>

@@ -13,6 +13,7 @@ class PartyCreationService
     public function __construct(
         private readonly NumberingService $numbering,
         private readonly CrmDuplicateGuardService $duplicates,
+        private readonly CrmCustomerService $customers,
     ) {}
 
     /**
@@ -39,6 +40,8 @@ class PartyCreationService
         ]);
 
         $party->types()->sync([$customerType->id]);
+
+        $this->customers->ensureProfile($party, $creator);
 
         return $party;
     }

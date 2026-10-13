@@ -5,7 +5,9 @@ namespace App\Livewire\WorkLogs;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\WorkLog;
+use App\Services\WorkLogManualEntryService;
 use Hekmatinasser\Verta\Verta;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -30,6 +32,11 @@ class Manager extends Component
     public bool $showBulkProjectModal = false;
 
     public bool $showDeleteConfirmModal = false;
+
+    public bool $showManualCreateModal = false;
+
+    /** @var list<array{employee_id:string,work_date_fa:string,start_time:string,end_time:string,project_id:string}> */
+    public array $manualRows = [];
 
     public ?int $pendingDeleteId = null;
 
@@ -80,10 +87,83 @@ class Manager extends Component
             'bulkProjectId',
             'showBulkProjectModal',
             'showDeleteConfirmModal',
+            'showManualCreateModal',
+            'manualRows',
             'pendingDeleteId',
             'deleteConfirmMessage',
         ]);
         $this->resetPage();
+    }
+
+    public function openManualCreateModal(): void
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.manage')), 403);
+
+        $this->manualRows = [$this->emptyManualRow()];
+        $this->showManualCreateModal = true;
+    }
+
+    public function closeManualCreateModal(): void
+    {
+        $this->showManualCreateModal = false;
+        $this->manualRows = [];
+        $this->resetErrorBag();
+    }
+
+    public function addManualRow(): void
+    {
+        $this->manualRows[] = $this->emptyManualRow();
+    }
+
+    public function removeManualRow(int $index): void
+    {
+        if (! isset($this->manualRows[$index])) {
+            return;
+        }
+
+        unset($this->manualRows[$index]);
+        $this->manualRows = array_values($this->manualRows);
+
+        if ($this->manualRows === []) {
+            $this->manualRows = [$this->emptyManualRow()];
+        }
+    }
+
+    public function saveManualEntries(WorkLogManualEntryService $service): void
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.manage')), 403);
+
+        try {
+            $created = $service->createMany($this->manualRows, $user);
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first() ?? 'ثبت کارکرد ناموفق بود.';
+            session()->flash('error', $message);
+
+            return;
+        }
+
+        $count = toPersianDigits(count($created));
+        $this->closeManualCreateModal();
+        $this->resetPage();
+        session()->flash('success', "{$count} کارکرد دستی ثبت شد.");
+    }
+
+    /** @return array{employee_id:string,work_date_fa:string,start_time:string,end_time:string,project_id:string} */
+    private function emptyManualRow(): array
+    {
+        $todayFa = function_exists('todayJalaliDate')
+            ? (string) todayJalaliDate()
+            : '';
+
+        return [
+            'employee_id' => '',
+            'work_date_fa' => $todayFa,
+            'start_time' => '08:00',
+            'end_time' => '16:00',
+            'project_id' => '',
+        ];
     }
 
     public function updateProject(int $workLogId, string $projectId): void
@@ -341,7 +421,21 @@ class Manager extends Component
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'personnel_code', 'employee_code']);
 
-        return view('livewire.work-logs.manager', compact('workLogs', 'projects', 'employees'));
+        $manageEmployees = $employees;
+        $user = auth()->user();
+        $canManageWorkLogs = $user && ($user->isAdmin() || $user->hasPermission('worklogs.manage'));
+        if ($canManageWorkLogs && $user && ! $user->isAdmin()) {
+            $allowedIds = $user->accessibleEmployeeIds('worklogs.manage');
+            $manageEmployees = $employees->whereIn('id', $allowedIds)->values();
+        }
+
+        return view('livewire.work-logs.manager', compact(
+            'workLogs',
+            'projects',
+            'employees',
+            'manageEmployees',
+            'canManageWorkLogs',
+        ));
     }
 
     private function filteredQuery()

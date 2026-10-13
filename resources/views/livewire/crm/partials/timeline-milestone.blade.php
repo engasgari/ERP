@@ -1,5 +1,12 @@
 @props(['milestone', 'showOpportunityLabel' => false])
 
+@php
+    $invoiceId = $milestone['invoice_id'] ?? null;
+    $isSaleInvoice = ($milestone['invoice_document_type'] ?? null) === 'invoice';
+    $documentLabel = $isSaleInvoice ? 'فاکتور فروش' : 'پیش‌فاکتور';
+    $documentTitle = trim(($milestone['title'] ?? $documentLabel));
+@endphp
+
 <article @class([
     'crm-timeline-milestone',
     'crm-timeline-milestone--' . ($milestone['kind'] ?? 'other'),
@@ -26,6 +33,20 @@
 
             @if(! empty($milestone['user_name']))
                 <div class="crm-timeline-entry-user">توسط {{ $milestone['user_name'] }}</div>
+            @endif
+
+            @if($invoiceId)
+                <div class="crm-timeline-milestone-actions">
+                    <button
+                        type="button"
+                        class="erp-btn erp-btn-secondary erp-btn-sm"
+                        data-invoice-show="{{ $invoiceId }}"
+                        data-invoice-show-crm="1"
+                        data-invoice-show-title="{{ $documentTitle }}"
+                    >
+                        مشاهده {{ $documentLabel }}
+                    </button>
+                </div>
             @endif
         </div>
 

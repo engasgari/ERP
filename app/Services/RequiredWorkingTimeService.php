@@ -8,11 +8,16 @@ use App\Models\EmploymentOrder;
 use App\Models\PayrollPeriod;
 use App\Models\WorkCalendar;
 use App\Models\WorkGroup;
-use App\Models\WorkShift;
+use App\Support\WorkCalendarDefaults;
 use Carbon\Carbon;
 
 class RequiredWorkingTimeService
 {
+    public function __construct(
+        private readonly WorkGroupAssignmentResolver $workGroupResolver,
+    ) {
+    }
+
     public function activeDecree(Employee $employee, PayrollPeriod $period): EmploymentOrder
     {
         $decree = $employee->employmentOrders()
@@ -33,42 +38,25 @@ class RequiredWorkingTimeService
 
     public function activeWorkGroup(Employee $employee, Carbon $date): WorkGroup
     {
-        $assignment = $employee->workGroupAssignments()
-            ->with(['workGroup.shift', 'workGroup.calendar'])
-            ->where(function ($query) use ($date): void {
-                $query->whereNull('start_date')->orWhereDate('start_date', '<=', $date->toDateString());
-            })
-            ->where(function ($query) use ($date): void {
-                $query->whereNull('end_date')->orWhereDate('end_date', '>=', $date->toDateString());
-            })
-            ->latest('start_date')
-            ->latest('id')
-            ->first();
+        $workGroup = $this->workGroupResolver->resolve($employee, $date);
 
-        if (! $assignment?->workGroup) {
-            $legacyGroup = $employee->workGroups()
-                ->with(['shift', 'calendar'])
-                ->whereNotNull('work_shift_id')
-                ->whereNotNull('work_calendar_id')
-                ->orderByDesc('work_group_employee.id')
-                ->first();
-
-            if ($legacyGroup) {
-                return $legacyGroup;
-            }
-
+        if (! $workGroup) {
             throw new AttendancePrerequisiteException('گروه کاری فعال برای پرسنل تخصیص داده نشده است.');
         }
 
-        if (! $assignment->workGroup->shift) {
+        if (! $workGroup->relationLoaded('shift')) {
+            $workGroup->load(['shift', 'calendar']);
+        }
+
+        if (! $workGroup->shift) {
             throw new AttendancePrerequisiteException('برای گروه کاری پرسنل شیفت تعریف نشده است.');
         }
 
-        if (! $assignment->workGroup->calendar) {
+        if (! $workGroup->calendar) {
             throw new AttendancePrerequisiteException('تقویم کاری شمسی برای گروه کاری پرسنل تعریف نشده است.');
         }
 
-        return $assignment->workGroup;
+        return $workGroup;
     }
 
     public function month(Employee $employee, PayrollPeriod $period, bool $isHourly): array
@@ -120,22 +108,33 @@ class RequiredWorkingTimeService
 
     public function isWorkingDay(Carbon $date, WorkCalendar $calendar): bool
     {
-        $jalaliDate = formatJalaliDateSafe($date, '');
-        $holidays = $calendar->holidays ?: [];
+        $holidays = collect($calendar->holidays ?: [])
+            ->map(fn ($holiday) => normalizePersianDigits((string) $holiday))
+            ->filter()
+            ->all();
 
-        if (in_array($date->toDateString(), $holidays, true) || in_array($jalaliDate, $holidays, true)) {
+        $gregorian = $date->toDateString();
+        $jalali = normalizePersianDigits(formatJalaliDateSafe($date, ''));
+
+        if (in_array($gregorian, $holidays, true) || in_array($jalali, $holidays, true)) {
             return false;
         }
 
         $dayOfWeek = (int) $date->dayOfWeek;
-        $weekends = $calendar->weekend_days ?: [];
+        $weekends = WorkCalendarDefaults::normalizeDayList(
+            $calendar->weekend_days,
+            WorkCalendarDefaults::weekendDays()
+        );
 
         if (in_array($dayOfWeek, $weekends, true)) {
             return false;
         }
 
-        $workingDays = $calendar->working_days ?: [];
+        $workingDays = WorkCalendarDefaults::normalizeDayList(
+            $calendar->working_days,
+            WorkCalendarDefaults::workingDays()
+        );
 
-        return $workingDays === [] || in_array($dayOfWeek, $workingDays, true);
+        return in_array($dayOfWeek, $workingDays, true);
     }
 }
