@@ -1,3 +1,14 @@
+/*
+ |--------------------------------------------------------------------------
+ | ERP unified stylesheet (single Vite entry)
+ |--------------------------------------------------------------------------
+ | Fonts are loaded via layouts (public/vendor) to keep woff2 URLs stable.
+ | Legacy public/css/*.css stubs remain only to avoid 404 on old bookmarks.
+ */
+
+@import './style.css';
+@import './erp-ui.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

@@ -1,0 +1,11 @@
+* {
+    font-family: Vazirmatn, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+body {
+    background: var(--neutral-lighter);
+    min-height: 100vh;
+    color: var(--neutral-dark);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: hidden;
+}

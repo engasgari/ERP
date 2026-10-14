@@ -6,7 +6,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title') - مدیریت ERP</title>
     <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}">
     @vite(['resources/css/app.css'])
     @livewireStyles
 </head>

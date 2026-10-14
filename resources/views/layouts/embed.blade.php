@@ -8,8 +8,6 @@
         <title>{{ request()->is('crm*') ? 'CRM' : config('app.name', 'ERP') }}</title>
 
         <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/style.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}?v={{ @filemtime(public_path('css/erp-ui.css')) ?: 1 }}">
         @vite(['resources/css/app.css'])
         <script src="{{ asset('vendor/jquery/jquery-3.6.0.min.js') }}"></script>
         <script src="{{ asset('js/erp-ui.js') }}?v={{ @filemtime(public_path('js/erp-ui.js')) ?: 1 }}"></script>

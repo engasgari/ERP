@@ -8,13 +8,8 @@
         <title>{{ request()->is('crm*') ? 'CRM' : config('app.name', 'ERP') }}</title>
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
 
-        <!-- Fonts -->
         <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/style.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/erp-ui.css') }}?v={{ @filemtime(public_path('css/erp-ui.css')) ?: 1 }}">
         @livewireStyles
-
-        <!-- Scripts -->
         @vite(['resources/css/app.css'])
         <script src="{{ asset('vendor/jquery/jquery-3.6.0.min.js') }}"></script>
     </head>
