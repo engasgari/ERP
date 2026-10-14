@@ -1620,8 +1620,8 @@
     "semantic_hash": "d8eda274115af5fd2aaa8230af329ef7"
   },
   "public/js/erp-ui.js": {
-    "mtime": 1791880300.2410438,
-    "ast_hash": "0b4eb2603fdb66f1f2381c4c4f640b40",
+    "mtime": 1791988888.7306204,
+    "ast_hash": "74bc6ac3ddfc11feaa1475c73dce876f",
     "semantic_hash": ""
   },
   "public/vendor/bootstrap/bootstrap.bundle.min.js": {
@@ -3750,8 +3750,8 @@
     "semantic_hash": ""
   },
   "app/Livewire/Insurance/Payments.php": {
-    "mtime": 1790144343.8867147,
-    "ast_hash": "91ec5b0c4878738f4fe9874e3dfe786b",
+    "mtime": 1791988905.745573,
+    "ast_hash": "0af7ceb2a13885bccff6d00004615bb7",
     "semantic_hash": ""
   },
   "app/Livewire/Insurance/Periods.php": {
@@ -3830,8 +3830,8 @@
     "semantic_hash": ""
   },
   "resources/views/livewire/insurance/payments.blade.php": {
-    "mtime": 1790175658.7959728,
-    "ast_hash": "8464014b46906d51c690b88d13d30485",
+    "mtime": 1791988918.784102,
+    "ast_hash": "ce1296455daaf5ebed39add7b92cd9b3",
     "semantic_hash": ""
   },
   "resources/views/livewire/insurance/periods.blade.php": {
@@ -5155,8 +5155,8 @@
     "semantic_hash": ""
   },
   "storage/framework/views/9284625a12ea1d7401b4dc078ac31073.php": {
-    "mtime": 1791887685.1903632,
-    "ast_hash": "c339e55b8d781dfca4ddf61974117bf7",
+    "mtime": 1791969635.1130362,
+    "ast_hash": "5343b9304baaf992fd9cd95987edbee2",
     "semantic_hash": ""
   },
   "storage/framework/views/ab31269008d70e25d7f041bfe5391c64.php": {

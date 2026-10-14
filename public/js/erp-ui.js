@@ -238,10 +238,15 @@ function syncJalaliInputWithLivewire(input) {
 
 function formatErpMoneyInput(input, sync = true) {
     const raw = erpMoneyRawValue(input.value);
-    input.value = raw === '' ? '' : normalizeErpMoneyValue(raw);
+    const display = raw === '' ? '' : normalizeErpMoneyValue(raw);
+    input.value = display;
 
     if (sync) {
+        // Keep thousand-separated Persian digits in the UI, but push the raw
+        // ASCII number to Livewire so `numeric` validation and PHP casting work.
+        input.value = raw;
         syncLivewireInput(input);
+        input.value = display;
     }
 }
 
