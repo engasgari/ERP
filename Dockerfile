@@ -50,8 +50,15 @@ RUN composer install \
     --optimize-autoloader \
     --no-dev
 
-# Install frontend dependencies and build Vite
-RUN npm ci && npm run build
+# Install frontend dependencies and build Vite (fail image build if assets missing)
+RUN npm ci \
+    && npm run build \
+    && test -f public/build/manifest.json \
+    && grep -q 'resources/css/app.css' public/build/manifest.json \
+    && grep -q 'resources/js/app.js' public/build/manifest.json \
+    && test -n "$(find public/build/assets -name 'app-*.css' | head -1)" \
+    && test -n "$(find public/build/assets -name 'app-*.js' | head -1)" \
+    && rm -rf node_modules
 
 # Laravel permissions
 RUN chown -R www-data:www-data \
