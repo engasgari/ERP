@@ -56,6 +56,8 @@ class Payments extends Component
 
     public function registerPayment(): void
     {
+        $this->normalizeLineDraftAmounts();
+
         $this->validate([
             'paymentDate' => ['required', 'string', 'max:20'],
             'method' => ['required', 'in:cash,bank'],
@@ -73,6 +75,9 @@ class Payments extends Component
             'method' => 'روش پرداخت',
             'bankAccountId' => 'حساب بانکی',
             'cashboxId' => 'صندوق',
+            'lineDrafts.*.principal_amount' => 'مبلغ اصل',
+            'lineDrafts.*.penalty_amount' => 'مبلغ جریمه',
+            'lineDrafts.*.other_amount' => 'سایر مبالغ',
         ]);
 
         $lines = collect($this->lineDrafts)
@@ -83,8 +88,15 @@ class Payments extends Component
                 'penalty_amount' => (float) ($line['penalty_amount'] ?? 0),
                 'other_amount' => (float) ($line['other_amount'] ?? 0),
             ])
+            ->filter(fn ($line) => ($line['principal_amount'] + $line['penalty_amount'] + $line['other_amount']) > 0)
             ->values()
             ->all();
+
+        if ($lines === []) {
+            session()->flash('error', 'حداقل یک دوره را انتخاب کنید و مبلغ پرداخت را وارد کنید.');
+
+            return;
+        }
 
         try {
             $payment = app(InsurancePaymentService::class)->create([
@@ -144,8 +156,12 @@ class Payments extends Component
         $remainingPaid = max(0, $remainingPaid - $penalty);
         $paidToOther = min($remainingPaid, $other);
 
-        $this->lineDrafts[$liabilityId] = array_merge($this->lineDrafts[$liabilityId] ?? [], [
+        $this->lineDrafts[$liabilityId] = array_merge($this->lineDrafts[$liabilityId] ?? [
+            'insurance_liability_id' => $liabilityId,
+        ], [
+            'insurance_liability_id' => $liabilityId,
             'selected' => true,
+            // Store plain numbers so Livewire + validation stay numeric.
             'principal_amount' => max(0, round($principal - $paidToPrincipal, 2)),
             'penalty_amount' => max(0, round($penalty - $paidToPenalty, 2)),
             'other_amount' => max(0, round($other - $paidToOther, 2)),
@@ -205,5 +221,14 @@ class Payments extends Component
         $this->description = '';
         $this->initializeLineDrafts();
         $this->resetValidation();
+    }
+
+    private function normalizeLineDraftAmounts(): void
+    {
+        foreach ($this->lineDrafts as $liabilityId => $line) {
+            $this->lineDrafts[$liabilityId]['principal_amount'] = normalizeMoneyValue($line['principal_amount'] ?? null) ?? 0;
+            $this->lineDrafts[$liabilityId]['penalty_amount'] = normalizeMoneyValue($line['penalty_amount'] ?? null) ?? 0;
+            $this->lineDrafts[$liabilityId]['other_amount'] = normalizeMoneyValue($line['other_amount'] ?? null) ?? 0;
+        }
     }
 }

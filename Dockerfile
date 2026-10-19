@@ -50,7 +50,6 @@ RUN composer install \
     --optimize-autoloader \
     --no-dev
 
-# Install frontend dependencies and build Vite
 
 # Laravel permissions
 RUN chown -R www-data:www-data \

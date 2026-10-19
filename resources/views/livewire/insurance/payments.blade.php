@@ -24,6 +24,17 @@
         <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
             <h3 class="mb-4 text-lg font-bold text-slate-900">فرم پرداخت</h3>
 
+            @if ($errors->any())
+                <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                    <div class="font-semibold mb-1">لطفاً خطاهای فرم را بررسی کنید.</div>
+                    <ul class="list-disc pr-5 space-y-1">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">تاریخ پرداخت</span>
@@ -98,13 +109,25 @@
                             <td>{{ $liability->period->persian_title }}</td>
                             <td>{{ formatMoney($liability->remainingBalance()) }}</td>
                             <td>
-                                <input wire:model="lineDrafts.{{ $liability->id }}.principal_amount" type="number" min="0" step="1" class="w-28 rounded-md border-gray-300 text-right">
+                                <x-erp.ui.money-input
+                                    wire:model.blur="lineDrafts.{{ $liability->id }}.principal_amount"
+                                    :decimals="0"
+                                    class="w-28 rounded-md border-gray-300"
+                                />
                             </td>
                             <td>
-                                <input wire:model="lineDrafts.{{ $liability->id }}.penalty_amount" type="number" min="0" step="1" class="w-28 rounded-md border-gray-300 text-right">
+                                <x-erp.ui.money-input
+                                    wire:model.blur="lineDrafts.{{ $liability->id }}.penalty_amount"
+                                    :decimals="0"
+                                    class="w-28 rounded-md border-gray-300"
+                                />
                             </td>
                             <td>
-                                <input wire:model="lineDrafts.{{ $liability->id }}.other_amount" type="number" min="0" step="1" class="w-28 rounded-md border-gray-300 text-right">
+                                <x-erp.ui.money-input
+                                    wire:model.blur="lineDrafts.{{ $liability->id }}.other_amount"
+                                    :decimals="0"
+                                    class="w-28 rounded-md border-gray-300"
+                                />
                             </td>
                             <td>
                                 <button type="button" wire:click="fillRemaining({{ $liability->id }})" class="text-blue-600 hover:underline">کل مانده</button>
