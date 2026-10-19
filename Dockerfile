@@ -51,7 +51,6 @@ RUN composer install \
     --no-dev
 
 # Install frontend dependencies and build Vite
-RUN npm ci && npm run build
 
 # Laravel permissions
 RUN chown -R www-data:www-data \
