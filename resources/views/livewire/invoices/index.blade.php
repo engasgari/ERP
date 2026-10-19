@@ -143,9 +143,9 @@
                 <button type="button" class="erp-modal-close" wire:click="closeModal">×</button>
             </x-slot>
             <x-slot name="footer">
-                <a href="{{ route('invoices.print', $showingInvoice) }}" target="_blank" data-no-spa class="erp-action-btn erp-action-detail">چاپ</a>
+                <a href="{{ route('invoices.print', ['invoice' => $showingInvoice->id]) }}" target="_blank" data-no-spa class="erp-action-btn erp-action-detail">چاپ</a>
                 @if($showingInvoice->settled_at)
-                    <form method="POST" action="{{ route('invoices.unsettle', $showingInvoice) }}">
+                    <form method="POST" action="{{ route('invoices.unsettle', ['invoice' => $showingInvoice->id]) }}">
                         @csrf
                         <button type="submit" class="erp-action-btn erp-action-detail">خروج از تسویه</button>
                     </form>

@@ -19,10 +19,14 @@
                 <li class="erp-breadcrumb-item {{ $loop->last ? 'is-active' : '' }}">
                     @if(! $loop->last)
                         @php
-                            $href = $crumb['url']
-                                ?? ((! empty($crumb['route']) && Route::has($crumb['route']))
-                                    ? route($crumb['route'], $crumb['routeParams'] ?? [])
-                                    : null);
+                            $href = $crumb['url'] ?? null;
+                            if ($href === null && ! empty($crumb['route']) && Route::has($crumb['route'])) {
+                                try {
+                                    $href = route($crumb['route'], $crumb['routeParams'] ?? []);
+                                } catch (\Illuminate\Routing\Exceptions\UrlGenerationException) {
+                                    $href = null;
+                                }
+                            }
                         @endphp
                         @if($href)
                             <a href="{{ $href }}" wire:navigate>{{ $crumb['label'] }}</a>

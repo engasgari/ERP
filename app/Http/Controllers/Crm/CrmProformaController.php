@@ -115,6 +115,11 @@ class CrmProformaController extends Controller
         return view('invoices.print', [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
+            'routes' => [
+                'show' => route('crm.proforma.show', $invoice),
+                'pdf' => route('crm.proforma.pdf', $invoice),
+                'excel' => route('crm.proforma.excel', $invoice),
+            ],
         ]);
     }
 
@@ -127,6 +132,11 @@ class CrmProformaController extends Controller
         $pdf = PersianPdf::loadView('invoices.print', [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
+            'routes' => [
+                'show' => route('crm.proforma.show', $invoice),
+                'pdf' => route('crm.proforma.pdf', $invoice),
+                'excel' => route('crm.proforma.excel', $invoice),
+            ],
         ], 'a4', 'landscape');
 
         return $pdf->download('proforma-'.$invoice->number.'.pdf');

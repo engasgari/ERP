@@ -42,6 +42,11 @@ class CrmCustomerInvoiceController extends Controller
         return view('invoices.print', [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
+            'routes' => [
+                'show' => route('crm.invoices.show', $invoice),
+                'pdf' => route('crm.invoices.pdf', $invoice),
+                'excel' => route('crm.invoices.excel', $invoice),
+            ],
         ]);
     }
 
@@ -54,6 +59,11 @@ class CrmCustomerInvoiceController extends Controller
         $pdf = PersianPdf::loadView('invoices.print', [
             'invoice' => $invoice,
             'company' => CompanySetting::first(),
+            'routes' => [
+                'show' => route('crm.invoices.show', $invoice),
+                'pdf' => route('crm.invoices.pdf', $invoice),
+                'excel' => route('crm.invoices.excel', $invoice),
+            ],
         ], 'a4', 'landscape');
 
         return $pdf->download('invoice-'.$invoice->number.'.pdf');

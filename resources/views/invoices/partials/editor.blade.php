@@ -50,12 +50,20 @@
                 : (isset($draftDefaults['invoice_date'])
                     ? gregorianToJalaliDate($draftDefaults['invoice_date'])
                     : todayJalaliDate()));
-        $formAction = $formAction ?? ($isEdit ? route('invoices.update', $invoice) : route('invoices.store'));
+        $invoiceKey = null;
+        if (is_object($invoice)) {
+            $invoiceKey = method_exists($invoice, 'getKey') ? $invoice->getKey() : null;
+            $invoiceKey = $invoiceKey ?? ($invoice->id ?? null);
+        }
+        $canEditExisting = $isEdit && filled($invoiceKey);
+        $formAction = $formAction ?? ($canEditExisting
+            ? route('invoices.update', $invoiceKey)
+            : route('invoices.store'));
     @endphp
 
     <form method="POST" action="{{ $formAction }}" class="invoice-editor space-y-4">
         @csrf
-        @if($isEdit)
+        @if($canEditExisting)
             @method('PUT')
         @endif
         <input type="hidden" name="direction" value="{{ $direction }}">
@@ -177,11 +185,11 @@
                     <button type="button" id="invoice-embedded-cancel">انصراف</button>
                 @else
                     <a href="{{ route('invoices.index') }}">بازگشت</a>
-                    @unless($isEdit)
+                    @unless($canEditExisting)
                         <button type="submit" formtarget="_blank" formaction="{{ route('invoices.preview') }}">پیش‌نمایش چاپ</button>
                     @endunless
                 @endif
-                <button type="submit">{{ $isEdit ? 'ذخیره تغییرات' : 'ثبت موقت و نمایش چاپ' }}</button>
+                <button type="submit">{{ $canEditExisting ? 'ذخیره تغییرات' : 'ثبت موقت و نمایش چاپ' }}</button>
             </div>
         </section>
     </form>

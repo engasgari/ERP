@@ -2,9 +2,19 @@
         $embedded = $embedded ?? false;
         $crmContext = $crmContext ?? false;
         $routes = $routes ?? [];
-        $urlPrint = $routes['print'] ?? route('invoices.print', $invoice);
-        $urlPdf = $routes['pdf'] ?? route('invoices.pdf', $invoice);
-        $urlExcel = $routes['excel'] ?? route('invoices.excel', $invoice);
+        $invoiceKey = null;
+        if (is_object($invoice)) {
+            $invoiceKey = method_exists($invoice, 'getKey') ? $invoice->getKey() : null;
+            $invoiceKey = $invoiceKey ?? ($invoice->id ?? null);
+        } elseif (is_numeric($invoice)) {
+            $invoiceKey = (int) $invoice;
+        }
+        $urlPrint = $routes['print']
+            ?? ($invoiceKey ? route('invoices.print', $invoiceKey) : null);
+        $urlPdf = $routes['pdf']
+            ?? ($invoiceKey ? route('invoices.pdf', $invoiceKey) : null);
+        $urlExcel = $routes['excel']
+            ?? ($invoiceKey ? route('invoices.excel', $invoiceKey) : null);
         $isSale = $invoice->direction === 'sale';
         $documentTitle = $invoice->document_type === 'proforma'
             ? 'پیش فاکتور فروش کالا و خدمات'
@@ -32,46 +42,54 @@
             @else
                 <a href="{{ route('invoices.index') }}">بازگشت به فهرست</a>
             @endif
-            @if($embedded && (! ($crmContext ?? false) || ($invoice->document_type === 'proforma' && $invoice->status === 'draft')))
+            @if($invoiceKey && $embedded && (! ($crmContext ?? false) || ($invoice->document_type === 'proforma' && $invoice->status === 'draft')))
                 <button type="button" id="invoice-show-embedded-edit">
                     {{ $invoice->document_type === 'proforma' ? 'ویرایش پیش‌فاکتور' : 'ویرایش فاکتور' }}
                 </button>
-            @elseif(! $embedded)
-                <a href="{{ route('invoices.edit', $invoice) }}">ویرایش فاکتور</a>
+            @elseif($invoiceKey && ! $embedded)
+                <a href="{{ $routes['edit'] ?? route('invoices.edit', $invoiceKey) }}">ویرایش فاکتور</a>
             @endif
             @unless($crmContext ?? false)
-                <a href="{{ $urlPrint }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
-                <a href="{{ $urlPdf }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>PDF</a>
+                @if($urlPrint)
+                    <a href="{{ $urlPrint }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
+                @endif
+                @if($urlPdf)
+                    <a href="{{ $urlPdf }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>PDF</a>
+                @endif
             @endunless
-            <a href="{{ $urlExcel }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>Excel</a>
+            @if($urlExcel)
+                <a href="{{ $urlExcel }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>Excel</a>
+            @endif
             @unless($crmContext)
-            <form method="POST" action="{{ route('invoices.destroy', $invoice) }}" class="invoice-embedded-action-form" @unless($embedded) onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')" @endunless>
+            @if($invoiceKey)
+            <form method="POST" action="{{ $routes['destroy'] ?? route('invoices.destroy', $invoiceKey) }}" class="invoice-embedded-action-form" @unless($embedded) onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')" @endunless>
             @csrf
             @method('DELETE')
             <button type="submit">حذف فاکتور</button>
         </form>
 
         @if($invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
-            <form method="POST" action="{{ route('invoices.convert', $invoice) }}" class="invoice-embedded-action-form">
+            <form method="POST" action="{{ $routes['convert'] ?? route('invoices.convert', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit">تبدیل به فاکتور</button>
             </form>
         @elseif($invoice->document_type !== 'proforma' && $invoice->status === 'draft')
-            <form method="POST" action="{{ route('invoices.confirm', $invoice) }}" class="invoice-embedded-action-form">
+            <form method="POST" action="{{ $routes['confirm'] ?? route('invoices.confirm', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">{{ $invoice->direction === 'purchase' ? 'تایید نهایی و ثبت رسید انبار' : 'تایید نهایی و ثبت حواله انبار' }}</button>
             </form>
         @elseif($invoice->status === 'confirmed' && ! $invoice->settled_at)
-            <form method="POST" action="{{ route('invoices.settle', $invoice) }}" class="invoice-embedded-action-form">
+            <form method="POST" action="{{ $routes['settle'] ?? route('invoices.settle', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">تسویه فاکتور</button>
             </form>
         @elseif($invoice->settled_at)
-            <form method="POST" action="{{ route('invoices.unsettle', $invoice) }}" class="invoice-embedded-action-form">
+            <form method="POST" action="{{ $routes['unsettle'] ?? route('invoices.unsettle', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">خروج از تسویه</button>
             </form>
         @endif
+            @endif
             @endunless
     </div>
 

@@ -71,7 +71,7 @@ class Index extends BaseListPage
 
         session()->flash('success', 'فاکتور خرید خدمات به صورت موقت ایجاد شد. مبالغ را ویرایش و سپس تأیید کنید.');
 
-        return redirect()->route('invoices.edit', $purchase);
+        return redirect()->route('invoices.edit', ['invoice' => $purchase->id]);
     }
 
     public function render(ContractorServicePurchaseRepository $repository): mixed

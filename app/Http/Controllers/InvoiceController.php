@@ -173,7 +173,7 @@ class InvoiceController extends Controller
         }
 
         return redirect()
-            ->route('invoices.show', $invoice)
+            ->route('invoices.show', ['invoice' => $invoice->id])
             ->with('success', 'فاکتور/پیش‌فاکتور ثبت موقت شد.');
     }
 
@@ -234,7 +234,7 @@ class InvoiceController extends Controller
         }
 
         return redirect()
-            ->route('invoices.show', $invoice)
+            ->route('invoices.show', ['invoice' => $invoice->id])
             ->with('success', 'فاکتور ویرایش شد. اسناد قبلی انبار و مالی حذف شدند؛ برای صدور سند جدید دوباره تایید کنید.');
     }
 
@@ -302,7 +302,7 @@ class InvoiceController extends Controller
             return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
         }
 
-        return redirect()->route('invoices.show', $invoice)->with('success', 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
+        return redirect()->route('invoices.show', ['invoice' => $invoice->id])->with('success', 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
     }
 
     public function settle(Request $request, Invoice $invoice)
@@ -385,7 +385,7 @@ class InvoiceController extends Controller
             );
         }
 
-        return redirect()->route('invoices.show', $new)->with('success', 'پیش‌فاکتور به فاکتور تبدیل شد و پیش‌فاکتور از سیستم حذف شد.');
+        return redirect()->route('invoices.show', ['invoice' => $new->id])->with('success', 'پیش‌فاکتور به فاکتور تبدیل شد و پیش‌فاکتور از سیستم حذف شد.');
     }
 
     public function destroy(Request $request, Invoice $invoice)

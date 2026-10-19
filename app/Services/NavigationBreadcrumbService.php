@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Support\NavigationBreadcrumbRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -217,7 +218,12 @@ class NavigationBreadcrumbService
                 }
             }
 
-            $trail[$index]['url'] = route($route, $params);
+            try {
+                $trail[$index]['url'] = route($route, $params);
+            } catch (UrlGenerationException) {
+                // Parameterized routes (e.g. invoices.edit) must not break the page.
+                unset($trail[$index]['route']);
+            }
         }
 
         if ($this->context->isReportRoute($routeName)) {

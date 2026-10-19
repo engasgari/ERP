@@ -399,14 +399,42 @@
     $emptyRows = max(0, 8 - $invoice->lines->count());
 @endphp
 
+@php
+    $printRoutes = $routes ?? [];
+    $isPrintPreview = (bool) ($preview ?? false);
+    $printShowUrl = $printPdfUrl = $printExcelUrl = null;
+
+    if (! $isPrintPreview) {
+        $printInvoiceKey = null;
+        if (is_object($invoice)) {
+            $printInvoiceKey = method_exists($invoice, 'getKey') ? $invoice->getKey() : null;
+            $printInvoiceKey = $printInvoiceKey ?? ($invoice->id ?? null);
+        } elseif (is_numeric($invoice)) {
+            $printInvoiceKey = (int) $invoice;
+        }
+
+        $printShowUrl = $printRoutes['show']
+            ?? ($printInvoiceKey ? route('invoices.show', $printInvoiceKey) : null);
+        $printPdfUrl = $printRoutes['pdf']
+            ?? ($printInvoiceKey ? route('invoices.pdf', $printInvoiceKey) : null);
+        $printExcelUrl = $printRoutes['excel']
+            ?? ($printInvoiceKey ? route('invoices.excel', $printInvoiceKey) : null);
+    }
+@endphp
 @unless($forPdf ?? false)
 <div class="print-actions">
-    @if($preview ?? false)
+    @if($isPrintPreview)
         <a href="#" onclick="window.close(); return false;">بستن</a>
     @else
-        <a href="{{ route('invoices.show', $invoice) }}">بازگشت</a>
-        <a href="{{ route('invoices.pdf', $invoice) }}" target="_blank" data-no-spa>PDF</a>
-        <a href="{{ route('invoices.excel', $invoice) }}" target="_blank" data-no-spa>Excel</a>
+        @if($printShowUrl)
+            <a href="{{ $printShowUrl }}">بازگشت</a>
+        @endif
+        @if($printPdfUrl)
+            <a href="{{ $printPdfUrl }}" target="_blank" data-no-spa>PDF</a>
+        @endif
+        @if($printExcelUrl)
+            <a href="{{ $printExcelUrl }}" target="_blank" data-no-spa>Excel</a>
+        @endif
     @endif
     <button type="button" onclick="window.print()">چاپ</button>
 </div>
