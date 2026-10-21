@@ -374,13 +374,14 @@
             }
 
             if (type === 'invoice-saved') {
+                if (!event.data.invoice?.id) {
+                    showInvoiceListFlash(event.data.message || 'ذخیره فاکتور تایید نشد. دوباره تلاش کنید.', 'danger');
+                    return;
+                }
+
                 closeInvoiceEdit();
-                if (event.data.invoice) {
-                    updateInvoiceListRow(event.data.invoice);
-                }
-                if (event.data.message) {
-                    showInvoiceListFlash(event.data.message);
-                }
+                updateInvoiceListRow(event.data.invoice);
+                showInvoiceListFlash(event.data.message || 'فاکتور ذخیره شد.');
                 return;
             }
 

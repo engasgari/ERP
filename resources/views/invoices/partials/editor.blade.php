@@ -69,9 +69,7 @@
         <input type="hidden" name="direction" value="{{ $direction }}">
         <input type="hidden" name="document_type" value="{{ $documentType }}">
 
-        @if($embedded)
-            <div id="invoice-embedded-errors" class="invoice-error" hidden></div>
-        @endif
+        <div id="invoice-embedded-errors" class="invoice-error" hidden></div>
 
         @if($errors->any())
             <div class="invoice-error">
@@ -629,82 +627,112 @@
             bootstrapInvoiceLines();
         }
 
-        if (@json($embedded)) {
-            const editorForm = document.querySelector('.invoice-editor');
-            const embeddedErrors = document.getElementById('invoice-embedded-errors');
-            const saveButton = editorForm?.querySelector('button[type="submit"]:not([formaction])');
+        const editorForm = document.querySelector('.invoice-editor');
+        const saveViaAjax = @json($embedded) || window.self !== window.top;
+        const embeddedErrors = document.getElementById('invoice-embedded-errors');
+        const saveButton = editorForm?.querySelector('button[type="submit"]:not([formaction])');
 
-            document.getElementById('invoice-embedded-cancel')?.addEventListener('click', () => {
-                window.parent.postMessage({ type: 'invoice-edit-cancel' }, window.location.origin);
-            });
+        function normalizeLineNumbersForSubmit() {
+            linesBody.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach(setRawValue);
+        }
 
-            editorForm?.addEventListener('submit', async (event) => {
-                if (event.submitter?.formaction?.includes('preview')) {
-                    return;
-                }
+        function showEmbeddedSaveError(message) {
+            if (embeddedErrors) {
+                embeddedErrors.hidden = false;
+                embeddedErrors.textContent = message;
+            }
 
-                event.preventDefault();
+            if (typeof window.showErpToast === 'function') {
+                window.showErpToast(message, 'danger');
+            }
 
-                if (embeddedErrors) {
-                    embeddedErrors.hidden = true;
-                    embeddedErrors.textContent = '';
-                }
+            if (window.self !== window.top) {
+                window.parent.postMessage({
+                    type: 'invoice-validation-error',
+                    message,
+                }, window.location.origin);
+            }
+        }
 
-                if (saveButton) {
-                    saveButton.disabled = true;
-                    saveButton.textContent = 'در حال ذخیره...';
-                }
+        document.getElementById('invoice-embedded-cancel')?.addEventListener('click', () => {
+            window.parent.postMessage({ type: 'invoice-edit-cancel' }, window.location.origin);
+        });
 
-                try {
-                    const response = await fetch(editorForm.action, {
-                        method: 'POST',
-                        headers: {
-                            Accept: 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: new FormData(editorForm),
-                    });
+        editorForm?.addEventListener('submit', async (event) => {
+            if (event.submitter?.formaction?.includes('preview')) {
+                return;
+            }
 
-                    let payload = {};
+            normalizeLineNumbersForSubmit();
+
+            if (!saveViaAjax) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (embeddedErrors) {
+                embeddedErrors.hidden = true;
+                embeddedErrors.textContent = '';
+            }
+
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.textContent = 'در حال ذخیره...';
+            }
+
+            try {
+                const csrfToken = editorForm.querySelector('input[name="_token"]')?.value
+                    || document.querySelector('meta[name="csrf-token"]')?.content
+                    || '';
+
+                const response = await fetch(editorForm.action, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    credentials: 'same-origin',
+                    body: new FormData(editorForm),
+                });
+
+                const contentType = response.headers.get('content-type') || '';
+                const isJson = contentType.includes('application/json');
+
+                let payload = {};
+                if (isJson) {
                     try {
                         payload = await response.json();
                     } catch {
                         payload = {};
                     }
-
-                    if (!response.ok) {
-                        const errors = payload.errors
-                            ? Object.values(payload.errors).flat()
-                            : [payload.message || 'ذخیره فاکتور انجام نشد.'];
-                        throw new Error(errors.join(' '));
-                    }
-
-                    window.parent.postMessage({
-                        type: 'invoice-saved',
-                        message: payload.message,
-                        invoice: payload.invoice,
-                    }, window.location.origin);
-                } catch (error) {
-                    const message = error.message || 'ذخیره فاکتور انجام نشد.';
-
-                    window.parent.postMessage({
-                        type: 'invoice-validation-error',
-                        message,
-                    }, window.location.origin);
-
-                    if (typeof window.showErpToast === 'function') {
-                        window.showErpToast(message, 'danger');
-                    } else if (embeddedErrors) {
-                        embeddedErrors.hidden = false;
-                        embeddedErrors.textContent = message;
-                    }
-                } finally {
-                    if (saveButton) {
-                        saveButton.disabled = false;
-                        saveButton.textContent = 'ذخیره تغییرات';
-                    }
                 }
-            });
-        }
+
+                if (!response.ok) {
+                    const errors = payload.errors
+                        ? Object.values(payload.errors).flat()
+                        : [payload.message || `ذخیره فاکتور انجام نشد. (کد ${response.status})`];
+                    throw new Error(errors.filter(Boolean).join(' '));
+                }
+
+                if (!isJson || !payload.invoice?.id) {
+                    throw new Error(payload.message || 'پاسخ ذخیره فاکتور نامعتبر بود. تغییرات اعمال نشد.');
+                }
+
+                window.parent.postMessage({
+                    type: 'invoice-saved',
+                    message: payload.message || 'فاکتور ذخیره شد.',
+                    invoice: payload.invoice,
+                }, window.location.origin);
+            } catch (error) {
+                showEmbeddedSaveError(error.message || 'ذخیره فاکتور انجام نشد.');
+            } finally {
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.textContent = @json($canEditExisting ? 'ذخیره تغییرات' : 'ثبت موقت و نمایش چاپ');
+                }
+            }
+        });
     })();
     </script>

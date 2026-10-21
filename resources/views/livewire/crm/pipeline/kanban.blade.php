@@ -381,9 +381,16 @@
             }
 
             if (type === 'invoice-saved') {
+                if (!event.data.invoice?.id) {
+                    if (typeof window.showErpToast === 'function') {
+                        window.showErpToast(event.data.message || 'ذخیره فاکتور تایید نشد. دوباره تلاش کنید.', 'danger');
+                    }
+                    return;
+                }
+
                 closeProformaEdit();
-                if (event.data.message && typeof window.showErpToast === 'function') {
-                    window.showErpToast(event.data.message);
+                if (typeof window.showErpToast === 'function') {
+                    window.showErpToast(event.data.message || 'فاکتور ذخیره شد.');
                 }
                 if (typeof Livewire !== 'undefined' && Livewire.first()) {
                     Livewire.first().$refresh();

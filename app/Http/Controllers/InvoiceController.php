@@ -51,7 +51,8 @@ class InvoiceController extends Controller
             invoice: $invoice->load('party', 'lines')
         );
 
-        if ($request->boolean('embedded')) {
+        // Modal/iframe editors always need the embed layout + AJAX save path.
+        if ($request->boolean('embedded') || $request->headers->get('Sec-Fetch-Dest') === 'iframe') {
             return view('invoices.edit-embedded', $data);
         }
 
@@ -131,6 +132,13 @@ class InvoiceController extends Controller
         $payload = $this->validatedPayload($request);
 
         if ($message = $this->stockErrorMessage($payload, $inventory)) {
+            if ($this->wantsInvoiceJson($request)) {
+                return response()->json([
+                    'message' => $message,
+                    'errors' => ['lines' => [$message]],
+                ], 422);
+            }
+
             return back()->withInput()->withErrors(['lines' => $message]);
         }
 
@@ -165,7 +173,7 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload(
                 $invoice->fresh(['party', 'lines.item.unit', 'project']),
                 'فاکتور/پیش‌فاکتور ثبت موقت شد.'
@@ -216,7 +224,7 @@ class InvoiceController extends Controller
                 $this->syncLines($invoice, $payload['lines']);
             });
         } catch (RuntimeException $exception) {
-            if ($request->expectsJson()) {
+            if ($this->wantsInvoiceJson($request)) {
                 return response()->json([
                     'message' => $exception->getMessage(),
                     'errors' => ['lines' => [$exception->getMessage()]],
@@ -226,7 +234,7 @@ class InvoiceController extends Controller
             return back()->withInput()->withErrors(['lines' => $exception->getMessage()]);
         }
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload(
                 $invoice->fresh(),
                 'فاکتور ویرایش شد. اسناد قبلی انبار و مالی حذف شدند؛ برای صدور سند جدید دوباره تایید کنید.'
@@ -288,7 +296,7 @@ class InvoiceController extends Controller
         try {
             $documents->postInvoice($invoice);
         } catch (RuntimeException $exception) {
-            if ($request->expectsJson()) {
+            if ($this->wantsInvoiceJson($request)) {
                 return response()->json([
                     'message' => $exception->getMessage(),
                     'errors' => ['inventory' => [$exception->getMessage()]],
@@ -298,7 +306,7 @@ class InvoiceController extends Controller
             return back()->withErrors(['inventory' => $exception->getMessage()]);
         }
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
         }
 
@@ -311,7 +319,7 @@ class InvoiceController extends Controller
         abort_if($invoice->status !== 'confirmed', 422, 'فقط فاکتور تایید شده را می‌توان تسویه کرد.');
 
         if ($invoice->settled_at) {
-            if ($request->expectsJson()) {
+            if ($this->wantsInvoiceJson($request)) {
                 return $this->invoiceJsonPayload($invoice, 'این فاکتور قبلاً تسویه شده است.');
             }
 
@@ -323,7 +331,7 @@ class InvoiceController extends Controller
             'settled_by' => $request->user()?->id,
         ]);
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور با موفقیت تسویه شد.');
         }
 
@@ -341,7 +349,7 @@ class InvoiceController extends Controller
             'settled_by' => null,
         ]);
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور از حالت تسویه خارج شد و به وضعیت تایید شده برگشت.');
         }
 
@@ -377,7 +385,7 @@ class InvoiceController extends Controller
             return $new->fresh(['lines', 'party']);
         });
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return $this->invoiceJsonPayload(
                 $new,
                 'پیش‌فاکتور به فاکتور تبدیل شد و پیش‌فاکتور از سیستم حذف شد.',
@@ -396,7 +404,7 @@ class InvoiceController extends Controller
             $invoice->delete();
         });
 
-        if ($request->expectsJson()) {
+        if ($this->wantsInvoiceJson($request)) {
             return response()->json([
                 'message' => 'فاکتور و همه اسناد انبار و مالی وابسته حذف شدند.',
                 'deleted_id' => $invoice->id,
@@ -652,6 +660,14 @@ class InvoiceController extends Controller
         ]);
 
         return str_replace('٫', '.', $value);
+    }
+
+    private function wantsInvoiceJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->ajax()
+            || $request->wantsJson()
+            || str_contains((string) $request->header('Accept', ''), 'application/json');
     }
 
     private function invoiceJsonPayload(Invoice $invoice, string $message, ?int $reloadShowId = null)

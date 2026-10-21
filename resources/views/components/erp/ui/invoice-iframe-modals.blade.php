@@ -355,15 +355,27 @@
 
         if (type === 'invoice-saved') {
 
+            if (!event.data.invoice?.id) {
+
+                if (typeof window.showErpToast === 'function') {
+
+                    window.showErpToast(event.data.message || 'ذخیره فاکتور تایید نشد. دوباره تلاش کنید.', 'danger');
+
+                }
+
+                return;
+
+            }
+
             closeInvoiceEdit();
 
             refreshLivewireHost();
 
 
 
-            if (event.data.message && typeof window.showErpToast === 'function') {
+            if (typeof window.showErpToast === 'function') {
 
-                window.showErpToast(event.data.message);
+                window.showErpToast(event.data.message || 'فاکتور ذخیره شد.');
 
             }
 
