@@ -42,8 +42,78 @@ class CrmProformaController extends Controller
                     'project_id' => $opportunity->project_id,
                     'invoice_date' => now()->toDateString(),
                 ],
+                'opportunity' => $opportunity,
+                'linkExistingUrl' => route('crm.proforma.link-picker', $opportunity),
             ]
         ));
+    }
+
+    public function linkPicker(Request $request, Opportunity $opportunity): View|RedirectResponse
+    {
+        $this->access->authorizeOpportunity($request->user(), $opportunity);
+
+        if ($opportunity->invoice_id) {
+            return redirect()->route('crm.proforma.show', $opportunity->invoice_id);
+        }
+
+        $search = trim((string) $request->query('q', ''));
+
+        return view('crm.proforma.link-embedded', [
+            'opportunity' => $opportunity->loadMissing('party'),
+            'proformas' => $this->proformas->linkableProformasForOpportunity($opportunity, $search),
+            'search' => $search,
+            'composeUrl' => route('crm.proforma.compose', $opportunity),
+            'linkAction' => route('crm.proforma.link', $opportunity),
+        ]);
+    }
+
+    public function link(Request $request, Opportunity $opportunity): JsonResponse|RedirectResponse
+    {
+        $this->access->authorizeOpportunity($request->user(), $opportunity);
+
+        abort_if($opportunity->invoice_id, 422, 'برای این فرصت قبلاً پیش‌فاکتور صادر شده است.');
+
+        $validated = $request->validate([
+            'invoice_id' => 'required|integer|exists:invoices,id',
+        ]);
+
+        $invoice = Invoice::query()->findOrFail($validated['invoice_id']);
+
+        try {
+            $opportunity = $this->proformas->attachExistingProforma($opportunity, $invoice, $request->user());
+        } catch (\InvalidArgumentException $exception) {
+            if ($this->wantsJson($request)) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'errors' => ['invoice_id' => [$exception->getMessage()]],
+                ], 422);
+            }
+
+            return back()->withErrors(['invoice_id' => $exception->getMessage()]);
+        }
+
+        $invoice = $opportunity->invoice()->with('party')->first() ?? $invoice->loadMissing('party');
+
+        if ($this->wantsJson($request)) {
+            return response()->json([
+                'message' => 'پیش‌فاکتور به فرصت متصل شد.',
+                'invoice' => [
+                    'id' => $invoice->id,
+                    'number' => $invoice->number,
+                    'type_label' => 'فروش / پیش‌فاکتور',
+                    'invoice_date' => gregorianToJalaliDate($invoice->invoice_date),
+                    'party_name' => $invoice->party?->name ?: ($opportunity->party?->name ?: '-'),
+                    'project_number' => '-',
+                    'total_amount_formatted' => formatMoney((float) $invoice->total_amount),
+                    'status' => $invoice->status,
+                    'settled_at' => $invoice->settled_at,
+                ],
+            ]);
+        }
+
+        return redirect()
+            ->route('crm.proforma.show', $invoice)
+            ->with('success', 'پیش‌فاکتور به فرصت متصل شد.');
     }
 
     public function store(
@@ -71,6 +141,14 @@ class CrmProformaController extends Controller
         }
 
         return $response;
+    }
+
+    private function wantsJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->ajax()
+            || $request->wantsJson()
+            || str_contains((string) $request->header('Accept', ''), 'application/json');
     }
 
     public function show(Request $request, Invoice $invoice)

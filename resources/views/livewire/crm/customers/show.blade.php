@@ -16,6 +16,8 @@
 
     <x-slot name="toolbar">
 
+        <button type="button" class="erp-action-btn erp-action-edit" data-customer-edit="{{ $party->id }}">ویرایش مشتری</button>
+
         @if(($party->crmProfile?->status ?? 'active') === 'inactive' || ! $party->is_active)
 
             <button type="button" wire:click="reactivateCustomer" class="erp-action-btn erp-action-edit">فعال‌سازی مشتری</button>
@@ -476,6 +478,107 @@
     @endif
 
     <x-erp.ui.invoice-iframe-modals />
+
+    <div id="customer-edit-modal" class="erp-modal item-edit-modal" hidden>
+        <div class="erp-ui-modal-backdrop" data-customer-edit-close></div>
+        <div class="erp-ui-modal-panel item-edit-modal-panel">
+            <div class="erp-modal-header">
+                <h3 id="customer-edit-modal-title">ویرایش مشتری</h3>
+                <button type="button" class="erp-modal-close" data-customer-edit-close aria-label="بستن">×</button>
+            </div>
+            <div class="erp-modal-body item-edit-modal-body">
+                <iframe id="customer-edit-iframe" title="ویرایش مشتری" class="item-edit-iframe"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (() => {
+        const editModal = document.getElementById('customer-edit-modal');
+        const editIframe = document.getElementById('customer-edit-iframe');
+        const editTitle = document.getElementById('customer-edit-modal-title');
+        const customerEditUrlBase = @json(url('crm/customers')) + '/';
+        const partyId = @json($party->id);
+
+        function openCustomerEdit(id) {
+            if (!editModal || !editIframe || !id) {
+                return;
+            }
+
+            editIframe.src = `${customerEditUrlBase}${id}/edit?embedded=1`;
+            if (editTitle) {
+                editTitle.textContent = 'ویرایش مشتری';
+            }
+            editModal.hidden = false;
+            document.body.classList.add('erp-modal-open');
+        }
+
+        function closeCustomerEdit() {
+            if (!editModal || !editIframe) {
+                return;
+            }
+
+            editModal.hidden = true;
+            editIframe.src = 'about:blank';
+            document.body.classList.remove('erp-modal-open');
+        }
+
+        document.addEventListener('click', (event) => {
+            const editTrigger = event.target.closest('[data-customer-edit]');
+            if (editTrigger) {
+                event.preventDefault();
+                openCustomerEdit(editTrigger.getAttribute('data-customer-edit') || partyId);
+            }
+
+            if (event.target.closest('[data-customer-edit-close]')) {
+                closeCustomerEdit();
+            }
+        });
+
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
+
+            const type = event.data?.type;
+
+            if (type === 'party-edit-cancel') {
+                closeCustomerEdit();
+                return;
+            }
+
+            if (type === 'party-validation-error') {
+                if (event.data.message && typeof window.showErpToast === 'function') {
+                    window.showErpToast(event.data.message, 'danger');
+                }
+                return;
+            }
+
+            if (type === 'party-saved') {
+                if (!event.data.party?.id) {
+                    if (typeof window.showErpToast === 'function') {
+                        window.showErpToast(event.data.message || 'ذخیره مشتری تایید نشد.', 'danger');
+                    }
+                    return;
+                }
+
+                closeCustomerEdit();
+
+                if (typeof window.showErpToast === 'function') {
+                    window.showErpToast(event.data.message || 'مشتری ویرایش شد.');
+                }
+
+                if (typeof Livewire !== 'undefined') {
+                    const host = editModal?.closest('[wire\\:id]');
+                    const component = host
+                        ? Livewire.find(host.getAttribute('wire:id'))
+                        : Livewire.first();
+                    component?.$refresh?.();
+                }
+            }
+        });
+    })();
+    </script>
 
 </x-erp.ui.detail-page>
 

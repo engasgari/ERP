@@ -28,6 +28,13 @@
             مشاهده پیش‌فاکتور
         @endif
     </button>
+@elseif($opportunity->status === 'open' && (int) ($opportunity->stage?->sort_order ?? 0) >= 5 && ($proformaButtonMode ?? null) === 'kanban')
+    <button type="button" class="erp-action-btn erp-action-edit" onclick="window.openCrmProformaCompose({{ $opportunity->id }})">
+        صدور پیش‌فاکتور
+    </button>
+    <button type="button" class="erp-action-btn erp-action-detail" onclick="window.openCrmProformaLink({{ $opportunity->id }})">
+        فهرست پیش‌فاکتورها
+    </button>
 @endif
 
 @if($opportunity->status === 'won' && $canMoveStage)

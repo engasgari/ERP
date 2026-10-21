@@ -5,6 +5,7 @@ namespace App\Services\Crm;
 use App\Models\Crm\Opportunity;
 use App\Models\Invoice;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -25,6 +26,73 @@ class CrmProformaInvoiceService
             'invoice_id' => $invoice->id,
             'invoice_number' => $invoice->number,
         ], $opportunity->party_id);
+    }
+
+    /**
+     * Link an existing ERP sale proforma to a CRM opportunity that has no invoice yet.
+     */
+    public function attachExistingProforma(Opportunity $opportunity, Invoice $invoice, User $actor): Opportunity
+    {
+        if ($opportunity->invoice_id) {
+            throw new InvalidArgumentException('برای این فرصت قبلاً پیش‌فاکتور/فاکتور متصل شده است.');
+        }
+
+        if ($invoice->document_type !== 'proforma' || $invoice->direction !== 'sale') {
+            throw new InvalidArgumentException('فقط پیش‌فاکتور فروش قابل اتصال است.');
+        }
+
+        if ($invoice->status === 'cancelled') {
+            throw new InvalidArgumentException('پیش‌فاکتور ابطال‌شده قابل اتصال نیست.');
+        }
+
+        if ($opportunity->party_id && $invoice->party_id && (int) $opportunity->party_id !== (int) $invoice->party_id) {
+            throw new InvalidArgumentException('طرف‌حساب پیش‌فاکتور با مشتری این فرصت یکسان نیست.');
+        }
+
+        $this->linkToOpportunity($opportunity, $invoice, $actor);
+
+        return $opportunity->fresh(['invoice.party', 'invoice']);
+    }
+
+    /**
+     * Sale proformas for the opportunity party that can be attached from CRM.
+     *
+     * @return Collection<int, Invoice>
+     */
+    public function linkableProformasForOpportunity(Opportunity $opportunity, ?string $search = null): Collection
+    {
+        if (! $opportunity->party_id) {
+            return collect();
+        }
+
+        $linkedInvoiceIds = Opportunity::query()
+            ->whereNotNull('invoice_id')
+            ->when($opportunity->id, fn ($query) => $query->where('id', '!=', $opportunity->id))
+            ->pluck('invoice_id')
+            ->all();
+
+        $query = Invoice::query()
+            ->with('party')
+            ->where('direction', 'sale')
+            ->where('document_type', 'proforma')
+            ->where('status', '!=', 'cancelled')
+            ->where('party_id', $opportunity->party_id)
+            ->orderByDesc('invoice_date')
+            ->orderByDesc('id');
+
+        $search = trim((string) $search);
+        if ($search !== '') {
+            $query->where(function ($inner) use ($search) {
+                $inner->where('number', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->limit(75)->get()->map(function (Invoice $invoice) use ($linkedInvoiceIds) {
+            $invoice->setAttribute('already_linked_elsewhere', in_array($invoice->id, $linkedInvoiceIds, true));
+
+            return $invoice;
+        });
     }
 
     /**

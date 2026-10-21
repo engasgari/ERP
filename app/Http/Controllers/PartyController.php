@@ -30,7 +30,7 @@ class PartyController extends Controller
     }
 
     /**
-     * Shared party form view used by ERP and CRM create flows.
+     * Shared party form view used by ERP and CRM create/edit flows.
      *
      * @param  list<int>  $selectedTypeIds
      */
@@ -41,6 +41,7 @@ class PartyController extends Controller
         ?string $cancelUrl = null,
         ?string $pageTitle = null,
         bool $lockCustomerType = false,
+        bool $embedded = false,
     ): View {
         $data = $this->formData($party);
 
@@ -50,13 +51,19 @@ class PartyController extends Controller
 
         $isEdit = $party->exists;
 
-        return view('parties.create', $data + [
+        $payload = $data + [
             'formAction' => $formAction ?? ($isEdit ? route('parties.update', $party) : route('parties.store')),
             'cancelUrl' => $cancelUrl ?? route('parties.index'),
             'pageTitle' => $pageTitle ?? ($isEdit ? 'ویرایش شخص/شرکت' : 'تعریف شخص/شرکت'),
             'lockCustomerType' => $lockCustomerType,
             'customerTypeId' => (int) PartyType::where('name', 'customer')->value('id'),
-        ]);
+        ];
+
+        if ($embedded) {
+            return view('parties.edit-embedded', $payload);
+        }
+
+        return view('parties.create', $payload);
     }
 
     public function store(Request $request, NumberingService $numbering)
@@ -100,12 +107,26 @@ class PartyController extends Controller
         return $party->load('types');
     }
 
-    public function edit(Party $party)
+    public function edit(Request $request, Party $party)
     {
-        return $this->createFormView($party->load('types'));
+        return $this->createFormView(
+            $party->load('types'),
+            embedded: $request->boolean('embedded') || $request->headers->get('Sec-Fetch-Dest') === 'iframe',
+        );
     }
 
     public function update(Request $request, Party $party)
+    {
+        $party = $this->updateParty($request, $party);
+
+        if ($this->wantsPartyJson($request)) {
+            return $this->partyJsonPayload($party, 'شخص/شرکت ویرایش شد.');
+        }
+
+        return redirect()->route('parties.index')->with('success', 'شخص/شرکت ویرایش شد.');
+    }
+
+    public function updateParty(Request $request, Party $party): Party
     {
         $validated = $this->validated($request, $party);
         $typeIds = $validated['types'] ?? [];
@@ -126,7 +147,33 @@ class PartyController extends Controller
             app(CrmCustomerService::class)->ensureProfile($party, $request->user());
         }
 
-        return redirect()->route('parties.index')->with('success', 'شخص/شرکت ویرایش شد.');
+        return $party->fresh(['types', 'crmProfile.assignedUser']);
+    }
+
+    public function partyJsonPayload(Party $party, string $message)
+    {
+        $party->loadMissing(['types', 'crmProfile.assignedUser']);
+
+        return response()->json([
+            'message' => $message,
+            'party' => [
+                'id' => $party->id,
+                'name' => $party->name,
+                'code' => $party->code,
+                'mobile' => $party->mobile,
+                'kind' => $party->kind,
+                'status_label' => $party->crmProfile?->status_label ?? '-',
+                'assigned_user_name' => $party->crmProfile?->assignedUser?->name ?? '-',
+            ],
+        ]);
+    }
+
+    private function wantsPartyJson(Request $request): bool
+    {
+        return $request->expectsJson()
+            || $request->ajax()
+            || $request->wantsJson()
+            || str_contains((string) $request->header('Accept', ''), 'application/json');
     }
 
     private function isCustomerTypeSelected(array $typeIds): bool

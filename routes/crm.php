@@ -49,6 +49,16 @@ Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.
         ->middleware('permission:crm.customers.view')
         ->name('customers.store');
 
+    Route::get('/customers/{party}/edit', [\App\Http\Controllers\Crm\CrmCustomerPartyController::class, 'edit'])
+        ->middleware('permission:crm.customers.view')
+        ->whereNumber('party')
+        ->name('customers.edit');
+
+    Route::put('/customers/{party}', [\App\Http\Controllers\Crm\CrmCustomerPartyController::class, 'update'])
+        ->middleware('permission:crm.customers.view')
+        ->whereNumber('party')
+        ->name('customers.update');
+
     Route::view('/customers/{party}', 'crm.customers.show')
 
         ->middleware('permission:crm.customers.view')
@@ -224,6 +234,22 @@ Route::middleware(['auth', 'verified', 'active.crm'])->prefix('crm')->name('crm.
             ->whereNumber('opportunity')
 
             ->name('proforma.compose');
+
+
+
+        Route::get('/opportunities/{opportunity}/proforma/link', [\App\Http\Controllers\Crm\CrmProformaController::class, 'linkPicker'])
+
+            ->whereNumber('opportunity')
+
+            ->name('proforma.link-picker');
+
+
+
+        Route::post('/opportunities/{opportunity}/proforma/link', [\App\Http\Controllers\Crm\CrmProformaController::class, 'link'])
+
+            ->whereNumber('opportunity')
+
+            ->name('proforma.link');
 
 
 

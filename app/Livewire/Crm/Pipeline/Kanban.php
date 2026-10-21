@@ -53,6 +53,11 @@ class Kanban extends Component
         $this->draggingOpportunityId = $opportunityId;
     }
 
+    public function cancelDrag(): void
+    {
+        $this->draggingOpportunityId = null;
+    }
+
     public function dropOnStage(int $stageId, CrmOpportunityService $opportunities): void
     {
         if (! $this->draggingOpportunityId) {

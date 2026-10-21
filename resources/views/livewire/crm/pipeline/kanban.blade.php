@@ -22,16 +22,202 @@
     </x-slot>
 
     @if($pipeline)
-        <div class="crm-kanban-shell" x-data="{ dragging: null }">
+        <script>
+            window.crmKanbanBoard = function ($wire) {
+                return {
+                    draggingId: null,
+                    pointerId: null,
+                    startX: 0,
+                    startY: 0,
+                    moved: false,
+                    cardEl: null,
+                    ghostEl: null,
+                    activeStageId: null,
+                    grabOffsetX: 0,
+                    grabOffsetY: 0,
+                    threshold: 10,
+                    _onMove: null,
+                    _onUp: null,
+
+                    beginDrag(event, opportunityId) {
+                        if (event.pointerType === 'mouse' && event.button !== 0) {
+                            return;
+                        }
+
+                        const handle = event.currentTarget;
+                        const card = handle.closest('.crm-kanban-card');
+                        if (!card) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        this.cleanupGhost();
+                        this.clearColumnHighlights();
+
+                        this.draggingId = opportunityId;
+                        this.pointerId = event.pointerId;
+                        this.startX = event.clientX;
+                        this.startY = event.clientY;
+                        this.moved = false;
+                        this.cardEl = card;
+                        this.activeStageId = null;
+
+                        const rect = card.getBoundingClientRect();
+                        this.grabOffsetX = event.clientX - rect.left;
+                        this.grabOffsetY = event.clientY - rect.top;
+
+                        try {
+                            handle.setPointerCapture(event.pointerId);
+                        } catch (_) {
+                            // ignore
+                        }
+
+                        $wire.startDrag(opportunityId);
+
+                        this._onMove = (e) => this.onPointerMove(e);
+                        this._onUp = (e) => this.onPointerUp(e);
+                        window.addEventListener('pointermove', this._onMove, { passive: false });
+                        window.addEventListener('pointerup', this._onUp);
+                        window.addEventListener('pointercancel', this._onUp);
+                    },
+
+                    onPointerMove(event) {
+                        if (this.pointerId !== null && event.pointerId !== this.pointerId) {
+                            return;
+                        }
+                        if (!this.draggingId) {
+                            return;
+                        }
+
+                        const dx = event.clientX - this.startX;
+                        const dy = event.clientY - this.startY;
+
+                        if (!this.moved && Math.hypot(dx, dy) < this.threshold) {
+                            return;
+                        }
+
+                        if (!this.moved) {
+                            this.moved = true;
+                            this.createGhost();
+                            this.cardEl?.classList.add('is-dragging');
+                            document.body.classList.add('crm-kanban-dragging');
+                        }
+
+                        event.preventDefault();
+                        this.positionGhost(event.clientX, event.clientY);
+                        this.highlightColumnAt(event.clientX, event.clientY);
+                    },
+
+                    onPointerUp(event) {
+                        if (this.pointerId !== null && event.pointerId !== this.pointerId) {
+                            return;
+                        }
+
+                        const stageId = this.activeStageId;
+                        const didMove = this.moved;
+                        const opportunityId = this.draggingId;
+
+                        this.teardownListeners();
+                        this.cleanupGhost();
+                        this.clearColumnHighlights();
+                        this.cardEl?.classList.remove('is-dragging');
+                        document.body.classList.remove('crm-kanban-dragging');
+
+                        this.draggingId = null;
+                        this.pointerId = null;
+                        this.cardEl = null;
+                        this.activeStageId = null;
+                        this.moved = false;
+
+                        if (didMove && stageId) {
+                            $wire.dropOnStage(stageId);
+                            return;
+                        }
+
+                        if (opportunityId) {
+                            $wire.cancelDrag();
+                        }
+                    },
+
+                    createGhost() {
+                        if (!this.cardEl || this.ghostEl) {
+                            return;
+                        }
+
+                        const ghost = this.cardEl.cloneNode(true);
+                        ghost.classList.add('crm-kanban-drag-ghost');
+                        ghost.querySelectorAll('button, a, input, select, textarea').forEach((el) => {
+                            el.setAttribute('disabled', 'disabled');
+                            el.removeAttribute('href');
+                            el.removeAttribute('wire:click');
+                            el.onclick = null;
+                        });
+
+                        const rect = this.cardEl.getBoundingClientRect();
+                        ghost.style.width = `${rect.width}px`;
+                        document.body.appendChild(ghost);
+                        this.ghostEl = ghost;
+                        this.positionGhost(this.startX, this.startY);
+                    },
+
+                    positionGhost(clientX, clientY) {
+                        if (!this.ghostEl) {
+                            return;
+                        }
+
+                        this.ghostEl.style.transform = `translate3d(${clientX - this.grabOffsetX}px, ${clientY - this.grabOffsetY}px, 0)`;
+                    },
+
+                    highlightColumnAt(clientX, clientY) {
+                        this.clearColumnHighlights();
+
+                        const target = document.elementFromPoint(clientX, clientY);
+                        const column = target?.closest?.('.crm-kanban-column');
+                        if (!column) {
+                            this.activeStageId = null;
+                            return;
+                        }
+
+                        column.classList.add('is-drop-target');
+                        this.activeStageId = Number(column.dataset.stageId || 0) || null;
+                    },
+
+                    clearColumnHighlights() {
+                        document.querySelectorAll('.crm-kanban-column.is-drop-target').forEach((el) => {
+                            el.classList.remove('is-drop-target');
+                        });
+                    },
+
+                    cleanupGhost() {
+                        this.ghostEl?.remove();
+                        this.ghostEl = null;
+                    },
+
+                    teardownListeners() {
+                        if (this._onMove) {
+                            window.removeEventListener('pointermove', this._onMove);
+                        }
+                        if (this._onUp) {
+                            window.removeEventListener('pointerup', this._onUp);
+                            window.removeEventListener('pointercancel', this._onUp);
+                        }
+                        this._onMove = null;
+                        this._onUp = null;
+                    },
+                };
+            };
+        </script>
+        <div class="crm-kanban-shell" x-data="crmKanbanBoard($wire)">
             <div class="crm-kanban-board">
                 <div class="crm-kanban-columns">
                     @foreach($stages as $stage)
                         @php $cards = $grouped->get((int) $stage->id, collect()); @endphp
                         <div
                             class="crm-kanban-column"
+                            data-stage-id="{{ $stage->id }}"
                             wire:key="kanban-stage-{{ $stage->id }}"
-                            x-on:dragover.prevent
-                            x-on:drop.prevent="$wire.dropOnStage({{ $stage->id }})"
                         >
                             <div class="crm-kanban-column-header">
                                 <span class="truncate">{{ $stage->name }}</span>
@@ -43,10 +229,11 @@
                                         <div class="crm-kanban-card-top">
                                             <div
                                                 class="crm-kanban-drag-handle"
-                                                draggable="true"
-                                                title="جابه‌جایی"
-                                                x-on:dragstart="dragging = {{ $opp->id }}; $wire.startDrag({{ $opp->id }})"
-                                                x-on:dragend="dragging = null"
+                                                title="برای جابه‌جایی نگه دارید و بکشید"
+                                                role="button"
+                                                tabindex="0"
+                                                aria-label="جابه‌جایی فرصت"
+                                                x-on:pointerdown="beginDrag($event, {{ $opp->id }})"
                                             >
                                                 <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="7" cy="5" r="1.2"/><circle cx="13" cy="5" r="1.2"/><circle cx="7" cy="10" r="1.2"/><circle cx="13" cy="10" r="1.2"/><circle cx="7" cy="15" r="1.2"/><circle cx="13" cy="15" r="1.2"/></svg>
                                             </div>
@@ -128,6 +315,12 @@
                                                     label="صدور پیش‌فاکتور"
                                                     class="crm-kanban-icon-btn"
                                                     onclick="window.openCrmProformaCompose({{ $opp->id }})"
+                                                />
+                                                <x-erp.ui.row-action
+                                                    icon="view"
+                                                    label="اتصال پیش‌فاکتور موجود"
+                                                    class="crm-kanban-icon-btn"
+                                                    onclick="window.openCrmProformaLink({{ $opp->id }})"
                                                 />
                                             @endif
                                         </div>
@@ -263,6 +456,24 @@
             document.body.classList.add('erp-modal-open');
         }
 
+        function openProformaLink(opportunityId) {
+            const editModal = proformaEditModal();
+            const editIframe = proformaEditIframe();
+            const editTitle = proformaEditTitle();
+
+            if (!editModal || !editIframe) {
+                return;
+            }
+
+            closeProformaShow();
+            editIframe.src = `${crmUrlBase}/opportunities/${opportunityId}/proforma/link`;
+            if (editTitle) {
+                editTitle.textContent = 'اتصال پیش‌فاکتور موجود';
+            }
+            editModal.hidden = false;
+            document.body.classList.add('erp-modal-open');
+        }
+
         function openProformaShow(invoiceId) {
             const showModal = proformaShowModal();
             const showIframe = proformaShowIframe();
@@ -332,6 +543,7 @@
         }
 
         window.openCrmProformaCompose = openProformaCompose;
+        window.openCrmProformaLink = openProformaLink;
 
         document.addEventListener('click', (event) => {
             const showTrigger = event.target.closest('[data-crm-proforma-show]');

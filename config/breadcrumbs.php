@@ -94,6 +94,7 @@ return [
         'parties.create' => 'تعریف شخص/شرکت',
         'crm.customers.index' => 'مشتریان CRM',
         'crm.customers.create' => 'تعریف مشتری جدید',
+        'crm.customers.edit' => 'ویرایش مشتری',
         'crm.customers.show' => 'پروفایل مشتری',
         'items.index' => 'کالا و خدمات',
         'items.create' => 'تعریف کالا/خدمت',
