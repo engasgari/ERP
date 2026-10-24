@@ -5,6 +5,7 @@ namespace App\Services\Crm;
 use App\Models\Crm\Opportunity;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Repositories\Crm\CrmCustomerRepository;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class CrmProformaAccessService
@@ -19,22 +20,21 @@ class CrmProformaAccessService
             return true;
         }
 
-        if (! $user->hasPermission('crm.opportunities.view')) {
-            return false;
+        // پیش‌فاکتور متصل به فرصت: مثل خود فرصت
+        if ($user->hasPermission('crm.opportunities.view')) {
+            $opportunity = Opportunity::query()->where('invoice_id', $invoice->id)->first();
+
+            if ($opportunity && $this->canAccessOpportunity($user, $opportunity)) {
+                return true;
+            }
         }
 
-        $opportunity = Opportunity::query()->where('invoice_id', $invoice->id)->first();
-
-        if (! $opportunity) {
-            return false;
+        // مشاهده‌کننده مشتری همان طرف‌حساب
+        if ($user->hasPermission('crm.customers.view') && $invoice->party_id) {
+            return app(CrmCustomerRepository::class)->findForShow((int) $invoice->party_id, $user) !== null;
         }
 
-        if ($user->hasPermission('crm.records.view_all')) {
-            return true;
-        }
-
-        return (int) $opportunity->assigned_user_id === $user->id
-            || (int) $opportunity->created_by === $user->id;
+        return false;
     }
 
     public function authorize(User $user, Invoice $invoice): void

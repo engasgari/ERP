@@ -49,14 +49,12 @@
             @elseif($invoiceKey && ! $embedded)
                 <a href="{{ $routes['edit'] ?? route('invoices.edit', $invoiceKey) }}">ویرایش فاکتور</a>
             @endif
-            @unless($crmContext ?? false)
-                @if($urlPrint)
-                    <a href="{{ $urlPrint }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
-                @endif
-                @if($urlPdf)
-                    <a href="{{ $urlPdf }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>PDF</a>
-                @endif
-            @endunless
+            @if($urlPrint)
+                <a href="{{ $urlPrint }}" @if($embedded) data-embedded-open @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
+            @endif
+            @if($urlPdf)
+                <a href="{{ $urlPdf }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>PDF</a>
+            @endif
             @if($urlExcel)
                 <a href="{{ $urlExcel }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>Excel</a>
             @endif
@@ -695,19 +693,76 @@
                 }, window.location.origin);
             });
 
-            document.querySelectorAll('[data-embedded-download]').forEach((link) => {
+            document.querySelectorAll('[data-embedded-open]').forEach((link) => {
                 link.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    window.top.open(link.href, '_blank', 'noopener,noreferrer');
+                });
+            });
+
+            document.querySelectorAll('[data-embedded-download]').forEach((link) => {
+                link.addEventListener('click', async (event) => {
                     event.preventDefault();
 
                     const url = link.href;
-                    const topDocument = window.top.document;
-                    const anchor = topDocument.createElement('a');
-                    anchor.href = url;
-                    anchor.target = '_blank';
-                    anchor.rel = 'noopener noreferrer';
-                    topDocument.body.appendChild(anchor);
-                    anchor.click();
-                    anchor.remove();
+                    const originalText = link.textContent;
+                    link.setAttribute('aria-busy', 'true');
+                    link.textContent = 'در حال دریافت...';
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+
+                        if (!response.ok) {
+                            let message = 'دانلود فایل انجام نشد.';
+                            if (response.status === 403) {
+                                message = 'شما به دانلود این فایل دسترسی ندارید.';
+                            } else if (response.status === 404) {
+                                message = 'فایل یا سند پیدا نشد.';
+                            } else if (response.status === 419) {
+                                message = 'نشست منقضی شده؛ صفحه را تازه کنید.';
+                            }
+                            throw new Error(message);
+                        }
+
+                        const disposition = response.headers.get('content-disposition') || '';
+                        const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+                        const plainMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+                        const filename = utfMatch?.[1]
+                            ? decodeURIComponent(utfMatch[1])
+                            : (plainMatch?.[1] || 'download.bin');
+
+                        const blob = await response.blob();
+                        const objectUrl = URL.createObjectURL(blob);
+                        const topDocument = window.top.document;
+                        const anchor = topDocument.createElement('a');
+                        anchor.href = objectUrl;
+                        anchor.download = filename;
+                        topDocument.body.appendChild(anchor);
+                        anchor.click();
+                        anchor.remove();
+                        URL.revokeObjectURL(objectUrl);
+                    } catch (error) {
+                        const message = error.message || 'دانلود فایل انجام نشد.';
+                        if (typeof window.showErpToast === 'function') {
+                            window.showErpToast(message, 'danger');
+                        } else if (window.parent && window.parent !== window) {
+                            window.parent.postMessage({
+                                type: 'invoice-validation-error',
+                                message,
+                            }, window.location.origin);
+                        } else {
+                            window.alert(message);
+                        }
+                    } finally {
+                        link.removeAttribute('aria-busy');
+                        link.textContent = originalText;
+                    }
                 });
             });
 
