@@ -685,6 +685,116 @@ function showErpToast(message, tone = 'success', options = {}) {
 
 window.showErpToast = showErpToast;
 
+function erpDownloadFilenameFromDisposition(disposition, fallback = 'download.bin') {
+    const header = String(disposition || '');
+    const utfMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utfMatch?.[1]) {
+        try {
+            return decodeURIComponent(utfMatch[1]);
+        } catch (_) {
+            return utfMatch[1];
+        }
+    }
+
+    const plainMatch = header.match(/filename=\"?([^\";]+)\"?/i);
+    return plainMatch?.[1] || fallback;
+}
+
+function erpReportDownloadError(message) {
+    if (typeof window.showErpToast === 'function') {
+        window.showErpToast(message, 'danger');
+        return;
+    }
+
+    if (window.parent && window.parent !== window) {
+        try {
+            window.parent.postMessage({
+                type: 'invoice-validation-error',
+                message,
+            }, window.location.origin);
+            return;
+        } catch (_) {
+            // ignore
+        }
+    }
+
+    window.alert(message);
+}
+
+async function erpDownloadFileFromUrl(url, triggerEl = null) {
+    const originalText = triggerEl?.textContent;
+
+    if (triggerEl) {
+        triggerEl.setAttribute('aria-busy', 'true');
+        triggerEl.textContent = 'در حال دریافت...';
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: '*/*',
+            },
+        });
+
+        if (!response.ok) {
+            let message = 'دانلود فایل انجام نشد.';
+            if (response.status === 403) {
+                message = 'شما به دانلود این فایل دسترسی ندارید.';
+            } else if (response.status === 404) {
+                message = 'فایل یا سند پیدا نشد.';
+            } else if (response.status === 419) {
+                message = 'نشست منقضی شده؛ صفحه را تازه کنید.';
+            }
+            throw new Error(message);
+        }
+
+        const filename = erpDownloadFilenameFromDisposition(
+            response.headers.get('content-disposition'),
+            'download.bin'
+        );
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const doc = window.top?.document || document;
+        const anchor = doc.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        doc.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+        erpReportDownloadError(error?.message || 'دانلود فایل انجام نشد.');
+    } finally {
+        if (triggerEl) {
+            triggerEl.removeAttribute('aria-busy');
+            triggerEl.textContent = originalText;
+        }
+    }
+}
+
+function enableErpFileDownloads(scope = document) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+
+    root.querySelectorAll('[data-erp-file-download]').forEach((link) => {
+        if (link.dataset.erpFileDownloadReady === '1') {
+            return;
+        }
+
+        link.dataset.erpFileDownloadReady = '1';
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            erpDownloadFileFromUrl(link.href, link);
+        });
+    });
+}
+
+window.erpDownloadFileFromUrl = erpDownloadFileFromUrl;
+window.enableErpFileDownloads = enableErpFileDownloads;
+
 let activeJalaliInput = null;
 let activeJalaliMonth = null;
 
@@ -1897,6 +2007,7 @@ function bootstrapErpUiListeners() {
     document.addEventListener('DOMContentLoaded', enableJalaliDatepickers);
     document.addEventListener('DOMContentLoaded', enableErpDeleteConfirms);
     document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
+    document.addEventListener('DOMContentLoaded', enableErpFileDownloads);
     document.addEventListener('DOMContentLoaded', bindErpShellObservers);
 
     document.addEventListener('livewire:init', () => {
@@ -1928,6 +2039,7 @@ function bootstrapErpUiListeners() {
         enableJalaliDatepickers();
         enableErpDeleteConfirms();
         enableErpFlashMessages();
+        enableErpFileDownloads();
         bindErpShellObservers();
     });
 
@@ -1953,6 +2065,7 @@ function bindLivewireJalaliHooks() {
             enableErpMoneyInputs();
             enableErpDeleteConfirms();
             enableErpFlashMessages();
+            enableErpFileDownloads();
             hydrateErpTables();
             enableErpSearchSelects();
         });
@@ -2009,6 +2122,7 @@ if (document.readyState !== 'loading') {
     enableJalaliDatepickers();
     enableErpDeleteConfirms();
     enableErpFlashMessages();
+    enableErpFileDownloads();
     bindErpShellObservers();
     if (window.Livewire) {
         bindLivewireJalaliHooks();

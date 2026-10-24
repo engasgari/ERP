@@ -53,10 +53,10 @@
                 <a href="{{ $urlPrint }}" @if($embedded) data-embedded-open @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
             @endif
             @if($urlPdf)
-                <a href="{{ $urlPdf }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>PDF</a>
+                <a href="{{ $urlPdf }}" data-erp-file-download data-no-spa>PDF</a>
             @endif
             @if($urlExcel)
-                <a href="{{ $urlExcel }}" @if($embedded) data-embedded-download @else target="_blank" data-no-spa @endif>Excel</a>
+                <a href="{{ $urlExcel }}" data-erp-file-download data-no-spa>Excel</a>
             @endif
             @unless($crmContext)
             @if($invoiceKey)
@@ -700,71 +700,9 @@
                 });
             });
 
-            document.querySelectorAll('[data-embedded-download]').forEach((link) => {
-                link.addEventListener('click', async (event) => {
-                    event.preventDefault();
-
-                    const url = link.href;
-                    const originalText = link.textContent;
-                    link.setAttribute('aria-busy', 'true');
-                    link.textContent = 'در حال دریافت...';
-
-                    try {
-                        const response = await fetch(url, {
-                            method: 'GET',
-                            credentials: 'same-origin',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                        });
-
-                        if (!response.ok) {
-                            let message = 'دانلود فایل انجام نشد.';
-                            if (response.status === 403) {
-                                message = 'شما به دانلود این فایل دسترسی ندارید.';
-                            } else if (response.status === 404) {
-                                message = 'فایل یا سند پیدا نشد.';
-                            } else if (response.status === 419) {
-                                message = 'نشست منقضی شده؛ صفحه را تازه کنید.';
-                            }
-                            throw new Error(message);
-                        }
-
-                        const disposition = response.headers.get('content-disposition') || '';
-                        const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-                        const plainMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
-                        const filename = utfMatch?.[1]
-                            ? decodeURIComponent(utfMatch[1])
-                            : (plainMatch?.[1] || 'download.bin');
-
-                        const blob = await response.blob();
-                        const objectUrl = URL.createObjectURL(blob);
-                        const topDocument = window.top.document;
-                        const anchor = topDocument.createElement('a');
-                        anchor.href = objectUrl;
-                        anchor.download = filename;
-                        topDocument.body.appendChild(anchor);
-                        anchor.click();
-                        anchor.remove();
-                        URL.revokeObjectURL(objectUrl);
-                    } catch (error) {
-                        const message = error.message || 'دانلود فایل انجام نشد.';
-                        if (typeof window.showErpToast === 'function') {
-                            window.showErpToast(message, 'danger');
-                        } else if (window.parent && window.parent !== window) {
-                            window.parent.postMessage({
-                                type: 'invoice-validation-error',
-                                message,
-                            }, window.location.origin);
-                        } else {
-                            window.alert(message);
-                        }
-                    } finally {
-                        link.removeAttribute('aria-busy');
-                        link.textContent = originalText;
-                    }
-                });
-            });
+            if (typeof window.enableErpFileDownloads === 'function') {
+                window.enableErpFileDownloads(document);
+            }
 
             document.querySelectorAll('.invoice-embedded-action-form').forEach((form) => {
                 form.addEventListener('submit', async (event) => {
