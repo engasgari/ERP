@@ -46,13 +46,12 @@ class InvoiceExcelTemplateService
             throw new RuntimeException('فایل قالب اکسل فاکتور پیدا نشد: storage/app/invoice_sample.xlsx');
         }
 
-        $target = storage_path('app/temp/invoice-' . $invoice->id . '-' . uniqid() . '.xlsx');
+        $target = $this->tempDirectory() . DIRECTORY_SEPARATOR
+            . 'invoice-' . $invoice->id . '-' . uniqid('', true) . '.xlsx';
 
-        if (! is_dir(dirname($target))) {
-            mkdir(dirname($target), 0775, true);
+        if (! @copy($template, $target)) {
+            throw new RuntimeException('امکان کپی قالب اکسل در پوشه موقت وجود ندارد.');
         }
-
-        copy($template, $target);
 
         $zip = new ZipArchive();
 
@@ -795,5 +794,33 @@ class InvoiceExcelTemplateService
         if ($name !== '') {
             $shapeNode->setAttribute('name', $name . ' ' . $shapeId);
         }
+    }
+
+    private function tempDirectory(): string
+    {
+        $candidates = [
+            storage_path('app/temp'),
+            storage_path('framework/tmp'),
+            rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR),
+        ];
+
+        foreach ($candidates as $dir) {
+            if ($dir === '') {
+                continue;
+            }
+
+            if (is_dir($dir) && is_writable($dir)) {
+                return $dir;
+            }
+
+            if (! is_dir($dir)) {
+                $created = @mkdir($dir, 0775, true);
+                if ($created && is_dir($dir) && is_writable($dir)) {
+                    return $dir;
+                }
+            }
+        }
+
+        throw new RuntimeException('پوشه موقت برای ساخت فایل اکسل قابل نوشتن نیست.');
     }
 }
