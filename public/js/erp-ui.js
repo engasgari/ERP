@@ -721,7 +721,35 @@ function erpReportDownloadError(message) {
     window.alert(message);
 }
 
+function erpOpenDownloadUrl(url) {
+    try {
+        const opener = window.top && window.top !== window ? window.top : window;
+        const opened = opener.open(url, '_blank', 'noopener,noreferrer');
+        if (opened) {
+            return true;
+        }
+    } catch (_) {
+        // fall through
+    }
+
+    try {
+        window.location.assign(url);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 async function erpDownloadFileFromUrl(url, triggerEl = null) {
+    // Inside iframes, async fetch+blob loses the user gesture and browsers
+    // silently block the download. Open the file URL in the top window instead.
+    if (window.self !== window.top) {
+        if (!erpOpenDownloadUrl(url)) {
+            erpReportDownloadError('دانلود فایل انجام نشد.');
+        }
+        return;
+    }
+
     const originalText = triggerEl?.textContent;
 
     if (triggerEl) {
@@ -751,22 +779,28 @@ async function erpDownloadFileFromUrl(url, triggerEl = null) {
             throw new Error(message);
         }
 
-        const filename = erpDownloadFilenameFromDisposition(
-            response.headers.get('content-disposition'),
-            'download.bin'
-        );
+        const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+        const disposition = response.headers.get('content-disposition') || '';
+
+        if (contentType.includes('text/html') && !/attachment/i.test(disposition)) {
+            erpOpenDownloadUrl(url);
+            return;
+        }
+
+        const filename = erpDownloadFilenameFromDisposition(disposition, 'download.bin');
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
-        const doc = window.top?.document || document;
-        const anchor = doc.createElement('a');
+        const anchor = document.createElement('a');
         anchor.href = objectUrl;
         anchor.download = filename;
-        doc.body.appendChild(anchor);
+        document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        URL.revokeObjectURL(objectUrl);
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
     } catch (error) {
-        erpReportDownloadError(error?.message || 'دانلود فایل انجام نشد.');
+        if (!erpOpenDownloadUrl(url)) {
+            erpReportDownloadError(error?.message || 'دانلود فایل انجام نشد.');
+        }
     } finally {
         if (triggerEl) {
             triggerEl.removeAttribute('aria-busy');
@@ -787,6 +821,13 @@ function enableErpFileDownloads(scope = document) {
         link.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+
+            // Sync path keeps the user gesture (required for download/popup).
+            if (window.self !== window.top) {
+                erpOpenDownloadUrl(link.href);
+                return;
+            }
+
             erpDownloadFileFromUrl(link.href, link);
         });
     });
@@ -794,6 +835,7 @@ function enableErpFileDownloads(scope = document) {
 
 window.erpDownloadFileFromUrl = erpDownloadFileFromUrl;
 window.enableErpFileDownloads = enableErpFileDownloads;
+window.erpReportDownloadError = erpReportDownloadError;
 
 let activeJalaliInput = null;
 let activeJalaliMonth = null;

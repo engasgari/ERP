@@ -430,56 +430,14 @@
             <a href="{{ $printShowUrl }}">بازگشت</a>
         @endif
         @if($printPdfUrl)
-            <a href="{{ $printPdfUrl }}" data-erp-file-download data-no-spa>PDF</a>
+            <a href="{{ $printPdfUrl }}" target="_blank" rel="noopener" data-no-spa>PDF</a>
         @endif
         @if($printExcelUrl)
-            <a href="{{ $printExcelUrl }}" data-erp-file-download data-no-spa>Excel</a>
+            <a href="{{ $printExcelUrl }}" target="_blank" rel="noopener" data-no-spa>Excel</a>
         @endif
     @endif
     <button type="button" onclick="window.print()">چاپ</button>
 </div>
-<script>
-(() => {
-    document.querySelectorAll('[data-erp-file-download]').forEach((link) => {
-        link.addEventListener('click', async (event) => {
-            event.preventDefault();
-            const original = link.textContent;
-            link.textContent = 'در حال دریافت...';
-            try {
-                const response = await fetch(link.href, {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!response.ok) {
-                    throw new Error(response.status === 403
-                        ? 'شما به دانلود این فایل دسترسی ندارید.'
-                        : 'دانلود فایل انجام نشد.');
-                }
-                const disposition = response.headers.get('content-disposition') || '';
-                const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-                const plainMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
-                const filename = utfMatch?.[1]
-                    ? decodeURIComponent(utfMatch[1])
-                    : (plainMatch?.[1] || 'download.bin');
-                const blob = await response.blob();
-                const objectUrl = URL.createObjectURL(blob);
-                const anchor = document.createElement('a');
-                anchor.href = objectUrl;
-                anchor.download = filename;
-                document.body.appendChild(anchor);
-                anchor.click();
-                anchor.remove();
-                URL.revokeObjectURL(objectUrl);
-            } catch (error) {
-                window.alert(error.message || 'دانلود فایل انجام نشد.');
-            } finally {
-                link.textContent = original;
-            }
-        });
-    });
-})();
-</script>
 @endunless
 
 <main class="invoice-page">

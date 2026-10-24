@@ -53,10 +53,10 @@
                 <a href="{{ $urlPrint }}" @if($embedded) data-embedded-open @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
             @endif
             @if($urlPdf)
-                <a href="{{ $urlPdf }}" data-erp-file-download data-no-spa>PDF</a>
+                <a href="{{ $urlPdf }}" @if($embedded) data-embedded-open @else target="_blank" @endif data-no-spa>PDF</a>
             @endif
             @if($urlExcel)
-                <a href="{{ $urlExcel }}" data-erp-file-download data-no-spa>Excel</a>
+                <a href="{{ $urlExcel }}" @if($embedded) data-embedded-open @else target="_blank" @endif data-no-spa>Excel</a>
             @endif
             @unless($crmContext)
             @if($invoiceKey)
@@ -699,10 +699,6 @@
                     window.top.open(link.href, '_blank', 'noopener,noreferrer');
                 });
             });
-
-            if (typeof window.enableErpFileDownloads === 'function') {
-                window.enableErpFileDownloads(document);
-            }
 
             document.querySelectorAll('.invoice-embedded-action-form').forEach((form) => {
                 form.addEventListener('submit', async (event) => {

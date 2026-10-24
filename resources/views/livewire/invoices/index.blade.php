@@ -410,6 +410,11 @@
                 if (event.data.message) {
                     showInvoiceListFlash(event.data.message);
                 }
+                return;
+            }
+
+            if (type === 'invoice-validation-error' && event.data.message) {
+                showInvoiceListFlash(event.data.message, 'danger');
             }
         });
     })();

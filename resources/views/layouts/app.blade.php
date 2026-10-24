@@ -61,6 +61,6 @@
         </div>
         <div id="erp-toast-stack" class="erp-toast-stack"></div>
         @livewireScripts
-        <script src="{{ asset('js/erp-ui.js') }}?v={{ @filemtime(public_path('js/erp-ui.js')) ?: 1 }}"></script>
+        <script src="{{ asset('js/erp-ui.js') }}?v={{ filemtime(public_path('js/erp-ui.js')) ?: time() }}&r=excel3"></script>
     </body>
 </html>

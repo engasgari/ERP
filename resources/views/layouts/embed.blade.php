@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="{{ asset('vendor/fonts/vazirmatn/vazirmatn-font-face.css') }}">
         @vite(['resources/css/app.css'])
         <script src="{{ asset('vendor/jquery/jquery-3.6.0.min.js') }}"></script>
-        <script src="{{ asset('js/erp-ui.js') }}?v={{ @filemtime(public_path('js/erp-ui.js')) ?: 1 }}"></script>
+        <script src="{{ asset('js/erp-ui.js') }}?v={{ filemtime(public_path('js/erp-ui.js')) ?: time() }}&r=excel3"></script>
     </head>
     <body class="font-sans antialiased bg-white text-slate-900">
         <div class="erp-shell invoice-embed-shell p-2 sm:p-3">
