@@ -125,6 +125,18 @@ Paid
 
 ---
 
+## Staged monthly workflow
+
+Payroll periods UI runs as a 3-step wizard for the selected Jalali year/month:
+
+1. **Attendance** — display-only review of monthly attendance (calculation happens in Attendance module), confirm to continue
+2. **Payroll** — `NewPayrollEngineService::runFullLifecycle`, review salary cards, optional manual amount edit popup (`PayrollAdjustmentService`), approve period
+3. **Payment** — register/edit/reverse payments in-period until remaining is zero; optionally close the period
+
+The standalone payroll payments list page is retired; `payroll/payments` redirects to periods.
+
+---
+
 ## Payment
 
 Registered separately after period approval.
@@ -146,6 +158,7 @@ Single group: `حقوق و دستمزد`
 - `payroll.view` / `payroll.manage`
 - `payroll.periods.create` / `payroll.calculate` / `payroll.approve` / `payroll.post`
 - `payroll.periods.delete` / `payroll.periods.close` / `payroll.adjust` / `payroll.settings.manage`
+- Payroll item catalog (base/earnings/deductions) lives under Payroll Settings (`payroll.settings`), not on Periods
 - `insurance.view` / `insurance.manage` / `insurance.payment`
 
 `payroll.manage` implies the granular action permissions.

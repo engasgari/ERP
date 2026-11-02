@@ -144,7 +144,7 @@ return [
         'self-service.index' => 'خدمات خودکار',
         'profile.edit' => 'پروفایل',
         'payroll.periods.index' => 'دوره‌های حقوق',
-        'payroll.payments.index' => 'لیست و پرداخت حقوق',
+        'payroll.settings.index' => 'تنظیمات حقوق و دستمزد',
         'payroll.accounting-settings.index' => 'تنظیمات حسابداری حقوق',
         'insurance.periods.index' => 'دوره‌های بیمه',
         'insurance.payments.index' => 'پرداخت بیمه',

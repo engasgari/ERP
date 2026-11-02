@@ -119,7 +119,7 @@ class NavigationMenu
                 'active' => ['payroll.*', 'payslips.*', 'insurance.*'],
                 'children' => [
                     ['label' => 'دوره‌های حقوق', 'route' => 'payroll.periods.index', 'permission' => 'payroll.view'],
-                    ['label' => 'لیست و پرداخت حقوق', 'route' => 'payroll.payments.index', 'permission' => 'payroll.view'],
+                    ['label' => 'تنظیمات حقوق و دستمزد', 'route' => 'payroll.settings.index', 'permission' => 'payroll.settings.manage'],
                     ['label' => 'تنظیمات حسابداری حقوق', 'route' => 'payroll.accounting-settings.index', 'permission' => 'payroll.settings.manage'],
                     ['type' => 'divider'],
                     ['label' => 'دوره‌های بیمه', 'route' => 'insurance.periods.index', 'permission' => 'insurance.view'],

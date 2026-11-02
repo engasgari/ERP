@@ -77,9 +77,9 @@ class ReportCenterService
                         'route' => route('management-reports.tax-summary'),
                     ],
                     [
-                        'title' => 'لیست و پرداخت حقوق',
-                        'description' => 'ریز محاسبات حقوق و ثبت پرداخت با حساب بانکی',
-                        'route' => route('payroll.payments.index'),
+                        'title' => 'اجرای حقوق ماهانه',
+                        'description' => 'محاسبه کارکرد، حقوق و ثبت پرداخت مرحله‌ای',
+                        'route' => route('payroll.periods.index'),
                     ],
                 ],
             ],

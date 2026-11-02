@@ -50,7 +50,7 @@ class PayrollCalculationService
 
             PayrollCalculation::query()
                 ->where('payroll_period_id', $period->id)
-                ->where('status', 'calculated')
+                ->where('status', '!=', 'failed')
                 ->update([
                     'approved_at' => now(),
                     'approved_by' => $userId,

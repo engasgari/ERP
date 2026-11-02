@@ -31,6 +31,7 @@ use App\Http\Controllers\WorkShiftController;
 use App\Http\Controllers\WorkCalendarController;
 use App\Http\Controllers\WorkGroupController;
 use App\Http\Controllers\PayrollAccountingSettingController;
+use App\Http\Controllers\PayrollSettingController;
 use App\Http\Controllers\OrganizationUnitController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\PositionController;
@@ -325,10 +326,13 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::patch('warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware('permission:warehouse.update');
     Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->middleware('permission:warehouse.delete')->name('warehouses.destroy');
 
+    Route::get('payroll/settings', [PayrollSettingController::class, 'index'])->middleware('permission:payroll.settings.manage')->name('payroll.settings.index');
     Route::get('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'index'])->middleware('permission:payroll.settings.manage')->name('payroll.accounting-settings.index');
     Route::put('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'update'])->middleware('permission:payroll.settings.manage')->name('payroll.accounting-settings.update');
     Route::view('payroll/periods', 'payroll.periods.index')->middleware('permission:payroll.view')->name('payroll.periods.index');
-    Route::view('payroll/payments', 'payroll.payments.index')->middleware('permission:payroll.view')->name('payroll.payments.index');
+    Route::get('payroll/payments', function () {
+        return redirect()->route('payroll.periods.index', request()->query());
+    })->middleware('permission:payroll.view')->name('payroll.payments.index');
     Route::view('insurance/periods', 'insurance.periods.index')->middleware('permission:insurance.view')->name('insurance.periods.index');
     Route::view('insurance/payments', 'insurance.payments.index')->middleware('permission:insurance.view')->name('insurance.payments.index');
     Route::get('insurance/payments/{payment}', [InsurancePaymentController::class, 'show'])->middleware('permission:insurance.view')->name('insurance.payments.show');
