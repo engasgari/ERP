@@ -22,6 +22,8 @@ class CompanySettingController extends Controller
             'economic_code' => 'nullable|string|max:255',
             'national_id' => 'nullable|string|max:255',
             'postal_code' => 'nullable|string|max:255',
+            'province' => 'nullable|string|max:100',
+            'city' => 'nullable|string|max:100',
             'phone' => 'nullable|string|max:255',
             'address' => 'nullable|string',
             'default_vat_rate' => 'nullable|numeric|min:0',

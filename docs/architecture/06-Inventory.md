@@ -21,6 +21,12 @@ Inventory never edits accounting.
 
 Accounting never edits stock.
 
+Permissions are granular under `inventory.documents.*` and `warehouse.*`.
+
+`inventory.manage` still implies document and warehouse action permissions for backward compatibility.
+
+`warehouse.manage` still implies `warehouse.create`, `warehouse.update`, and `warehouse.delete`.
+
 ---
 
 ## Inventory Documents

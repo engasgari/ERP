@@ -16,6 +16,7 @@ use App\Services\Crm\CrmProformaInvoiceService;
 use App\Services\FiscalPeriodService;
 use App\Services\InventoryPostingService;
 use App\Services\InvoiceCalculationService;
+use App\Services\InvoiceCancellationService;
 use App\Services\InvoiceExcelTemplateService;
 use App\Services\ItemSalePriceService;
 use App\Services\NumberingService;
@@ -48,7 +49,7 @@ class InvoiceController extends Controller
         $data = $this->formData(
             direction: $invoice->direction,
             documentType: $invoice->document_type,
-            invoice: $invoice->load('party', 'lines')
+            invoice: $invoice->load('party', 'lines', 'returnedFrom')
         );
 
         // Modal/iframe editors always need the embed layout + AJAX save path.
@@ -67,7 +68,7 @@ class InvoiceController extends Controller
         return $this->formData(
             direction: $invoice->direction,
             documentType: $invoice->document_type,
-            invoice: $invoice->load('party', 'lines')
+            invoice: $invoice->load('party', 'lines', 'returnedFrom')
         );
     }
 
@@ -81,7 +82,7 @@ class InvoiceController extends Controller
 
     public function show(Request $request, Invoice $invoice)
     {
-        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy']);
+        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'accountingDocument.lines', 'inventoryDocuments.lines', 'settledBy', 'returnedFrom']);
 
         $data = [
             'invoice' => $invoice,
@@ -142,9 +143,7 @@ class InvoiceController extends Controller
             return back()->withInput()->withErrors(['lines' => $message]);
         }
 
-        $key = $payload['data']['document_type'] === 'proforma'
-            ? 'sale_proforma'
-            : ($payload['data']['direction'] === 'sale' ? 'sale_invoice' : 'purchase_invoice');
+        $key = $this->numberingKey($payload['data']['direction'], $payload['data']['document_type']);
 
         $invoice = DB::transaction(function () use ($payload, $numbering, $key) {
             $fiscalYear = app(FiscalPeriodService::class)->fiscalYearForDate($payload['data']['invoice_date']);
@@ -153,11 +152,12 @@ class InvoiceController extends Controller
                 'fiscal_year_id' => $fiscalYear?->id,
                 'direction' => $payload['data']['direction'],
                 'document_type' => $payload['data']['document_type'],
-                'number' => ($payload['data']['number'] ?? null) ?: $numbering->next($key, null, $fiscalYear?->id),
+                'number' => $numbering->allocate($key, $payload['data']['number'] ?? null, null, $fiscalYear?->id),
                 'invoice_date' => $payload['data']['invoice_date'],
                 'party_id' => $payload['data']['party_id'],
                 'project_id' => $payload['data']['project_id'] ?? null,
                 'warehouse_id' => $payload['data']['warehouse_id'] ?? null,
+                'returned_from_id' => $payload['data']['returned_from_id'] ?? null,
                 'status' => 'draft',
                 'subtotal' => $payload['subtotal'],
                 'discount_amount' => $payload['discount_amount'],
@@ -199,15 +199,24 @@ class InvoiceController extends Controller
                     throw new RuntimeException($message);
                 }
 
+                $fiscalYearId = app(FiscalPeriodService::class)->fiscalYearForDate($payload['data']['invoice_date'])?->id;
+                $numberingKey = $this->numberingKey($payload['data']['direction'], $payload['data']['document_type']);
+                $number = trim((string) ($payload['data']['number'] ?? '')) ?: $invoice->number;
+
+                if ($number !== $invoice->number) {
+                    $number = app(NumberingService::class)->allocate($numberingKey, $number, null, $fiscalYearId);
+                }
+
                 $invoice->update([
-                    'fiscal_year_id' => app(FiscalPeriodService::class)->fiscalYearForDate($payload['data']['invoice_date'])?->id,
+                    'fiscal_year_id' => $fiscalYearId,
                     'direction' => $payload['data']['direction'],
                     'document_type' => $payload['data']['document_type'],
-                    'number' => $payload['data']['number'] ?: $invoice->number,
+                    'number' => $number,
                     'invoice_date' => $payload['data']['invoice_date'],
                     'party_id' => $payload['data']['party_id'],
                     'project_id' => $payload['data']['project_id'] ?? null,
                     'warehouse_id' => $payload['data']['warehouse_id'] ?? null,
+                    'returned_from_id' => $payload['data']['returned_from_id'] ?? null,
                     'status' => 'draft',
                     'subtotal' => $payload['subtotal'],
                     'discount_amount' => $payload['discount_amount'],
@@ -291,7 +300,8 @@ class InvoiceController extends Controller
 
     public function confirm(Request $request, Invoice $invoice, AccountingDocumentService $documents)
     {
-        abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور مستقیم تایید مالی نمی‌شود.');
+        abort_if($invoice->status === 'cancelled', 422, 'سند ابطال‌شده قابل تایید نیست.');
+        abort_if($invoice->isProforma(), 422, 'پیش‌فاکتور مستقیم تایید مالی نمی‌شود.');
 
         try {
             $documents->postInvoice($invoice);
@@ -306,16 +316,46 @@ class InvoiceController extends Controller
             return back()->withErrors(['inventory' => $exception->getMessage()]);
         }
 
+        $success = $invoice->isReturn()
+            ? 'فاکتور برگشت تایید و سند حسابداری/انبار صادر شد.'
+            : 'فاکتور تایید و سند حسابداری اتومات صادر شد.';
+
         if ($this->wantsInvoiceJson($request)) {
-            return $this->invoiceJsonPayload($invoice->fresh(), 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
+            return $this->invoiceJsonPayload($invoice->fresh(), $success);
         }
 
-        return redirect()->route('invoices.show', ['invoice' => $invoice->id])->with('success', 'فاکتور تایید و سند حسابداری اتومات صادر شد.');
+        return redirect()->route('invoices.show', ['invoice' => $invoice->id])->with('success', $success);
+    }
+
+    public function cancel(Request $request, Invoice $invoice, InvoiceCancellationService $cancellation)
+    {
+        try {
+            $cancellation->cancel($invoice, $request->user()?->id);
+        } catch (RuntimeException $exception) {
+            if ($this->wantsInvoiceJson($request)) {
+                return response()->json([
+                    'message' => $exception->getMessage(),
+                    'errors' => ['cancel' => [$exception->getMessage()]],
+                ], 422);
+            }
+
+            return back()->withErrors(['cancel' => $exception->getMessage()]);
+        }
+
+        $success = $invoice->isProforma()
+            ? 'پیش‌فاکتور ابطال شد.'
+            : 'فاکتور ابطال شد. در صورت نیاز، از بخش برگشت فاکتور ابطالی را انتخاب و برگشت را ثبت کنید.';
+
+        if ($this->wantsInvoiceJson($request)) {
+            return $this->invoiceJsonPayload($invoice->fresh(), $success);
+        }
+
+        return redirect()->route('invoices.show', ['invoice' => $invoice->id])->with('success', $success);
     }
 
     public function settle(Request $request, Invoice $invoice)
     {
-        abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور قابل تسویه نیست.');
+        abort_if($invoice->isProforma(), 422, 'پیش‌فاکتور قابل تسویه نیست.');
         abort_if($invoice->status !== 'confirmed', 422, 'فقط فاکتور تایید شده را می‌توان تسویه کرد.');
 
         if ($invoice->settled_at) {
@@ -340,7 +380,7 @@ class InvoiceController extends Controller
 
     public function unsettle(Request $request, Invoice $invoice)
     {
-        abort_if($invoice->document_type === 'proforma', 422, 'پیش‌فاکتور قابل خروج از تسویه نیست.');
+        abort_if($invoice->isProforma(), 422, 'پیش‌فاکتور قابل خروج از تسویه نیست.');
         abort_if(! $invoice->settled_at, 422, 'این فاکتور هنوز تسویه نشده است.');
 
         $invoice->update([
@@ -430,6 +470,55 @@ class InvoiceController extends Controller
             $parties->push($invoice->party);
         }
 
+        $numberingKey = $this->numberingKey($direction, $documentType);
+
+        $suggestedNumber = null;
+
+        if (! $invoice) {
+            try {
+                $suggestedNumber = app(NumberingService::class)->peek($numberingKey);
+            } catch (RuntimeException) {
+                $suggestedNumber = null;
+            }
+        }
+
+        $cancelledSources = collect();
+        $cancelledSourcePayload = [];
+
+        if ($documentType === 'return') {
+            $cancelledSources = app(InvoiceCancellationService::class)
+                ->cancelledSourcesForReturn($direction, $invoice?->id);
+
+            if ($invoice?->returned_from_id) {
+                $invoice->loadMissing('returnedFrom.party', 'returnedFrom.lines.item.unit', 'returnedFrom.warehouse', 'returnedFrom.project');
+            }
+
+            if ($invoice?->returnedFrom && ! $cancelledSources->contains('id', $invoice->returned_from_id)) {
+                $cancelledSources->prepend($invoice->returnedFrom);
+            }
+
+            $cancelledSourcePayload = $cancelledSources->mapWithKeys(function (Invoice $source) {
+                return [
+                    (string) $source->id => [
+                        'id' => $source->id,
+                        'number' => $source->number,
+                        'party_id' => $source->party_id,
+                        'party_name' => $source->party?->name,
+                        'project_id' => $source->project_id,
+                        'warehouse_id' => $source->warehouse_id,
+                        'description' => $source->description,
+                        'lines' => $source->lines->map(fn ($line) => [
+                            'item_id' => $line->item_id,
+                            'quantity' => (float) $line->quantity,
+                            'unit_price' => (float) $line->unit_price,
+                            'discount_amount' => (float) $line->discount_amount,
+                            'tax_rate' => (float) $line->tax_rate,
+                        ])->values()->all(),
+                    ],
+                ];
+            })->all();
+        }
+
         return [
             'invoice' => $invoice,
             'isEdit' => (bool) $invoice,
@@ -440,6 +529,9 @@ class InvoiceController extends Controller
             'items' => Item::with('unit')->where('is_active', true)->orderBy('name')->get(),
             'warehouses' => Warehouse::where('is_active', true)->orderBy('name')->get(),
             'partyTypeId' => PartyType::where('name', $partyType)->value('id'),
+            'suggestedNumber' => $suggestedNumber,
+            'cancelledSources' => $cancelledSources,
+            'cancelledSourcePayload' => $cancelledSourcePayload,
         ];
     }
 
@@ -488,7 +580,8 @@ class InvoiceController extends Controller
 
         $validated = $request->validate([
             'direction' => 'required|in:sale,purchase',
-            'document_type' => 'required|in:proforma,invoice',
+            'document_type' => 'required|in:proforma,invoice,return',
+            'returned_from_id' => 'nullable|exists:invoices,id',
             'number' => $numberRule,
             'invoice_date' => 'required|date',
             'party_id' => 'required|exists:parties,id',
@@ -503,6 +596,34 @@ class InvoiceController extends Controller
             'lines.*.discount_amount' => 'nullable|numeric|min:0',
             'lines.*.tax_rate' => 'nullable|numeric|min:0',
         ]);
+
+        if ($validated['document_type'] === 'return') {
+            if (empty($validated['returned_from_id'])) {
+                throw ValidationException::withMessages([
+                    'returned_from_id' => 'برای ثبت برگشت، ابتدا فاکتور مبنا را ابطال و سپس آن را انتخاب کنید.',
+                ]);
+            }
+
+            $source = Invoice::query()->findOrFail((int) $validated['returned_from_id']);
+
+            try {
+                app(InvoiceCancellationService::class)->assertValidReturnSource(
+                    $source,
+                    $validated['direction'],
+                    $invoice?->id
+                );
+            } catch (RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'returned_from_id' => $exception->getMessage(),
+                ]);
+            }
+
+            $validated['party_id'] = $source->party_id;
+            $validated['project_id'] = $validated['project_id'] ?? $source->project_id;
+            $validated['warehouse_id'] = $validated['warehouse_id'] ?? $source->warehouse_id;
+        } else {
+            $validated['returned_from_id'] = null;
+        }
 
         $lines = collect($validated['lines'])
             ->filter(fn ($line) => !empty($line['item_id']));
@@ -541,11 +662,19 @@ class InvoiceController extends Controller
         $validated = $payload['data'];
         $productItemIds = Item::whereIn('id', $lines->pluck('item_id'))->where('type', 'product')->pluck('id');
 
-        if ($validated['document_type'] === 'invoice' && $productItemIds->isNotEmpty() && empty($validated['warehouse_id'])) {
-            return 'برای فاکتور دارای کالا، انتخاب انبار الزامی است.';
+        $postsStock = in_array($validated['document_type'], ['invoice', 'return'], true);
+
+        if ($postsStock && $productItemIds->isNotEmpty() && empty($validated['warehouse_id'])) {
+            return 'برای سند دارای کالا، انتخاب انبار الزامی است.';
         }
 
-        if ($validated['direction'] !== 'sale' || $validated['document_type'] !== 'invoice' || $productItemIds->isEmpty()) {
+        // Stock leaves warehouse for sale invoices and purchase returns.
+        $needsStockCheck = $productItemIds->isNotEmpty() && (
+            ($validated['direction'] === 'sale' && $validated['document_type'] === 'invoice')
+            || ($validated['direction'] === 'purchase' && $validated['document_type'] === 'return')
+        );
+
+        if (! $needsStockCheck) {
             return null;
         }
 
@@ -662,6 +791,17 @@ class InvoiceController extends Controller
         return str_replace('٫', '.', $value);
     }
 
+    private function numberingKey(string $direction, string $documentType): string
+    {
+        return match (true) {
+            $documentType === 'proforma' => 'sale_proforma',
+            $documentType === 'return' && $direction === 'sale' => 'sale_return',
+            $documentType === 'return' => 'purchase_return',
+            $direction === 'sale' => 'sale_invoice',
+            default => 'purchase_invoice',
+        };
+    }
+
     private function wantsInvoiceJson(Request $request): bool
     {
         return $request->expectsJson()
@@ -680,7 +820,7 @@ class InvoiceController extends Controller
             'invoice' => [
                 'id' => $invoice->id,
                 'number' => $invoice->number,
-                'type_label' => ($invoice->direction === 'sale' ? 'فروش' : 'خرید') . ' / ' . ($invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور'),
+                'type_label' => $invoice->typeLabel(),
                 'invoice_date' => gregorianToJalaliDate($invoice->invoice_date),
                 'party_name' => $invoice->party?->name ?: 'طرف حساب حذف شده',
                 'project_number' => $invoice->project?->project_number ?: '-',

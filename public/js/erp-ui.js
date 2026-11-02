@@ -115,7 +115,21 @@ function isErpMoneyField(input) {
         return false;
     }
 
-    if (input.closest('.invoice-editor')) {
+    // Explicit opt-out always wins.
+    if (input.dataset.erpMoney === '0' || input.dataset.erpNumber === '0') {
+        return false;
+    }
+
+    // Explicit opt-in wins over skip containers / heuristics (readonly still skipped for binding).
+    if (input.dataset.erpMoney === '1' || input.dataset.erpNumber === '1') {
+        return ! input.readOnly;
+    }
+
+    if (input.readOnly) {
+        return false;
+    }
+
+    if (input.closest('.invoice-editor') || input.closest('[data-erp-skip-money]')) {
         return false;
     }
 
@@ -124,18 +138,6 @@ function isErpMoneyField(input) {
         || input.classList.contains('line-discount')
         || input.classList.contains('line-tax-rate')) {
         return false;
-    }
-
-    if (input.dataset.erpMoney === '0' || input.dataset.erpNumber === '0') {
-        return false;
-    }
-
-    if (input.dataset.erpMoney === '1') {
-        return true;
-    }
-
-    if (input.dataset.erpNumber === '1') {
-        return true;
     }
 
     if (input.type === 'hidden' || input.type === 'file' || input.type === 'password' || input.type === 'checkbox' || input.type === 'radio' || input.type === 'submit' || input.type === 'button') {
@@ -202,9 +204,20 @@ function erpMoneyRawValue(value) {
     return `${negative ? '-' : ''}${normalizedInteger}${fractionPart ? `.${fractionPart}` : ''}`;
 }
 
+function inputHasWireModel(input) {
+    return Array.from(input.attributes).some((attribute) => attribute.name.startsWith('wire:model'));
+}
+
 function syncLivewireInput(input) {
+    // For wire:model fields, only notify via DOM events. Calling Livewire.set() on
+    // nested paths like editLines.0.amount can wipe sibling keys (title/locked/id).
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (inputHasWireModel(input)) {
+        return;
+    }
+
     input.dispatchEvent(new Event('blur', { bubbles: true }));
 
     const componentEl = input.closest('[wire\\:id]');
@@ -239,15 +252,21 @@ function syncJalaliInputWithLivewire(input) {
 function formatErpMoneyInput(input, sync = true) {
     const raw = erpMoneyRawValue(input.value);
     const display = raw === '' ? '' : normalizeErpMoneyValue(raw);
-    input.value = display;
 
-    if (sync) {
-        // Keep thousand-separated Persian digits in the UI, but push the raw
-        // ASCII number to Livewire so `numeric` validation and PHP casting work.
-        input.value = raw;
-        syncLivewireInput(input);
+    if (! sync) {
         input.value = display;
+
+        return;
     }
+
+    // Push ASCII raw so Livewire/PHP see a numeric value, then restore Persian display.
+    input.value = raw;
+    syncLivewireInput(input);
+    queueMicrotask(() => {
+        if (document.activeElement !== input) {
+            input.value = display;
+        }
+    });
 }
 
 function enableErpMoneyInputs() {
@@ -1449,6 +1468,14 @@ function resolveSearchSelectOptions(root) {
         return window.__erpSoldDeviceItemOptions;
     }
 
+    if (source === 'chart-accounts' && Array.isArray(window.__erpChartAccountOptions)) {
+        return window.__erpChartAccountOptions;
+    }
+
+    if (source === 'parties' && Array.isArray(window.__erpPartyOptions)) {
+        return window.__erpPartyOptions;
+    }
+
     try {
         return JSON.parse(root.dataset.options || '[]');
     } catch (error) {
@@ -1526,6 +1553,7 @@ function bindErpSearchSelect(root) {
         options: resolveSearchSelectOptions(root),
         filtered: [],
         listHome: list.parentElement,
+        clearedByUser: false,
     };
 
     const positionList = () => {
@@ -1604,8 +1632,28 @@ function bindErpSearchSelect(root) {
         attachListListeners();
     };
 
+    const selectedOption = () => state.options.find((option) => String(option.id) === String(hidden.value));
+
+    const selectedLabel = () => {
+        const selected = selectedOption();
+
+        return selected ? formatSearchSelectLabel(selected) : '';
+    };
+
+    // When the visible text is still the current selection, treat query as empty
+    // so reopening the field shows the full list (no need to clear first).
+    const isShowingSelectedLabel = () => {
+        if (! hidden.value) {
+            return false;
+        }
+
+        return normalizeSearchText(input.value) === normalizeSearchText(selectedLabel());
+    };
+
+    const searchQueryForList = () => (isShowingSelectedLabel() ? '' : input.value);
+
     const renderList = () => {
-        state.filtered = filterSearchSelectOptions(state.options, input.value);
+        state.filtered = filterSearchSelectOptions(state.options, searchQueryForList());
         list.innerHTML = '';
 
         if (!state.filtered.length) {
@@ -1623,6 +1671,10 @@ function bindErpSearchSelect(root) {
             button.type = 'button';
             button.className = 'erp-search-select__option';
             button.dataset.index = String(index);
+
+            if (hidden.value !== '' && String(option.id) === String(hidden.value)) {
+                button.classList.add('is-selected');
+            }
 
             const label = document.createElement('span');
             label.className = 'erp-search-select__option-label';
@@ -1669,6 +1721,7 @@ function bindErpSearchSelect(root) {
     };
 
     const selectOption = (option) => {
+        state.clearedByUser = false;
         hidden.value = String(option.id ?? '');
         input.value = formatSearchSelectLabel(option);
         closeList();
@@ -1676,7 +1729,7 @@ function bindErpSearchSelect(root) {
     };
 
     const syncLabelFromValue = () => {
-        const selected = state.options.find((option) => String(option.id) === String(hidden.value));
+        const selected = selectedOption();
 
         input.value = selected ? formatSearchSelectLabel(selected) : '';
     };
@@ -1684,9 +1737,23 @@ function bindErpSearchSelect(root) {
     const tryAutoSelect = () => {
         const query = normalizeSearchText(input.value);
 
-        if (!query) {
-            hidden.value = '';
-            dispatchSearchSelectValueEvents(hidden);
+        if (! query) {
+            if (state.clearedByUser) {
+                hidden.value = '';
+                dispatchSearchSelectValueEvents(hidden);
+                state.clearedByUser = false;
+
+                return;
+            }
+
+            syncLabelFromValue();
+
+            return;
+        }
+
+        // Reopened field still showing current selection — keep it.
+        if (isShowingSelectedLabel()) {
+            syncLabelFromValue();
 
             return;
         }
@@ -1694,8 +1761,9 @@ function bindErpSearchSelect(root) {
         const exact = state.options.find((option) => {
             const code = normalizeSearchText(option.code);
             const label = normalizeSearchText(option.label);
+            const formatted = normalizeSearchText(formatSearchSelectLabel(option));
 
-            return code === query || label === query;
+            return code === query || label === query || formatted === query;
         });
 
         if (exact) {
@@ -1718,15 +1786,46 @@ function bindErpSearchSelect(root) {
         state.options = resolveSearchSelectOptions(root);
     };
 
-    input.addEventListener('focus', () => {
+    const prepareSearch = () => {
         refreshOptions();
         renderList();
         openList();
-        input.select();
+
+        // Select all so the next keystroke replaces the label (no manual clear).
+        window.requestAnimationFrame(() => {
+            try {
+                input.select();
+            } catch (error) {
+                // ignore unsupported select() cases
+            }
+        });
+    };
+
+    input.addEventListener('focus', () => {
+        prepareSearch();
+    });
+
+    // Second click while already focused does not re-fire focus — still reopen for search.
+    input.addEventListener('click', () => {
+        prepareSearch();
     });
 
     input.addEventListener('input', () => {
-        hidden.value = '';
+        const query = normalizeSearchText(input.value);
+
+        if (! query) {
+            state.clearedByUser = true;
+            hidden.value = '';
+            dispatchSearchSelectValueEvents(hidden);
+        } else {
+            state.clearedByUser = false;
+            // Typing a new search invalidates the previous selection.
+            if (! isShowingSelectedLabel()) {
+                hidden.value = '';
+                dispatchSearchSelectValueEvents(hidden);
+            }
+        }
+
         refreshOptions();
         renderList();
         openList();
@@ -1736,8 +1835,7 @@ function bindErpSearchSelect(root) {
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             if (list.hidden) {
-                renderList();
-                openList();
+                prepareSearch();
             }
             state.activeIndex = Math.min(state.activeIndex + 1, Math.max(state.filtered.length - 1, 0));
             highlightActiveOption();
@@ -1764,8 +1862,29 @@ function bindErpSearchSelect(root) {
 
         if (event.key === 'Escape') {
             event.preventDefault();
+            state.clearedByUser = false;
             closeList();
             syncLabelFromValue();
+        }
+
+        // Backspace/Delete on a fully-selected label clears for a fresh search.
+        if ((event.key === 'Backspace' || event.key === 'Delete') && isShowingSelectedLabel()) {
+            const selectedLength = String(input.value || '').length;
+            const hasFullSelection = typeof input.selectionStart === 'number'
+                && typeof input.selectionEnd === 'number'
+                && input.selectionEnd - input.selectionStart >= selectedLength
+                && selectedLength > 0;
+
+            if (hasFullSelection) {
+                event.preventDefault();
+                state.clearedByUser = true;
+                input.value = '';
+                hidden.value = '';
+                dispatchSearchSelectValueEvents(hidden);
+                refreshOptions();
+                renderList();
+                openList();
+            }
         }
     });
 
@@ -1977,7 +2096,139 @@ function handleErpSpaClick(event) {
     }
 
     event.preventDefault();
+    // Keep list scroll when returning to this page (e.g. after open/back).
+    erpSaveScrollPosition(current);
     window.Livewire.navigate(url.pathname + url.search + url.hash);
+}
+
+const ERP_SCROLL_STORAGE_PREFIX = 'erp:list-scroll:';
+
+function erpScrollStorageKey(url = window.location) {
+    const resolved = typeof url === 'string'
+        ? new URL(url, window.location.origin)
+        : (url instanceof URL ? url : new URL(window.location.href));
+
+    return ERP_SCROLL_STORAGE_PREFIX + resolved.pathname + resolved.search;
+}
+
+function erpCurrentScrollY() {
+    return Math.round(window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0);
+}
+
+function erpSaveScrollPosition(url = window.location) {
+    try {
+        sessionStorage.setItem(erpScrollStorageKey(url), String(erpCurrentScrollY()));
+    } catch (error) {
+        // Ignore quota / private-mode failures.
+    }
+}
+
+function erpRestoreScrollPosition(url = window.location) {
+    let raw = null;
+
+    try {
+        raw = sessionStorage.getItem(erpScrollStorageKey(url));
+    } catch (error) {
+        return;
+    }
+
+    if (raw === null || raw === '') {
+        return;
+    }
+
+    const y = Number.parseInt(raw, 10);
+
+    if (!Number.isFinite(y) || y < 0) {
+        return;
+    }
+
+    const apply = () => {
+        window.scrollTo({ top: y, left: 0, behavior: 'auto' });
+    };
+
+    apply();
+    window.requestAnimationFrame(apply);
+    window.setTimeout(apply, 40);
+    window.setTimeout(apply, 120);
+    window.setTimeout(apply, 280);
+}
+
+function erpShouldPreserveListScroll() {
+    return Boolean(document.querySelector('[data-erp-preserve-scroll]'));
+}
+
+function enableErpScrollPreservation() {
+    if (window.__erpScrollPreservationBound) {
+        return;
+    }
+
+    window.__erpScrollPreservationBound = true;
+
+    if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+    }
+
+    const restoreIfList = () => {
+        if (erpShouldPreserveListScroll()) {
+            erpRestoreScrollPosition();
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', restoreIfList);
+    window.addEventListener('pageshow', restoreIfList);
+
+    window.addEventListener('pagehide', () => {
+        if (erpShouldPreserveListScroll()) {
+            erpSaveScrollPosition();
+        }
+    });
+
+    // POST actions like settle/confirm redirect back() and would jump to top without this.
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+
+        if (!(form instanceof HTMLFormElement)) {
+            return;
+        }
+
+        if (!erpShouldPreserveListScroll() && !form.closest('[data-erp-preserve-scroll]')) {
+            return;
+        }
+
+        erpSaveScrollPosition();
+    }, true);
+
+    document.addEventListener('livewire:navigated', () => {
+        window.requestAnimationFrame(restoreIfList);
+    });
+
+    if (document.readyState !== 'loading') {
+        restoreIfList();
+    }
+}
+
+function bindLivewireScrollPreservation() {
+    if (!window.Livewire?.hook || window.__erpLivewireScrollHookBound) {
+        return;
+    }
+
+    window.__erpLivewireScrollHookBound = true;
+
+    window.Livewire.hook('commit', ({ succeed }) => {
+        if (!erpShouldPreserveListScroll()) {
+            return;
+        }
+
+        const x = window.scrollX || 0;
+        const y = erpCurrentScrollY();
+
+        succeed(() => {
+            const restore = () => window.scrollTo(x, y);
+            restore();
+            window.requestAnimationFrame(restore);
+            window.setTimeout(restore, 40);
+        });
+    });
 }
 
 function enableErpAutoFilters(root = document) {
@@ -2051,6 +2302,7 @@ function bootstrapErpUiListeners() {
     document.addEventListener('DOMContentLoaded', enableErpFlashMessages);
     document.addEventListener('DOMContentLoaded', enableErpFileDownloads);
     document.addEventListener('DOMContentLoaded', bindErpShellObservers);
+    document.addEventListener('DOMContentLoaded', enableErpScrollPreservation);
 
     document.addEventListener('livewire:init', () => {
         enableErpFlashMessages();
@@ -2058,6 +2310,7 @@ function bootstrapErpUiListeners() {
         enableJalaliDatepickers();
         enableErpMoneyInputs();
         bindLivewireJalaliHooks();
+        bindLivewireScrollPreservation();
 
         if (window.Livewire?.hook && !window.__erpUiElementInitHookBound) {
             window.__erpUiElementInitHookBound = true;
@@ -2083,6 +2336,8 @@ function bootstrapErpUiListeners() {
         enableErpFlashMessages();
         enableErpFileDownloads();
         bindErpShellObservers();
+        enableErpScrollPreservation();
+        bindLivewireScrollPreservation();
     });
 
     document.addEventListener('livewire:update', () => {
@@ -2166,7 +2421,9 @@ if (document.readyState !== 'loading') {
     enableErpFlashMessages();
     enableErpFileDownloads();
     bindErpShellObservers();
+    enableErpScrollPreservation();
     if (window.Livewire) {
         bindLivewireJalaliHooks();
+        bindLivewireScrollPreservation();
     }
 }

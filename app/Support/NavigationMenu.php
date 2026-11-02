@@ -54,13 +54,16 @@ class NavigationMenu
             [
                 'label' => 'بازرگانی',
                 'route' => 'invoices.index',
-                'active' => ['invoices.*', 'sales-reports.*', 'sales.intelligence', 'commerce.contractor-service-purchases.*'],
+                'active' => ['invoices.*', 'sales-reports.*', 'sales.intelligence', 'commerce.contractor-service-purchases.*', 'commerce.item-pricing.*'],
                 'children' => [
                     ['label' => 'لیست فاکتورها', 'route' => 'invoices.index', 'permission' => 'commerce.view'],
+                    ['label' => 'قیمت‌گذاری کالا و خدمات', 'route' => 'commerce.item-pricing.index', 'permission' => 'commerce.view'],
                     ['type' => 'divider'],
-                    ['label' => 'پیش‌فاکتور فروش', 'route' => 'invoices.create', 'params' => ['direction' => 'sale', 'document_type' => 'proforma'], 'permission' => 'commerce.manage'],
-                    ['label' => 'فاکتور فروش', 'route' => 'invoices.create', 'params' => ['direction' => 'sale', 'document_type' => 'invoice'], 'permission' => 'commerce.manage'],
-                    ['label' => 'فاکتور خرید', 'route' => 'invoices.create', 'params' => ['direction' => 'purchase', 'document_type' => 'invoice'], 'permission' => 'commerce.manage'],
+                    ['label' => 'پیش‌فاکتور فروش', 'route' => 'invoices.create', 'params' => ['direction' => 'sale', 'document_type' => 'proforma'], 'permission' => 'commerce.invoices.create'],
+                    ['label' => 'فاکتور فروش', 'route' => 'invoices.create', 'params' => ['direction' => 'sale', 'document_type' => 'invoice'], 'permission' => 'commerce.invoices.create'],
+                    ['label' => 'برگشت از فروش', 'route' => 'invoices.create', 'params' => ['direction' => 'sale', 'document_type' => 'return'], 'permission' => 'commerce.invoices.create'],
+                    ['label' => 'فاکتور خرید', 'route' => 'invoices.create', 'params' => ['direction' => 'purchase', 'document_type' => 'invoice'], 'permission' => 'commerce.invoices.create'],
+                    ['label' => 'برگشت از خرید', 'route' => 'invoices.create', 'params' => ['direction' => 'purchase', 'document_type' => 'return'], 'permission' => 'commerce.invoices.create'],
                     ['label' => 'خرید خدمات پیمانکار', 'route' => 'commerce.contractor-service-purchases.index', 'permission' => 'commerce.view'],
                     ['type' => 'divider'],
                     ['label' => 'داشبورد فروش', 'route' => 'sales.intelligence', 'permission' => 'reports.sales.view'],
@@ -72,7 +75,7 @@ class NavigationMenu
                 'active' => ['projects.*'],
                 'children' => [
                     ['label' => 'لیست پروژه‌ها', 'route' => 'projects.index', 'permission' => 'projects.view'],
-                    ['label' => 'تعریف پروژه', 'route' => 'projects.create', 'permission' => 'projects.manage'],
+                    ['label' => 'تعریف پروژه', 'route' => 'projects.create', 'permission' => 'projects.create'],
                 ],
             ],
             [
@@ -81,7 +84,7 @@ class NavigationMenu
                 'active' => ['employees.*', 'organization-units.*', 'jobs.*', 'positions.*', 'employment-orders.*', 'employment-contracts.*', 'employee-documents.*', 'work-shifts.*', 'work-calendars.*', 'work-groups.*'],
                 'children' => [
                     ['label' => 'لیست پرسنل', 'route' => 'employees.index', 'permission' => 'employees.view'],
-                    ['label' => 'پرسنل جدید', 'route' => 'employees.create', 'permission' => 'employees.manage'],
+                    ['label' => 'پرسنل جدید', 'route' => 'employees.create', 'permission' => 'employees.create'],
                     ['label' => 'مدارک پرسنلی', 'route' => 'employee-documents.index', 'permission' => 'hr.view'],
                     ['type' => 'divider'],
                     ['label' => 'ساختار سازمانی', 'route' => 'organization-units.index', 'permission' => 'hr.view'],
@@ -94,7 +97,7 @@ class NavigationMenu
                     ['label' => 'شیفت‌های کاری', 'route' => 'work-shifts.index', 'permission' => 'hr.view'],
                     ['label' => 'تقویم کاری', 'route' => 'work-calendars.index', 'permission' => 'hr.view'],
                     ['label' => 'گروه‌های کاری', 'route' => 'work-groups.index', 'permission' => 'hr.view'],
-                    ['label' => 'تخصیص گروه کاری', 'route' => 'work-groups.assignments', 'permission' => 'worklogs.manage'],
+                    ['label' => 'تخصیص گروه کاری', 'route' => 'work-groups.assignments', 'permission' => 'worklogs.setup.manage'],
                 ],
             ],
             [
@@ -115,9 +118,9 @@ class NavigationMenu
                 'route' => 'payroll.periods.index',
                 'active' => ['payroll.*', 'payslips.*', 'insurance.*'],
                 'children' => [
-                    ['label' => 'دوره‌های حقوق', 'route' => 'payroll.periods.index', 'permission' => 'salaries.manage'],
-                    ['label' => 'لیست و پرداخت حقوق', 'route' => 'payroll.payments.index', 'permission' => 'salaries.manage'],
-                    ['label' => 'تنظیمات حسابداری حقوق', 'route' => 'payroll.accounting-settings.index', 'permission' => 'salaries.manage'],
+                    ['label' => 'دوره‌های حقوق', 'route' => 'payroll.periods.index', 'permission' => 'payroll.view'],
+                    ['label' => 'لیست و پرداخت حقوق', 'route' => 'payroll.payments.index', 'permission' => 'payroll.view'],
+                    ['label' => 'تنظیمات حسابداری حقوق', 'route' => 'payroll.accounting-settings.index', 'permission' => 'payroll.settings.manage'],
                     ['type' => 'divider'],
                     ['label' => 'دوره‌های بیمه', 'route' => 'insurance.periods.index', 'permission' => 'insurance.view'],
                     ['label' => 'پرداخت بیمه', 'route' => 'insurance.payments.index', 'permission' => 'insurance.view'],
@@ -132,7 +135,7 @@ class NavigationMenu
                     ['label' => 'کالا و خدمات', 'route' => 'items.index', 'permission' => 'base-info.view'],
                     ['label' => 'تعریف کالا/خدمت', 'route' => 'items.create', 'permission' => 'base-info.manage'],
                     ['label' => 'لیست انبارها', 'route' => 'warehouses.index', 'permission' => 'warehouse.view'],
-                    ['label' => 'تعریف انبار', 'route' => 'warehouses.create', 'permission' => 'warehouse.manage'],
+                    ['label' => 'تعریف انبار', 'route' => 'warehouses.create', 'permission' => 'warehouse.create'],
                 ],
             ],
             [
@@ -142,10 +145,10 @@ class NavigationMenu
                 'children' => [
                     ['label' => 'ثبت سند حسابداری', 'route' => 'accounting-documents.create', 'permission' => 'accounting.documents.create'],
                     ['label' => 'ثبت هزینه/درآمد', 'route' => 'financial-transactions.create', 'permission' => 'financial.manage'],
-                    ['label' => 'دریافت و پرداخت', 'route' => 'treasury.index', 'permission' => 'treasury.manage'],
+                    ['label' => 'دریافت و پرداخت', 'route' => 'treasury.index', 'permission' => 'treasury.view'],
                     ['label' => 'اسناد حسابداری', 'route' => 'accounting-documents.index', 'permission' => 'accounting.view'],
                     ['label' => 'هزینه‌ها و درآمدها', 'route' => 'financial-transactions.index', 'permission' => 'financial.view'],
-                    ['label' => 'حساب‌های جاری شرکا', 'route' => 'partner-current-accounts.index', 'permission' => 'treasury.manage'],
+                    ['label' => 'حساب‌های جاری شرکا', 'route' => 'partner-current-accounts.index', 'permission' => 'treasury.partners.manage'],
                     ['label' => 'حساب‌های بانکی', 'route' => 'bank-accounts.index', 'permission' => 'financial.manage'],
                     ['label' => 'دوره‌های مالی', 'route' => 'fiscal-periods.index', 'permission' => 'fiscal-years.manage'],
                 ],

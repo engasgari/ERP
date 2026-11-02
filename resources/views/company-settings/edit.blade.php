@@ -28,6 +28,14 @@
                 <input name="postal_code" value="{{ old('postal_code', $company->postal_code) }}" class="w-full">
             </label>
 
+            <label>استان
+                <input name="province" value="{{ old('province', $company->province) }}" class="w-full" placeholder="مثلاً تهران">
+            </label>
+
+            <label>شهر
+                <input name="city" value="{{ old('city', $company->city) }}" class="w-full" placeholder="مثلاً تهران">
+            </label>
+
             <label>تلفن
                 <input name="phone" value="{{ old('phone', $company->phone) }}" class="w-full">
             </label>

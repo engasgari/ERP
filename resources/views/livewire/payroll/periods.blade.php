@@ -1,3 +1,11 @@
+@php
+    $authUser = auth()->user();
+    $canCreatePeriod = (bool) $authUser?->hasPermission('payroll.periods.create');
+    $canCalculatePayroll = (bool) $authUser?->hasPermission('payroll.calculate');
+    $canApprovePayroll = (bool) $authUser?->hasPermission('payroll.approve');
+    $canDeletePeriod = (bool) $authUser?->hasPermission('payroll.periods.delete');
+    $canClosePeriod = (bool) $authUser?->hasPermission('payroll.periods.close');
+@endphp
 <div dir="rtl" class="space-y-6">
     @include('livewire.partials.flash')
 
@@ -14,6 +22,7 @@
                 </p>
             </div>
 
+            @if($canCreatePeriod)
             <form wire:submit="createPeriod" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:min-w-[640px]">
                 <label class="block">
                     <span class="text-sm font-medium text-slate-700">سال</span>
@@ -43,6 +52,7 @@
                     <span wire:loading wire:target="createPeriod">در حال ساخت...</span>
                 </button>
             </form>
+            @endif
         </div>
 
         @error('year') <div class="mt-3 text-sm text-red-600">{{ $message }}</div> @enderror
@@ -99,16 +109,18 @@
                         <td class="px-3 py-3 font-semibold text-slate-900">{{ formatMoney((float) $period->payroll_calculations_sum_net_payable) }}</td>
                         <td class="px-3 py-3">
                             <x-erp.ui.row-actions>
-                                <x-erp.ui.row-action
-                                    icon="calculate"
-                                    label="محاسبه"
-                                    wire:click="calculate({{ $period->id }})"
-                                    wire:confirm="محاسبه مجدد این دوره انجام شود؟"
-                                    wire:loading.attr="disabled"
-                                    wire:target="calculate({{ $period->id }})"
-                                />
+                                @if($canCalculatePayroll)
+                                    <x-erp.ui.row-action
+                                        icon="calculate"
+                                        label="محاسبه"
+                                        wire:click="calculate({{ $period->id }})"
+                                        wire:confirm="محاسبه مجدد این دوره انجام شود؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="calculate({{ $period->id }})"
+                                    />
+                                @endif
 
-                                @if(in_array($period->status, ['draft', 'calculated'], true))
+                                @if($canDeletePeriod && in_array($period->status, ['draft', 'calculated'], true))
                                     <x-erp.ui.row-action
                                         icon="delete"
                                         label="حذف"
@@ -120,7 +132,7 @@
                                     />
                                 @endif
 
-                                @if($period->status === 'calculated')
+                                @if($canApprovePayroll && $period->status === 'calculated')
                                     <x-erp.ui.row-action
                                         icon="confirm"
                                         label="تایید"
@@ -132,7 +144,7 @@
                                     />
                                 @endif
 
-                                @if($period->status === 'approved')
+                                @if($canClosePeriod && $period->status === 'approved')
                                     <x-erp.ui.row-action
                                         icon="close"
                                         label="بستن"
@@ -143,7 +155,7 @@
                                     />
                                 @endif
 
-                                @if($period->status === 'closed')
+                                @if($canClosePeriod && $period->status === 'closed')
                                     <x-erp.ui.row-action
                                         icon="reopen"
                                         label="بازگشایی"

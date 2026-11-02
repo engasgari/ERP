@@ -46,6 +46,7 @@ class NumberingSettingService
                     : false;
                 $nextNumber = $this->numbering->storedNextNumber($definition['key'], $fiscalYearId);
                 $lastUsed = $this->numbering->lastUsedSequence($definition['key'], $prefix, $fiscalYearId);
+                $preview = $this->numbering->peek($definition['key'], null, $fiscalYearId);
 
                 return [
                     'document_key' => $definition['key'],
@@ -56,7 +57,7 @@ class NumberingSettingService
                     'next_number' => $nextNumber,
                     'last_used' => $lastUsed,
                     'reuse_deleted_numbers' => $reuse,
-                    'preview' => $prefix . str_pad((string) $nextNumber, $padding, '0', STR_PAD_LEFT),
+                    'preview' => $preview,
                 ];
             })
             ->values()

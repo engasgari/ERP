@@ -24,7 +24,7 @@
     @if($wireAttributes !== []) wire:ignore.self @endif
     data-erp-search-select
     @if($optionsSource) data-options-source="{{ $optionsSource }}" @endif
-    data-options="@json($inlineOptions)"
+    data-options="{{ json_encode($inlineOptions, JSON_UNESCAPED_UNICODE) }}"
 >
     <input
         type="hidden"

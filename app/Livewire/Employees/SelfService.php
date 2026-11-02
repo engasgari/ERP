@@ -62,7 +62,7 @@ class SelfService extends Component
             return;
         }
 
-        app(LeaveManagementService::class)->request([
+        $leave = app(LeaveManagementService::class)->request([
             'employee_id' => $employee->id,
             'request_type' => $this->leave_request_type,
             'start_date' => $startDate,
@@ -78,6 +78,11 @@ class SelfService extends Component
 
         $this->reset(['leave_start_date', 'leave_end_date', 'leave_start_time', 'leave_end_time', 'leave_hours', 'leave_total_days', 'leave_reason']);
         session()->flash('success', 'درخواست مرخصی شما ثبت شد.');
+
+        $this->redirect(route('attendance.leaves.print', [
+            'leave' => $leave,
+            'back' => route('self-service.index'),
+        ]), navigate: false);
     }
 
     public function requestMission(): void
@@ -109,7 +114,7 @@ class SelfService extends Component
             return;
         }
 
-        app(MissionManagementService::class)->request([
+        $mission = app(MissionManagementService::class)->request([
             'employee_id' => $employee->id,
             'request_type' => $this->mission_request_type,
             'destination' => $this->mission_destination ?: null,
@@ -125,6 +130,11 @@ class SelfService extends Component
 
         $this->reset(['mission_destination', 'mission_start_date', 'mission_end_date', 'mission_start_time', 'mission_end_time', 'mission_hours', 'mission_total_days', 'mission_description']);
         session()->flash('success', 'درخواست ماموریت شما ثبت شد.');
+
+        $this->redirect(route('attendance.missions.print', [
+            'mission' => $mission,
+            'back' => route('self-service.index'),
+        ]), navigate: false);
     }
 
     public function render()

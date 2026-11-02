@@ -152,6 +152,55 @@ class FinancialReportService
         ];
     }
 
+    /**
+     * Account drilldown for trial balance: same scope as accountBalances()
+     * (exact chart_account_id, opening before date_from + period movement).
+     */
+    public function trialBalanceAccountLedgerSummary(ChartAccount $account, array $filters = []): array
+    {
+        $filters = $this->normalizeFilters($filters);
+        unset($filters['account_id']);
+        $filters['exact_chart_account_id'] = (int) $account->id;
+
+        $openingLines = $this->openingLines($filters);
+        $periodLines = $this->postedLines($filters);
+
+        $openingDebit = (float) $openingLines->sum('debit');
+        $openingCredit = (float) $openingLines->sum('credit');
+        $periodDebit = (float) $periodLines->sum('debit');
+        $periodCredit = (float) $periodLines->sum('credit');
+        $closingNet = ($openingDebit + $periodDebit) - ($openingCredit + $periodCredit);
+
+        $running = $openingDebit - $openingCredit;
+        $lines = $periodLines->map(function ($line) use (&$running) {
+            $running += (float) $line->debit - (float) $line->credit;
+            $row = $this->lineRow($line);
+            $row['document'] = $line->document;
+            $row['party'] = $line->party;
+            $row['project'] = $line->project;
+            $row['account'] = $line->account;
+            $row['running_balance'] = $running;
+
+            return $row;
+        })->values();
+
+        return [
+            'account' => $account,
+            'lines' => $lines,
+            'opening_debit' => $openingDebit,
+            'opening_credit' => $openingCredit,
+            'period_debit' => $periodDebit,
+            'period_credit' => $periodCredit,
+            'closing_debit' => max($closingNet, 0.0),
+            'closing_credit' => max(-$closingNet, 0.0),
+            // Aliases aligned with trial-balance row columns the user compares.
+            'debit' => $periodDebit,
+            'credit' => $periodCredit,
+            'balance' => $closingNet,
+            'balance_type' => $this->balanceType($closingNet),
+        ];
+    }
+
     public function partyStatementSummaries(?int $accountId = null, ?int $partyId = null, array $filters = [], ?string $side = null): Collection
     {
         unset($filters['side'], $side);
@@ -278,29 +327,33 @@ class FinancialReportService
 
     public function bankTransactions(BankAccount $bankAccount, array $filters = []): array
     {
+        $treasuryId = (int) ($bankAccount->getKey() ?: ($filters['bank_account_id'] ?? 0));
+
         return $this->treasuryStatementTransactions(
             treasuryFilterKey: 'bank_account_id',
-            treasuryId: $bankAccount->id,
+            treasuryId: $treasuryId,
             openingBalance: (float) $bankAccount->opening_balance,
             subtitle: $bankAccount->code . ' - ' . $bankAccount->bank_name,
             payloadKey: 'bank-transactions',
             title: 'تراکنش‌های بانکی',
             sectionTitle: 'گردش حساب بانکی',
-            filters: $filters,
+            filters: array_merge($filters, ['bank_account_id' => $treasuryId]),
         );
     }
 
     public function cashTransactions(Cashbox $cashbox, array $filters = []): array
     {
+        $treasuryId = (int) ($cashbox->getKey() ?: ($filters['cashbox_id'] ?? 0));
+
         return $this->treasuryStatementTransactions(
             treasuryFilterKey: 'cashbox_id',
-            treasuryId: $cashbox->id,
+            treasuryId: $treasuryId,
             openingBalance: (float) $cashbox->opening_balance,
             subtitle: $cashbox->code . ' - ' . $cashbox->name,
             payloadKey: 'cash-transactions',
             title: 'تراکنش‌های صندوق',
             sectionTitle: 'گردش صندوق',
-            filters: $filters,
+            filters: array_merge($filters, ['cashbox_id' => $treasuryId]),
         );
     }
 
@@ -1847,7 +1900,7 @@ class FinancialReportService
             }
         }
 
-        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'bank_account_id', 'cashbox_id', 'per_page', 'fiscal_period_id'] as $key) {
+        foreach (['fiscal_year_id', 'branch_id', 'project_id', 'party_id', 'account_id', 'exact_chart_account_id', 'bank_account_id', 'cashbox_id', 'per_page', 'fiscal_period_id'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $filters[$key] = (int) $filters[$key];
             }
@@ -1874,6 +1927,10 @@ class FinancialReportService
 
         $openingFilters = $filters;
         $openingFilters['date_to'] = \Carbon\Carbon::parse($filters['date_from'])->subDay()->toDateString();
+        // Must clear date_from; otherwise date_from <= d <= date_from-1 is impossible.
+        unset($openingFilters['date_from']);
+        // Brought-forward balance is prior to the selected period / fiscal year window.
+        unset($openingFilters['fiscal_year_id'], $openingFilters['fiscal_period_id']);
 
         return $this->postedLineQuery($openingFilters, $excludeReversalDocuments)
             ->orderBy('accounting_documents.document_date')
@@ -2041,13 +2098,28 @@ class FinancialReportService
             'party' => $line->party?->name ?: '-',
             'project' => $line->project?->name ?: '-',
             'cost_center' => $line->cost_center ?: '-',
-            'description' => $line->description ?: $line->document?->description ?: '-',
+            'description' => $this->resolveLedgerLineDescription($line),
             'debit' => (float) $line->debit,
             'credit' => (float) $line->credit,
             'running_balance' => $running,
             'bank_account_id' => $line->bank_account_id,
             'cashbox_id' => $line->cashbox_id,
         ];
+    }
+
+    private function resolveLedgerLineDescription($line): string
+    {
+        $base = trim((string) ($line->description ?: $line->document?->description ?: ''));
+        $source = $line->document?->source;
+
+        if ($source instanceof FinancialTransaction) {
+            $note = trim((string) ($source->description ?? ''));
+            if ($note !== '' && ($base === '' || ! str_contains($base, $note))) {
+                $base = $base !== '' ? $base . ' - ' . $note : $note;
+            }
+        }
+
+        return $base !== '' ? $base : '-';
     }
 
     private function bankStatementLineRow($line, Collection $linesByDocument, Collection $documentSources): array
@@ -2091,8 +2163,15 @@ class FinancialReportService
         string $sectionTitle,
         array $filters,
     ): array {
+        if ($treasuryId <= 0) {
+            $treasuryId = (int) ($filters[$treasuryFilterKey] ?? 0);
+        }
+
         $filters = $this->normalizeFilters($filters);
-        $filters[$treasuryFilterKey] = $treasuryId;
+
+        if ($treasuryId > 0) {
+            $filters[$treasuryFilterKey] = $treasuryId;
+        }
 
         $partyFilterId = ! empty($filters['party_id']) ? (int) $filters['party_id'] : null;
         $projectFilterId = ! empty($filters['project_id']) ? (int) $filters['project_id'] : null;

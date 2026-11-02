@@ -59,6 +59,8 @@ class Index extends Component
 
     public function delete(int $documentId, RelatedDocumentDeletionService $deletion): void
     {
+        abort_unless(auth()->user()?->hasPermission('inventory.documents.delete'), 403);
+
         $document = InventoryDocument::findOrFail($documentId);
 
         if ($document->is_automatic || $document->is_initial_stock) {

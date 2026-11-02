@@ -11,6 +11,7 @@ use App\Services\InventoryPostingService;
 use App\Services\AccountingPostingService;
 use App\Services\NumberingService;
 use App\Services\RelatedDocumentDeletionService;
+use App\Support\InventoryPermissions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -187,6 +188,10 @@ class InventoryDocumentController extends Controller
             'lines.*.unit_price' => 'nullable|numeric|min:0',
             'lines.*.description' => 'nullable|string|max:255',
         ]);
+
+        if (($validated['status'] ?? 'draft') === 'confirmed') {
+            abort_unless(auth()->user()?->hasPermission(InventoryPermissions::DOCUMENTS_CONFIRM), 403);
+        }
 
         $validated['lines'] = collect($validated['lines'])
             ->filter(fn ($line) => !empty($line['item_id']))

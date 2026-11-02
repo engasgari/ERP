@@ -55,6 +55,8 @@ class Index extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.documents.manage'), 403);
+
         $data = $this->validate()['form'];
         $data['issued_at'] = $data['issued_at'] ? jalaliToGregorianDate($data['issued_at']) : null;
         $data['expires_at'] = $data['expires_at'] ? jalaliToGregorianDate($data['expires_at']) : null;
@@ -70,6 +72,8 @@ class Index extends Component
 
     public function delete(int $id): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.documents.manage'), 403);
+
         EmployeeDocument::findOrFail($id)->delete();
         session()->flash('success', 'مدرک حذف شد.');
     }

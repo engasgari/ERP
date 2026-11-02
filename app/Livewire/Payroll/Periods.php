@@ -50,6 +50,8 @@ class Periods extends Component
 
     public function createPeriod(): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.periods.create'), 403);
+
         $this->validatePeriod();
 
         $service = app(PayrollCalculationService::class);
@@ -61,6 +63,8 @@ class Periods extends Component
 
     public function calculate(int $periodId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.calculate'), 403);
+
         $period = PayrollPeriod::findOrFail($periodId);
 
         if ($period->status === 'closed') {
@@ -81,6 +85,8 @@ class Periods extends Component
 
     public function approve(int $periodId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.approve'), 403);
+
         $period = PayrollPeriod::findOrFail($periodId);
 
         if ($period->status !== 'calculated') {
@@ -95,6 +101,8 @@ class Periods extends Component
 
     public function deletePeriod(int $periodId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.periods.delete'), 403);
+
         $period = PayrollPeriod::findOrFail($periodId);
 
         if (in_array($period->status, ['approved', 'closed'], true)) {
@@ -109,6 +117,8 @@ class Periods extends Component
 
     public function close(int $periodId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.periods.close'), 403);
+
         $period = PayrollPeriod::findOrFail($periodId);
 
         if ($period->status !== 'approved') {
@@ -126,6 +136,8 @@ class Periods extends Component
 
     public function reopen(int $periodId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.periods.close'), 403);
+
         $period = PayrollPeriod::findOrFail($periodId);
 
         try {
@@ -141,6 +153,8 @@ class Periods extends Component
 
     public function registerPayment(int $calculationId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         $calculation = PayrollCalculation::with(['period', 'employee.party', 'payments'])->findOrFail($calculationId);
 
         $this->validate([
@@ -175,6 +189,8 @@ class Periods extends Component
 
     public function reversePayment(int $calculationId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         $calculation = PayrollCalculation::with(['period', 'payments'])->findOrFail($calculationId);
 
         try {

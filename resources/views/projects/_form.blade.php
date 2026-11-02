@@ -17,7 +17,7 @@
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
         <label class="grid gap-1 text-sm font-bold text-slate-600">
             شماره پروژه
-            <input name="project_number" value="{{ old('project_number', $project->project_number) }}" placeholder="خالی = شماره خودکار" class="rounded-md border-slate-300">
+            <input name="project_number" value="{{ old('project_number', $project->project_number ?: ($suggestedNumber ?? '')) }}" placeholder="شماره پیشنهادی — قابل ویرایش" class="rounded-md border-slate-300">
         </label>
 
         <label class="grid gap-1 text-sm font-bold text-slate-600 md:col-span-2">

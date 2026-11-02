@@ -1,16 +1,25 @@
 @php
     $statusLabels = ['confirmed' => 'تایید شده', 'draft' => 'موقت'];
+    $authUser = auth()->user();
+    $canCreateDocument = (bool) $authUser?->hasPermission('inventory.documents.create');
+    $canUpdateDocument = (bool) $authUser?->hasPermission('inventory.documents.update');
+    $canDeleteDocument = (bool) $authUser?->hasPermission('inventory.documents.delete');
+
+    $headerActions = [];
+    if ($canCreateDocument) {
+        $headerActions = [
+            ['label' => 'رسید انبار', 'url' => route('inventory-documents.create', ['type' => 'receipt']), 'class' => 'erp-action-edit'],
+            ['label' => 'حواله خروج', 'url' => route('inventory-documents.create', ['type' => 'issue']), 'class' => 'erp-action-edit'],
+            ['label' => 'حواله مصرف', 'url' => route('inventory-documents.create', ['type' => 'consumption']), 'class' => 'erp-action-edit'],
+            ['label' => 'انتقال بین انبار', 'url' => route('inventory-documents.create', ['type' => 'transfer']), 'class' => 'erp-action-edit'],
+        ];
+    }
 @endphp
 <x-erp.ui.list-page
     title="فهرست رسید و حواله انبار"
     description="مدیریت رسید، حواله خروج، حواله مصرف و انتقال بین انبار."
     route="inventory-documents.index"
-    :actions="[
-        ['label' => 'رسید انبار', 'url' => route('inventory-documents.create', ['type' => 'receipt']), 'class' => 'erp-action-edit'],
-        ['label' => 'حواله خروج', 'url' => route('inventory-documents.create', ['type' => 'issue']), 'class' => 'erp-action-edit'],
-        ['label' => 'حواله مصرف', 'url' => route('inventory-documents.create', ['type' => 'consumption']), 'class' => 'erp-action-edit'],
-        ['label' => 'انتقال بین انبار', 'url' => route('inventory-documents.create', ['type' => 'transfer']), 'class' => 'erp-action-edit'],
-    ]"
+    :actions="$headerActions"
 >
     <x-slot name="filters">
         <x-erp.ui.filter-bar wire:submit.prevent>
@@ -90,16 +99,20 @@
                     <x-erp.ui.row-actions>
                         <x-erp.ui.row-action icon="view" label="جزئیات" wire:click="show({{ $document->id }})" />
                         <x-erp.ui.row-action icon="expand" label="نمایش کامل" wire:click="showFull({{ $document->id }})" />
-                        <x-erp.ui.row-action icon="edit" label="ویرایش" :href="route('inventory-documents.edit', $document)" />
-                        <x-erp.ui.row-action
-                            icon="delete"
-                            label="حذف"
-                            tone="danger"
-                            wire:click="delete({{ $document->id }})"
-                            wire:confirm="آیا از حذف این سند انبار مطمئن هستید؟"
-                            wire:loading.attr="disabled"
-                            wire:target="delete({{ $document->id }})"
-                        />
+                        @if($canUpdateDocument)
+                            <x-erp.ui.row-action icon="edit" label="ویرایش" :href="route('inventory-documents.edit', $document)" />
+                        @endif
+                        @if($canDeleteDocument)
+                            <x-erp.ui.row-action
+                                icon="delete"
+                                label="حذف"
+                                tone="danger"
+                                wire:click="delete({{ $document->id }})"
+                                wire:confirm="آیا از حذف این سند انبار مطمئن هستید؟"
+                                wire:loading.attr="disabled"
+                                wire:target="delete({{ $document->id }})"
+                            />
+                        @endif
                     </x-erp.ui.row-actions>
                 </td>
             </tr>
@@ -122,11 +135,13 @@
                 ];
             }
 
-            $modalActions[] = [
-                'label' => 'ویرایش',
-                'url' => route('inventory-documents.edit', $showingDocument),
-                'class' => 'erp-action-edit',
-            ];
+            if ($canUpdateDocument) {
+                $modalActions[] = [
+                    'label' => 'ویرایش',
+                    'url' => route('inventory-documents.edit', $showingDocument),
+                    'class' => 'erp-action-edit',
+                ];
+            }
         @endphp
 
         <x-erp.ui.details-modal

@@ -54,7 +54,9 @@ class Missions extends Component
 
     public function save(): void
     {
-        $data = $this->validate([
+        abort_unless(auth()->user()?->hasPermission('attendance.missions.create'), 403);
+
+        $rules = [
             'employee_id' => ['required', 'exists:employees,id'],
             'project_id' => ['nullable', 'exists:projects,id'],
             'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
@@ -62,12 +64,20 @@ class Missions extends Component
             'destination' => ['nullable', 'string', 'max:255'],
             'start_date' => ['required', 'string'],
             'end_date' => ['nullable', 'string'],
-            'start_time' => ['nullable', 'date_format:H:i'],
-            'end_time' => ['nullable', 'date_format:H:i'],
             'hours' => ['nullable', 'numeric', 'min:0'],
             'total_days' => ['nullable', 'numeric', 'min:0'],
             'description' => ['nullable', 'string', 'max:1000'],
-        ], [], $this->attributes());
+        ];
+
+        if ($this->request_type === 'hourly') {
+            $rules['start_time'] = ['required', 'date_format:H:i'];
+            $rules['end_time'] = ['required', 'date_format:H:i'];
+        } else {
+            $rules['start_time'] = ['nullable', 'date_format:H:i'];
+            $rules['end_time'] = ['nullable', 'date_format:H:i'];
+        }
+
+        $data = $this->validate($rules, [], $this->attributes());
 
         $startDate = jalaliToGregorianDate($data['start_date']);
         $endDate = jalaliToGregorianDate($data['end_date'] ?: $data['start_date']);
@@ -77,7 +87,22 @@ class Missions extends Component
             return;
         }
 
-        app(MissionManagementService::class)->request([
+        $hours = $data['request_type'] === 'hourly' ? ($data['hours'] ?: null) : null;
+        if ($data['request_type'] === 'hourly' && ! empty($data['start_time']) && ! empty($data['end_time'])) {
+            $startAt = \Carbon\Carbon::createFromFormat('H:i', $data['start_time']);
+            $endAt = \Carbon\Carbon::createFromFormat('H:i', $data['end_time']);
+            if ($endAt->lessThanOrEqualTo($startAt)) {
+                $endAt->addDay();
+            }
+            $computedHours = round($startAt->diffInMinutes($endAt) / 60, 2);
+            if ($computedHours <= 0) {
+                $this->addError('end_time', 'پایان ماموریت باید بعد از شروع باشد.');
+                return;
+            }
+            $hours = $hours ?: $computedHours;
+        }
+
+        $mission = app(MissionManagementService::class)->request([
             'employee_id' => $data['employee_id'],
             'project_id' => $data['project_id'] ?: null,
             'cost_center_id' => $data['cost_center_id'] ?: null,
@@ -88,7 +113,7 @@ class Missions extends Component
             'mission_date' => $startDate,
             'start_time' => $data['request_type'] === 'hourly' ? ($data['start_time'] ?: null) : null,
             'end_time' => $data['request_type'] === 'hourly' ? ($data['end_time'] ?: null) : null,
-            'hours' => $data['request_type'] === 'hourly' ? ($data['hours'] ?: null) : null,
+            'hours' => $hours,
             'total_days' => $data['request_type'] === 'daily' ? ($data['total_days'] ?: null) : null,
             'description' => $data['description'] ?: null,
             'status' => 'pending',
@@ -96,10 +121,14 @@ class Missions extends Component
 
         $this->resetForm();
         session()->flash('success', 'درخواست ماموریت ثبت شد و در انتظار تایید قرار گرفت.');
+
+        $this->redirect(route('attendance.missions.print', $mission), navigate: false);
     }
 
     public function approve(int $missionId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.missions.approve'), 403);
+
         $mission = AttendanceMission::findOrFail($missionId);
         app(MissionManagementService::class)->approve($mission, auth()->id());
 
@@ -108,6 +137,8 @@ class Missions extends Component
 
     public function reject(int $missionId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.missions.approve'), 403);
+
         $mission = AttendanceMission::findOrFail($missionId);
         app(MissionManagementService::class)->reject($mission, auth()->id(), $this->rejection_reason ?: null);
         $this->rejection_reason = '';
@@ -117,6 +148,8 @@ class Missions extends Component
 
     public function cancel(int $missionId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.missions.create'), 403);
+
         $mission = AttendanceMission::findOrFail($missionId);
 
         if ($mission->status === 'approved') {

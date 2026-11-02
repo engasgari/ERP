@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\ChartAccount;
 use App\Rules\WithinActiveFiscalPeriod;
 use App\Services\FiscalPeriodService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -19,7 +20,41 @@ class StoreAccountingDocumentRequest extends FormRequest
                 return $line;
             })
             ->filter(fn ($line) => !empty($line['chart_account_id']) || (float) ($line['debit'] ?? 0) > 0 || (float) ($line['credit'] ?? 0) > 0)
-            ->values()
+            ->values();
+
+        $selectedAccountIds = $lines
+            ->pluck('chart_account_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        $accountsById = $selectedAccountIds === []
+            ? collect()
+            : ChartAccount::query()->whereIn('id', $selectedAccountIds)->get()->keyBy('id');
+
+        $lines = $lines
+            ->map(function (array $line) use ($accountsById) {
+                $selectedId = (int) ($line['chart_account_id'] ?? 0);
+                $account = $accountsById->get($selectedId);
+
+                if (! $account) {
+                    return $line;
+                }
+
+                // Selecting a detail account stores it under detail_account_id and its parent as معین.
+                if ($account->level === 'detail') {
+                    $line['detail_account_id'] = $account->id;
+                    $line['chart_account_id'] = $account->parent_id;
+
+                    return $line;
+                }
+
+                if ($account->level === 'subsidiary' && empty($line['detail_account_id'])) {
+                    $line['detail_account_id'] = null;
+                }
+
+                return $line;
+            })
             ->all();
 
         $this->merge([

@@ -43,7 +43,7 @@ class AccountingPostingService
             $document = AccountingDocument::create([
                 'fiscal_year_id' => $year?->id,
                 'fiscal_period_id' => $period?->id,
-                'number' => $data['number'] ?? $this->numbering->next('accounting_document', 'ACC-', $year?->id),
+                'number' => $this->numbering->allocate('accounting_document', $data['number'] ?? null, 'ACC-', $year?->id),
                 'document_date' => $date,
                 'type' => $data['type'] ?? 'manual',
                 'status' => $data['status'] ?? 'draft',
@@ -74,7 +74,7 @@ class AccountingPostingService
             $document = AccountingDocument::create([
                 'fiscal_year_id' => $year?->id,
                 'fiscal_period_id' => $period?->id,
-                'number' => $data['number'] ?? $this->numbering->next('accounting_document', 'ACC-', $year?->id),
+                'number' => $this->numbering->allocate('accounting_document', $data['number'] ?? null, 'ACC-', $year?->id),
                 'document_date' => $date,
                 'type' => $data['type'] ?? 'manual',
                 'status' => 'posted',
@@ -130,7 +130,7 @@ class AccountingPostingService
 
     /**
      * System documents must stay consistent with their source record, so only classification
-     * (accounts, party, project, descriptions, date) may change; amounts and treasury lines are locked.
+     * (account, party, project, descriptions, date) may change; amounts and treasury account lines are locked.
      */
     public function updateAutomatic(AccountingDocument $document, array $data, array $lines, ?int $userId = null): AccountingDocument
     {
@@ -162,12 +162,12 @@ class AccountingPostingService
                 $isTreasuryLine = $line->bank_account_id || $line->cashbox_id;
 
                 if ($isTreasuryLine && (int) $input['chart_account_id'] !== (int) $line->chart_account_id) {
-                    throw ValidationException::withMessages(['lines' => 'حساب معین ردیف‌های بانک و صندوق در سند سیستمی قابل تغییر نیست؛ فقط تفصیل قابل اصلاح است.']);
+                    throw ValidationException::withMessages(['lines' => 'حساب معین ردیف‌های بانک و صندوق در سند سیستمی قابل تغییر نیست.']);
                 }
 
-                if ($isTreasuryLine && $detailAccountId && $detailAccountId !== (int) $line->detail_account_id
-                    && ! ChartAccount::query()->whereKey($detailAccountId)->where('parent_id', $line->chart_account_id)->exists()) {
-                    throw ValidationException::withMessages(['lines' => 'تفصیل ردیف بانک/صندوق باید زیرمجموعه همان حساب معین ردیف باشد.']);
+                // Treasury detail accounts stay system-managed; preserve existing value when UI omits them.
+                if ($isTreasuryLine) {
+                    $detailAccountId = $line->detail_account_id ? (int) $line->detail_account_id : $detailAccountId;
                 }
 
                 $line->update([
@@ -309,55 +309,107 @@ class AccountingPostingService
         $net = (float) $invoice->subtotal - (float) $invoice->discount_amount;
         $partyId = $invoice->party_id ? (int) $invoice->party_id : null;
         $projectId = $invoice->project_id ? (int) $invoice->project_id : null;
+        $isReturn = $invoice->isReturn();
 
         if ($invoice->direction === 'sale') {
-            $lines[] = $this->line($this->invoiceReceivableCode(), $invoice->total_amount, 0, 'حساب دریافتنی مشتری', partyId: $partyId, projectId: $projectId);
-            $lines[] = $this->line($this->invoiceSalesRevenueCode(), 0, $net, 'درآمد فروش', partyId: $partyId, projectId: $projectId);
-            if ((float) $invoice->tax_amount > 0) {
-                $lines[] = $this->line($this->invoiceSalesVatCode(), 0, $invoice->tax_amount, 'مالیات ارزش افزوده فروش', partyId: $partyId, projectId: $projectId);
-            }
+            if ($isReturn) {
+                $lines[] = $this->line($this->invoiceSalesRevenueCode(), $net, 0, 'برگشت درآمد فروش', partyId: $partyId, projectId: $projectId);
+                if ((float) $invoice->tax_amount > 0) {
+                    $lines[] = $this->line($this->invoiceSalesVatCode(), $invoice->tax_amount, 0, 'برگشت مالیات ارزش افزوده فروش', partyId: $partyId, projectId: $projectId);
+                }
+                $lines[] = $this->line($this->invoiceReceivableCode(), 0, $invoice->total_amount, 'کاهش حساب دریافتنی مشتری', partyId: $partyId, projectId: $projectId);
 
-            $cogsAmount = $this->invoiceSaleCogsAmount($invoice);
-            if ($cogsAmount > 0) {
-                $lines[] = $this->line($this->invoiceCogsCode(), $cogsAmount, 0, 'بهای تمام‌شده کالای فروش‌رفته', partyId: $partyId, projectId: $projectId);
-                $lines[] = $this->line($this->invoiceInventoryCode(), 0, $cogsAmount, 'حواله انبار', partyId: $partyId, projectId: $projectId);
+                $cogsAmount = $this->invoiceSaleCogsAmount($invoice);
+                if ($cogsAmount > 0) {
+                    $lines[] = $this->line($this->invoiceInventoryCode(), $cogsAmount, 0, 'برگشت به انبار', partyId: $partyId, projectId: $projectId);
+                    $lines[] = $this->line($this->invoiceCogsCode(), 0, $cogsAmount, 'برگشت بهای تمام‌شده', partyId: $partyId, projectId: $projectId);
+                }
+            } else {
+                $lines[] = $this->line($this->invoiceReceivableCode(), $invoice->total_amount, 0, 'حساب دریافتنی مشتری', partyId: $partyId, projectId: $projectId);
+                $lines[] = $this->line($this->invoiceSalesRevenueCode(), 0, $net, 'درآمد فروش', partyId: $partyId, projectId: $projectId);
+                if ((float) $invoice->tax_amount > 0) {
+                    $lines[] = $this->line($this->invoiceSalesVatCode(), 0, $invoice->tax_amount, 'مالیات ارزش افزوده فروش', partyId: $partyId, projectId: $projectId);
+                }
+
+                $cogsAmount = $this->invoiceSaleCogsAmount($invoice);
+                if ($cogsAmount > 0) {
+                    $lines[] = $this->line($this->invoiceCogsCode(), $cogsAmount, 0, 'بهای تمام‌شده کالای فروش‌رفته', partyId: $partyId, projectId: $projectId);
+                    $lines[] = $this->line($this->invoiceInventoryCode(), 0, $cogsAmount, 'حواله انبار', partyId: $partyId, projectId: $projectId);
+                }
             }
         } else {
             $purchaseBreakdown = $this->invoicePurchaseBreakdown($invoice);
 
-            if ($purchaseBreakdown['inventory'] > 0) {
-                $lines[] = $this->line(
-                    $this->invoicePurchaseInventoryCode(),
-                    $purchaseBreakdown['inventory'],
-                    0,
-                    'خرید کالا',
-                    partyId: $partyId,
-                    projectId: $projectId
-                );
-            }
+            if ($isReturn) {
+                $lines[] = $this->line($this->invoicePayableCode(), $invoice->total_amount, 0, 'کاهش حساب پرداختنی فروشنده', partyId: $partyId, projectId: $projectId);
 
-            if ($purchaseBreakdown['expense'] > 0) {
-                $lines[] = $this->line(
-                    $this->invoicePurchaseExpenseCode(),
-                    $purchaseBreakdown['expense'],
-                    0,
-                    'هزینه خدمات',
-                    partyId: $partyId,
-                    projectId: $projectId
-                );
-            }
+                if ($purchaseBreakdown['inventory'] > 0) {
+                    $lines[] = $this->line(
+                        $this->invoicePurchaseInventoryCode(),
+                        0,
+                        $purchaseBreakdown['inventory'],
+                        'برگشت خرید کالا',
+                        partyId: $partyId,
+                        projectId: $projectId
+                    );
+                }
 
-            if ((float) $invoice->tax_amount > 0) {
-                $lines[] = $this->line($this->invoicePurchaseVatCode(), $invoice->tax_amount, 0, 'اعتبار مالیات خرید', partyId: $partyId, projectId: $projectId);
+                if ($purchaseBreakdown['expense'] > 0) {
+                    $lines[] = $this->line(
+                        $this->invoicePurchaseExpenseCode(),
+                        0,
+                        $purchaseBreakdown['expense'],
+                        'برگشت هزینه خدمات',
+                        partyId: $partyId,
+                        projectId: $projectId
+                    );
+                }
+
+                if ((float) $invoice->tax_amount > 0) {
+                    $lines[] = $this->line($this->invoicePurchaseVatCode(), 0, $invoice->tax_amount, 'برگشت اعتبار مالیات خرید', partyId: $partyId, projectId: $projectId);
+                }
+            } else {
+                if ($purchaseBreakdown['inventory'] > 0) {
+                    $lines[] = $this->line(
+                        $this->invoicePurchaseInventoryCode(),
+                        $purchaseBreakdown['inventory'],
+                        0,
+                        'خرید کالا',
+                        partyId: $partyId,
+                        projectId: $projectId
+                    );
+                }
+
+                if ($purchaseBreakdown['expense'] > 0) {
+                    $lines[] = $this->line(
+                        $this->invoicePurchaseExpenseCode(),
+                        $purchaseBreakdown['expense'],
+                        0,
+                        'هزینه خدمات',
+                        partyId: $partyId,
+                        projectId: $projectId
+                    );
+                }
+
+                if ((float) $invoice->tax_amount > 0) {
+                    $lines[] = $this->line($this->invoicePurchaseVatCode(), $invoice->tax_amount, 0, 'اعتبار مالیات خرید', partyId: $partyId, projectId: $projectId);
+                }
+                $lines[] = $this->line($this->invoicePayableCode(), 0, $invoice->total_amount, 'حساب پرداختنی فروشنده', partyId: $partyId, projectId: $projectId);
             }
-            $lines[] = $this->line($this->invoicePayableCode(), 0, $invoice->total_amount, 'حساب پرداختنی فروشنده', partyId: $partyId, projectId: $projectId);
         }
+
+        $documentType = match (true) {
+            $isReturn && $invoice->direction === 'sale' => 'sale_return',
+            $isReturn => 'purchase_return',
+            $invoice->direction === 'sale' => 'sale_invoice',
+            default => 'purchase_invoice',
+        };
 
         $document = $this->automatic(
             source: $invoice,
-            type: $invoice->direction === 'sale' ? 'sale_invoice' : 'purchase_invoice',
+            type: $documentType,
             date: $invoice->invoice_date->toDateString(),
-            description: 'ثبت خودکار فاکتور ' . $invoice->number,
+            description: 'ثبت خودکار ' . $invoice->typeLabel() . ' ' . $invoice->number,
             lines: $lines,
             userId: $userId ?? $invoice->created_by
         );
@@ -566,7 +618,11 @@ class AccountingPostingService
         $bankDetailAccountId = $transaction->bankAccount?->detail_account_id;
         $offsetCode = $this->financialTransactionAccountCode($transaction->type, $transaction->category);
         $offsetDescription = trim((string) ($transaction->detailAccount?->title ?: $transaction->category ?: $transaction->chartAccount?->title));
-        $documentDescription = $this->financialTransactionDocumentDescription($transaction->type, $offsetDescription);
+        $documentDescription = $this->financialTransactionDocumentDescription(
+            $transaction->type,
+            $offsetDescription,
+            $transaction->description,
+        );
         $projectId = $transaction->project_id ? (int) $transaction->project_id : null;
         $counterAccountCode = $transaction->chartAccount?->code ?: $offsetCode;
 
@@ -989,11 +1045,22 @@ class AccountingPostingService
         };
     }
 
-    private function financialTransactionDocumentDescription(string $type, string $title): string
+    private function financialTransactionDocumentDescription(string $type, string $title, ?string $note = null): string
     {
         $kind = $type === 'income' ? 'سند درآمد مالی' : 'سند هزینه مالی';
+        $title = trim($title);
+        $base = $title !== '' ? trim($kind . ' - ' . $title) : $kind;
+        $note = trim((string) $note);
 
-        return trim($kind . ' - ' . $title);
+        if ($note === '' || $note === $title || str_contains($base, $note)) {
+            return $base;
+        }
+
+        if (str_contains($note, $base)) {
+            return $note;
+        }
+
+        return trim($base . ' - ' . $note);
     }
 
     private function reversalDocumentDate(AccountingDocument $document): string

@@ -62,6 +62,15 @@ Profit
 
 ---
 
+## Permissions
+
+- `projects.view` / `projects.manage`
+- `projects.create` / `projects.update` / `projects.delete`
+
+`projects.manage` implies create/update/delete.
+
+---
+
 ## Forbidden
 
 Delete Closed Project

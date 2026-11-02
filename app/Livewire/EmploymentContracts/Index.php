@@ -33,6 +33,8 @@ class Index extends Component
 
     public function saveBody(): void
     {
+        abort_unless(auth()->user()?->hasPermission('contracts.update'), 403);
+
         if ($this->editingId === null) {
             session()->flash('error', 'لطفا ابتدا یک قرارداد را انتخاب کنید.');
             return;

@@ -71,7 +71,7 @@ class InvoiceExcelTemplateService
         $dom->formatOutput = false;
         $dom->loadXML($sheetXml);
 
-        $invoice->loadMissing('party', 'project', 'lines.item.unit');
+        $invoice->loadMissing('party.crmProfile', 'project', 'lines.item.unit');
 
         $isSale = $invoice->direction === 'sale';
 
@@ -469,10 +469,13 @@ class InvoiceExcelTemplateService
     {
         $isSale = $invoice->direction === 'sale';
         $isProforma = $invoice->document_type === 'proforma';
+        $isReturn = $invoice->document_type === 'return';
 
         return match (true) {
             $isProforma && $isSale => 'پیش فاکتور فروش کالا و خدمات',
             $isProforma && ! $isSale => 'پیش فاکتور خرید کالا و خدمات',
+            $isReturn && $isSale => 'فاکتور برگشت از فروش کالا و خدمات',
+            $isReturn => 'فاکتور برگشت از خرید کالا و خدمات',
             $isSale => 'فاکتور فروش کالا و خدمات',
             default => 'فاکتور خرید کالا و خدمات',
         };
@@ -499,6 +502,13 @@ class InvoiceExcelTemplateService
             return $this->emptyProfile('طرف حساب حذف‌شده');
         }
 
+        $province = trim((string) ($party->province ?? ''));
+        $city = trim((string) ($party->city ?? ''));
+        // Fallback to CRM profile city only when party.city is empty (legacy rows).
+        if ($city === '') {
+            $city = trim((string) ($party->crmProfile?->city ?? ''));
+        }
+
         return [
             'name' => $party->name,
             'economic_code' => (string) ($party->economic_code ?? ''),
@@ -507,8 +517,8 @@ class InvoiceExcelTemplateService
             'national_id' => (string) ($party->national_id ?? ''),
             'address' => (string) ($party->address ?? ''),
             'phone' => (string) ($party->phone ?: ($party->mobile ?? '')),
-            'province' => 'تهران',
-            'city' => 'تهران',
+            'province' => $province,
+            'city' => $city,
         ];
     }
 
@@ -525,8 +535,8 @@ class InvoiceExcelTemplateService
             'national_id' => (string) ($company?->national_id ?? ''),
             'address' => (string) ($company?->address ?? ''),
             'phone' => (string) ($company?->phone ?? ''),
-            'province' => 'تهران',
-            'city' => 'تهران',
+            'province' => trim((string) ($company?->province ?? '')),
+            'city' => trim((string) ($company?->city ?? '')),
         ];
     }
 
@@ -543,8 +553,8 @@ class InvoiceExcelTemplateService
             'national_id' => '',
             'address' => '',
             'phone' => '',
-            'province' => 'تهران',
-            'city' => 'تهران',
+            'province' => '',
+            'city' => '',
         ];
     }
 

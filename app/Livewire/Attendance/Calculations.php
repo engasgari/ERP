@@ -51,6 +51,8 @@ class Calculations extends Component
 
     public function calculate(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.calculate'), 403);
+
         $this->normalizePeriodFilters();
 
         $this->validate([
@@ -130,6 +132,8 @@ class Calculations extends Component
 
     public function saveEdit(bool $recalculatePayable = false): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.calculate'), 403);
+
         if (! $this->editingId) {
             return;
         }

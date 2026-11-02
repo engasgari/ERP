@@ -36,7 +36,12 @@ class AccountingTreasurySeeder extends Seeder
             ['key' => 'fiscal.open', 'title' => 'بازکردن سال مالی', 'group' => 'حسابداری'],
             ['key' => 'fiscal.reopen', 'title' => 'بازگشایی سال مالی', 'group' => 'حسابداری'],
             ['key' => 'fiscal.manage_sequences', 'title' => 'مدیریت شماره‌گذاری سال مالی', 'group' => 'حسابداری'],
-            ['key' => 'treasury.manage', 'title' => 'مدیریت خزانه', 'group' => 'خزانه‌داری'],
+            ['key' => 'treasury.view', 'title' => 'مشاهده خزانه', 'group' => 'خزانه'],
+            ['key' => 'treasury.manage', 'title' => 'مدیریت کامل خزانه', 'group' => 'خزانه'],
+            ['key' => 'treasury.create', 'title' => 'ثبت تراکنش خزانه', 'group' => 'خزانه'],
+            ['key' => 'treasury.update', 'title' => 'ویرایش تراکنش خزانه', 'group' => 'خزانه'],
+            ['key' => 'treasury.delete', 'title' => 'حذف تراکنش خزانه', 'group' => 'خزانه'],
+            ['key' => 'treasury.partners.manage', 'title' => 'مدیریت حساب‌های جاری شرکا', 'group' => 'خزانه'],
             ['key' => 'financial.reports.view', 'title' => 'مشاهده گزارش‌های مالی', 'group' => 'گزارش‌ها'],
         ];
 
@@ -62,7 +67,12 @@ class AccountingTreasurySeeder extends Seeder
             'fiscal.open',
             'fiscal.reopen',
             'fiscal.manage_sequences',
+            'treasury.view',
             'treasury.manage',
+            'treasury.create',
+            'treasury.update',
+            'treasury.delete',
+            'treasury.partners.manage',
         ])->pluck('id');
 
         foreach (['admin', 'accounting_manager', 'accountant'] as $roleName) {

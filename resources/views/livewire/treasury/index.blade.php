@@ -1,11 +1,22 @@
+@php
+    $authUser = auth()->user();
+    $canCreateTreasury = (bool) $authUser?->hasPermission('treasury.create');
+    $canUpdateTreasury = (bool) $authUser?->hasPermission('treasury.update');
+    $canDeleteTreasury = (bool) $authUser?->hasPermission('treasury.delete');
+    $canManagePartners = (bool) $authUser?->hasPermission('treasury.partners.manage');
+    $headerActions = [];
+    if ($canCreateTreasury) {
+        $headerActions[] = ['label' => 'ثبت تراکنش خزانه', 'url' => route('treasury.create'), 'class' => 'erp-action-edit'];
+    }
+    if ($canManagePartners) {
+        $headerActions[] = ['label' => 'حساب جاری شرکا', 'url' => route('partner-current-accounts.index'), 'class' => 'erp-action-detail'];
+    }
+@endphp
 <x-erp.ui.list-page
     title="تراکنش‌های خزانه"
     description="دریافت، پرداخت و انتقال بین بانک و صندوق با ثبت خودکار سند حسابداری."
     route="treasury.index"
-    :actions="[
-        ['label' => 'ثبت تراکنش خزانه', 'url' => route('treasury.create'), 'class' => 'erp-action-edit'],
-        ['label' => 'حساب جاری شرکا', 'url' => route('partner-current-accounts.index'), 'class' => 'erp-action-detail'],
-    ]"
+    :actions="$headerActions"
 >
     <x-slot name="filters">
         <x-erp.ui.filter-bar wire:submit.prevent>
@@ -79,16 +90,20 @@
                 </td>
                 <td>
                     <x-erp.ui.row-actions>
-                        <x-erp.ui.row-action icon="edit" label="ویرایش" :href="route('treasury.edit', $transaction)" />
-                        <x-erp.ui.row-action
-                            icon="delete"
-                            label="حذف"
-                            tone="danger"
-                            wire:click="delete({{ $transaction->id }})"
-                            wire:confirm="تراکنش خزانه و سند حسابداری وابسته حذف شوند؟"
-                            wire:loading.attr="disabled"
-                            wire:target="delete({{ $transaction->id }})"
-                        />
+                        @if($canUpdateTreasury)
+                            <x-erp.ui.row-action icon="edit" label="ویرایش" :href="route('treasury.edit', $transaction)" />
+                        @endif
+                        @if($canDeleteTreasury)
+                            <x-erp.ui.row-action
+                                icon="delete"
+                                label="حذف"
+                                tone="danger"
+                                wire:click="delete({{ $transaction->id }})"
+                                wire:confirm="تراکنش خزانه و سند حسابداری وابسته حذف شوند؟"
+                                wire:loading.attr="disabled"
+                                wire:target="delete({{ $transaction->id }})"
+                            />
+                        @endif
                     </x-erp.ui.row-actions>
                 </td>
             </tr>

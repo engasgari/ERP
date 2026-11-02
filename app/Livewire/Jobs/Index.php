@@ -49,6 +49,8 @@ class Index extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $data = $this->validate()['form'];
         $data['is_active'] = (string) $data['is_active'] === '1' || $data['is_active'] === true;
         Job::updateOrCreate(['id' => $this->editingId], $data);
@@ -58,6 +60,8 @@ class Index extends Component
 
     public function delete(int $id): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $job = Job::findOrFail($id);
         if ($job->positions()->exists()) {
             session()->flash('error', 'این شغل در پست سازمانی استفاده شده است.');

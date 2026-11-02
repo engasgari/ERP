@@ -14,17 +14,9 @@ class InsuranceLiabilityService
     public function syncFromPayrollPeriod(PayrollPeriod $payrollPeriod): InsurancePeriod
     {
         return DB::transaction(function () use ($payrollPeriod) {
-            $insurancePeriod = InsurancePeriod::query()->updateOrCreate(
-                ['payroll_period_id' => $payrollPeriod->id],
-                [
-                    'year' => $payrollPeriod->year,
-                    'month' => $payrollPeriod->month,
-                    'title' => $payrollPeriod->persian_title,
-                    'starts_at' => $payrollPeriod->starts_at,
-                    'ends_at' => $payrollPeriod->ends_at,
-                    'status' => 'open',
-                ]
-            );
+            // Unique keys: (year, month) AND payroll_period_id — match by year/month first
+            // so recreating a payroll period for the same month does not insert a duplicate.
+            $insurancePeriod = $this->resolveInsurancePeriod($payrollPeriod);
 
             $totals = InsuranceRecord::query()
                 ->where('payroll_period_id', $payrollPeriod->id)
@@ -172,6 +164,52 @@ class InsuranceLiabilityService
         }
 
         return $query->get();
+    }
+
+    private function resolveInsurancePeriod(PayrollPeriod $payrollPeriod): InsurancePeriod
+    {
+        $attributes = [
+            'payroll_period_id' => $payrollPeriod->id,
+            'year' => (int) $payrollPeriod->year,
+            'month' => (int) $payrollPeriod->month,
+            'title' => $payrollPeriod->persian_title,
+            'starts_at' => $payrollPeriod->starts_at,
+            'ends_at' => $payrollPeriod->ends_at,
+        ];
+
+        $byYearMonth = InsurancePeriod::query()
+            ->where('year', $attributes['year'])
+            ->where('month', $attributes['month'])
+            ->first();
+
+        if ($byYearMonth) {
+            // Free payroll_period_id unique slot if another row holds this period id.
+            InsurancePeriod::query()
+                ->where('payroll_period_id', $payrollPeriod->id)
+                ->where('id', '!=', $byYearMonth->id)
+                ->update(['payroll_period_id' => null]);
+
+            $byYearMonth->fill($attributes);
+            $byYearMonth->save();
+
+            return $byYearMonth;
+        }
+
+        $byPayroll = InsurancePeriod::query()
+            ->where('payroll_period_id', $payrollPeriod->id)
+            ->first();
+
+        if ($byPayroll) {
+            $byPayroll->fill($attributes);
+            if (! $byPayroll->status) {
+                $byPayroll->status = 'open';
+            }
+            $byPayroll->save();
+
+            return $byPayroll;
+        }
+
+        return InsurancePeriod::query()->create($attributes + ['status' => 'open']);
     }
 
     private function resolveStatus(float $totalDue, float $paid, float $balance): string

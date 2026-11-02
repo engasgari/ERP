@@ -84,7 +84,10 @@ class AttendanceDayCalculatorService
         $breakMinutes = $this->breakMinutesForDay($date, $logs, $shift, $config, $plannedMinutes);
         $workedMinutes = max(0, $workedMinutes - $breakMinutes);
 
-        $holidayMinutes = $isWorkingDay ? 0 : $workedMinutes;
+        $dayKind = $this->nonWorkingDayKind($date, $calendar);
+        // کار در روز غیرموظف فقط در عنوان تعطیل/جمعه لحاظ می‌شود — نه هم‌زمان در اضافه‌کاری.
+        $holidayMinutes = (! $isWorkingDay && $dayKind === 'official_holiday') ? $workedMinutes : 0;
+        $fridayMinutes = (! $isWorkingDay && $dayKind === 'weekend') ? $workedMinutes : 0;
         $absenceMinutes = max(0, $plannedMinutes - $workedMinutes - $requestCoverageMinutes);
 
         // اگر تأخیر+تعجیل از کارکرد بیشتر باشد، روز غیبت محسوب می‌شود (قانون کار اداری).
@@ -96,15 +99,16 @@ class AttendanceDayCalculatorService
             $absenceMinutes = max($absenceMinutes, max(0, $plannedMinutes - $requestCoverageMinutes));
         }
 
-        $overtimeMinutes = $delayAndEarlyExceedWork
+        $overtimeMinutes = ($delayAndEarlyExceedWork || ! $isWorkingDay)
             ? 0
-            : ($isWorkingDay ? max(0, $workedMinutes - $plannedMinutes) : $workedMinutes);
+            : max(0, $workedMinutes - $plannedMinutes);
         $attendanceDeductionMinutes = min(
             $plannedMinutes,
             max($absenceMinutes, $delayMinutes + $earlyMinutes)
         );
         $netPayableMinutes = max(0, $plannedMinutes - $attendanceDeductionMinutes);
-        $payableMinutes = $netPayableMinutes + $overtimeMinutes;
+        // کارکرد غیرموظف در جمعه/تعطیل به payable اضافه می‌شود (با ضریب جدا در موتور حقوق).
+        $payableMinutes = $netPayableMinutes + $overtimeMinutes + $holidayMinutes + $fridayMinutes;
 
         $absenceFrom = null;
         $absenceTo = null;
@@ -137,6 +141,8 @@ class AttendanceDayCalculatorService
             'attendance_deduction_minutes' => $attendanceDeductionMinutes,
             'overtime_minutes' => $overtimeMinutes,
             'holiday_minutes' => $holidayMinutes,
+            'friday_minutes' => $fridayMinutes,
+            'day_kind' => $isWorkingDay ? 'working' : $dayKind,
             'net_payable_minutes' => $netPayableMinutes,
             'payable_minutes' => $payableMinutes,
             'leave_days' => $leaveMetrics['days'],
@@ -237,6 +243,14 @@ class AttendanceDayCalculatorService
 
     private function isWorkingDay(Carbon $date, ?\App\Models\WorkCalendar $calendar): bool
     {
+        return $this->nonWorkingDayKind($date, $calendar) === null;
+    }
+
+    /**
+     * @return null|'official_holiday'|'weekend'
+     */
+    private function nonWorkingDayKind(Carbon $date, ?\App\Models\WorkCalendar $calendar): ?string
+    {
         $holidays = collect($calendar?->holidays ?: [])
             ->map(fn ($holiday) => normalizePersianDigits((string) $holiday))
             ->filter()
@@ -246,7 +260,7 @@ class AttendanceDayCalculatorService
         $jalali = normalizePersianDigits(formatJalaliDateSafe($date, ''));
 
         if (in_array($gregorian, $holidays, true) || in_array($jalali, $holidays, true)) {
-            return false;
+            return 'official_holiday';
         }
 
         $dayOfWeek = (int) $date->dayOfWeek;
@@ -256,7 +270,7 @@ class AttendanceDayCalculatorService
         );
 
         if (in_array($dayOfWeek, $weekends, true)) {
-            return false;
+            return 'weekend';
         }
 
         $workingDays = WorkCalendarDefaults::normalizeDayList(
@@ -264,7 +278,11 @@ class AttendanceDayCalculatorService
             WorkCalendarDefaults::workingDays()
         );
 
-        return in_array($dayOfWeek, $workingDays, true);
+        if (! in_array($dayOfWeek, $workingDays, true)) {
+            return 'weekend';
+        }
+
+        return null;
     }
 
     /**

@@ -1,8 +1,16 @@
+@php
+    $authUser = auth()->user();
+    $canCreateWarehouse = (bool) $authUser?->hasPermission('warehouse.create');
+    $canUpdateWarehouse = (bool) $authUser?->hasPermission('warehouse.update');
+    $canDeleteWarehouse = (bool) $authUser?->hasPermission('warehouse.delete');
+@endphp
 <div class="py-4 py-md-5">
     <div class="bg-white rounded-lg shadow-md p-3 p-md-4 space-y-4">
         <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
             <h2 class="text-2xl font-bold mb-0">لیست انبارها</h2>
-            <a href="{{ route('warehouses.create') }}" class="erp-action-btn erp-action-edit text-center">انبار جدید</a>
+            @if($canCreateWarehouse)
+                <a href="{{ route('warehouses.create') }}" class="erp-action-btn erp-action-edit text-center">انبار جدید</a>
+            @endif
         </div>
 
         @include('livewire.partials.flash')
@@ -42,31 +50,45 @@
                 @forelse($warehouses as $warehouse)
                     <tr wire:key="warehouse-{{ $warehouse->id }}">
                         <td>
-                            <input class="form-control form-control-sm" value="{{ $warehouse->name }}" wire:change="updateField({{ $warehouse->id }}, 'name', $event.target.value)">
+                            @if($canUpdateWarehouse)
+                                <input class="form-control form-control-sm" value="{{ $warehouse->name }}" wire:change="updateField({{ $warehouse->id }}, 'name', $event.target.value)">
+                            @else
+                                {{ $warehouse->name }}
+                            @endif
                         </td>
                         <td class="text-nowrap">{{ formatJalaliDateSafe($warehouse->created_at) }}</td>
                         <td>
-                            <select class="form-select form-select-sm" wire:change="updateField({{ $warehouse->id }}, 'is_active', $event.target.value)">
-                                <option value="1" @selected($warehouse->is_active)>فعال</option>
-                                <option value="0" @selected(! $warehouse->is_active)>غیرفعال</option>
-                            </select>
+                            @if($canUpdateWarehouse)
+                                <select class="form-select form-select-sm" wire:change="updateField({{ $warehouse->id }}, 'is_active', $event.target.value)">
+                                    <option value="1" @selected($warehouse->is_active)>فعال</option>
+                                    <option value="0" @selected(! $warehouse->is_active)>غیرفعال</option>
+                                </select>
+                            @else
+                                {{ $warehouse->is_active ? 'فعال' : 'غیرفعال' }}
+                            @endif
                         </td>
                         <td>
-                            <input class="form-control form-control-sm" value="{{ $warehouse->description }}" wire:change="updateField({{ $warehouse->id }}, 'description', $event.target.value)" placeholder="شرح">
+                            @if($canUpdateWarehouse)
+                                <input class="form-control form-control-sm" value="{{ $warehouse->description }}" wire:change="updateField({{ $warehouse->id }}, 'description', $event.target.value)" placeholder="شرح">
+                            @else
+                                {{ $warehouse->description ?: '-' }}
+                            @endif
                         </td>
                         <td>
                             <x-erp.ui.row-actions>
                                 <x-erp.ui.row-action icon="view" label="جزئیات" wire:click="show({{ $warehouse->id }})" />
                                 <x-erp.ui.row-action icon="chart" label="گزارش" :href="route('warehouses.show', $warehouse)" />
-                                <x-erp.ui.row-action
-                                    icon="delete"
-                                    label="حذف"
-                                    tone="danger"
-                                    wire:click="delete({{ $warehouse->id }})"
-                                    wire:confirm="آیا از حذف این انبار مطمئن هستید؟"
-                                    wire:loading.attr="disabled"
-                                    wire:target="delete({{ $warehouse->id }})"
-                                />
+                                @if($canDeleteWarehouse)
+                                    <x-erp.ui.row-action
+                                        icon="delete"
+                                        label="حذف"
+                                        tone="danger"
+                                        wire:click="delete({{ $warehouse->id }})"
+                                        wire:confirm="آیا از حذف این انبار مطمئن هستید؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="delete({{ $warehouse->id }})"
+                                    />
+                                @endif
                             </x-erp.ui.row-actions>
                         </td>
                     </tr>

@@ -18,7 +18,7 @@ class InvoiceRepository
 
     public function findForDetails(int $invoiceId): ?Invoice
     {
-        return Invoice::with(['party', 'project', 'lines.item', 'accountingDocument', 'settledBy'])
+        return Invoice::with(['party', 'project', 'lines.item', 'accountingDocument', 'settledBy', 'returnedFrom'])
             ->find($invoiceId);
     }
 
@@ -28,11 +28,6 @@ class InvoiceRepository
             if (! empty($filters[$filter])) {
                 $query->where($filter, $filters[$filter]);
             }
-        }
-
-        // ابطال‌شده‌ها فقط وقتی صریحاً فیلتر وضعیت «لغوشده» انتخاب شود در ERP دیده می‌شوند.
-        if (empty($filters['status'])) {
-            $query->where('status', '!=', 'cancelled');
         }
 
         if (! empty($filters['search'])) {

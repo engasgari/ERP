@@ -149,6 +149,103 @@ class AttendanceDailySummaryService
     }
 
     /**
+     * Dataset for the signed A4 daily-attendance print form (one employee / month).
+     *
+     * @return array{
+     *     days: list<array<string, mixed>>,
+     *     totals: array<string, int>,
+     *     year: int,
+     *     month: int,
+     *     month_label: string
+     * }
+     */
+    public function buildPrintReport(Employee $employee, int $jalaliYear, int $jalaliMonth): array
+    {
+        $days = array_map(function (array $day): array {
+            $day['start_display'] = ($day['first_in'] ?? '-') !== '-'
+                ? $day['first_in']
+                : ($day['shift_start'] ?? '-');
+            $day['end_display'] = ($day['last_out'] ?? '-') !== '-'
+                ? $day['last_out']
+                : ($day['shift_end'] ?? '-');
+            $day['status_label'] = $this->printStatusLabel($day);
+
+            return $day;
+        }, $this->daysFor($employee, $jalaliYear, $jalaliMonth));
+
+        $sum = static fn (string $key): int => (int) array_sum(array_column($days, $key));
+
+        $totals = [
+            'worked_minutes' => $sum('worked_minutes'),
+            'delay_minutes' => $sum('delay_minutes'),
+            'early_leave_minutes' => $sum('early_leave_minutes'),
+            'leave_minutes' => $sum('leave_minutes'),
+            'mission_minutes' => $sum('mission_minutes'),
+            'absence_minutes' => $sum('absence_minutes'),
+            'present_days' => count(array_filter($days, static fn (array $day): bool => (int) ($day['worked_minutes'] ?? 0) > 0)),
+            'absence_days' => count(array_filter($days, static fn (array $day): bool => (bool) ($day['is_absence'] ?? false))),
+            'off_days' => count(array_filter($days, static fn (array $day): bool => (bool) ($day['is_off_day'] ?? false))),
+            'incomplete_days' => count(array_filter($days, static fn (array $day): bool => (bool) ($day['is_incomplete'] ?? false))),
+        ];
+
+        return [
+            'days' => $days,
+            'totals' => $totals,
+            'year' => $jalaliYear,
+            'month' => $jalaliMonth,
+            'month_label' => getPersianMonthName($jalaliMonth),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $day
+     */
+    private function printStatusLabel(array $day): string
+    {
+        if ($day['is_off_day'] ?? $day['is_holiday'] ?? false) {
+            return (string) ($day['day_type'] ?? 'تعطیل');
+        }
+
+        if (($day['mission_minutes'] ?? 0) > 0 && ($day['worked_minutes'] ?? 0) <= 0) {
+            return 'ماموریت';
+        }
+
+        if (($day['leave_minutes'] ?? 0) > 0 && ($day['worked_minutes'] ?? 0) <= 0) {
+            return 'مرخصی';
+        }
+
+        if ($day['is_absence'] ?? false) {
+            return 'غیبت';
+        }
+
+        if ($day['is_incomplete'] ?? false) {
+            return 'تردد ناقص';
+        }
+
+        if (($day['first_in'] ?? '-') !== '-' && ($day['last_out'] ?? '-') !== '-') {
+            $label = 'حاضر';
+            if (($day['mission_minutes'] ?? 0) > 0) {
+                $label .= ' + ماموریت';
+            }
+            if (($day['leave_minutes'] ?? 0) > 0) {
+                $label .= ' + مرخصی';
+            }
+
+            return $label;
+        }
+
+        if (($day['mission_minutes'] ?? 0) > 0) {
+            return 'ماموریت';
+        }
+
+        if (($day['leave_minutes'] ?? 0) > 0) {
+            return 'مرخصی';
+        }
+
+        return (string) ($day['day_type'] ?? '—');
+    }
+
+    /**
      * @param  Collection<int, WorkLog|AttendanceRawLog>  $logs
      */
     private function isIncomplete(Collection $logs): bool

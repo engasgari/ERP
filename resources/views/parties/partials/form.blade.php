@@ -8,6 +8,8 @@
     $cancelUrl = $cancelUrl ?? route('parties.index');
     $lockCustomerType = (bool) ($lockCustomerType ?? false);
     $customerTypeId = (int) ($customerTypeId ?? 0);
+    $lockedTypeId = (int) ($lockedTypeId ?? ($lockCustomerType ? $customerTypeId : 0));
+    $requireComplete = (bool) ($requireComplete ?? false);
 @endphp
 
 <form
@@ -18,10 +20,11 @@
         selectedTypes: @js($selectedTypeIds),
         shareholderTypeId: @js($shareholderTypeId),
         customerTypeId: @js($customerTypeId),
+        lockedTypeId: @js($lockedTypeId),
         lockCustomerType: @js($lockCustomerType),
         toggleType(typeId) {
             typeId = Number(typeId);
-            if (this.lockCustomerType && typeId === Number(this.customerTypeId)) {
+            if (this.lockedTypeId && typeId === Number(this.lockedTypeId)) {
                 return;
             }
             if (this.selectedTypes.includes(typeId)) {
@@ -38,6 +41,9 @@
     @csrf
     @if($isEdit)
         @method('PUT')
+    @endif
+    @if($requireComplete)
+        <input type="hidden" name="require_complete" value="1">
     @endif
 
     @if($embedded)
@@ -57,7 +63,7 @@
 
     <div class="grid gap-4 md:grid-cols-3">
         <label class="grid gap-1">نوع
-            <select name="kind" class="w-full rounded-md border-gray-300">
+            <select name="kind" class="w-full rounded-md border-gray-300" required>
                 <option value="person" @selected(old('kind', $party->kind ?? 'person') === 'person')>شخص</option>
                 <option value="company" @selected(old('kind', $party->kind ?? '') === 'company')>شرکت</option>
             </select>
@@ -66,7 +72,7 @@
             <input name="name" required class="w-full rounded-md border-gray-300" value="{{ old('name', $party->name ?? '') }}">
         </label>
         <label class="grid gap-1">شناسه/کد ملی
-            <input name="national_id" class="w-full rounded-md border-gray-300" value="{{ old('national_id', $party->national_id ?? '') }}">
+            <input name="national_id" class="w-full rounded-md border-gray-300" value="{{ old('national_id', $party->national_id ?? '') }}" @if($requireComplete) placeholder="برای شخص الزامی" @endif>
         </label>
         <label class="grid gap-1">کد اقتصادی
             <input name="economic_code" class="w-full rounded-md border-gray-300" value="{{ old('economic_code', $party->economic_code ?? '') }}">
@@ -75,10 +81,16 @@
             <input name="registration_number" class="w-full rounded-md border-gray-300" value="{{ old('registration_number', $party->registration_number ?? '') }}">
         </label>
         <label class="grid gap-1">کد پستی
-            <input name="postal_code" class="w-full rounded-md border-gray-300" value="{{ old('postal_code', $party->postal_code ?? '') }}">
+            <input name="postal_code" @if($requireComplete) required @endif class="w-full rounded-md border-gray-300" value="{{ old('postal_code', $party->postal_code ?? '') }}">
+        </label>
+        <label class="grid gap-1">استان
+            <input name="province" @if($requireComplete) required @endif class="w-full rounded-md border-gray-300" value="{{ old('province', $party->province ?? '') }}" placeholder="مثلاً اصفهان">
+        </label>
+        <label class="grid gap-1">شهر
+            <input name="city" @if($requireComplete) required @endif class="w-full rounded-md border-gray-300" value="{{ old('city', $party->city ?? '') }}" placeholder="مثلاً کاشان">
         </label>
         <label class="grid gap-1">موبایل
-            <input name="mobile" class="w-full rounded-md border-gray-300" value="{{ old('mobile', $party->mobile ?? '') }}">
+            <input name="mobile" @if($requireComplete) required @endif class="w-full rounded-md border-gray-300" value="{{ old('mobile', $party->mobile ?? '') }}">
         </label>
         <label class="grid gap-1">تلفن
             <input name="phone" class="w-full rounded-md border-gray-300" value="{{ old('phone', $party->phone ?? '') }}">
@@ -95,6 +107,7 @@
                 @php
                     $isShareholderType = $type->name === 'shareholder';
                     $isCustomerType = $type->name === 'customer';
+                    $isLockedType = $lockedTypeId > 0 && (int) $type->id === $lockedTypeId;
                     $isLockedCustomer = $lockCustomerType && $isCustomerType;
                 @endphp
                 {{-- CRM customer form: hide partner/shareholder UI (managed in ERP base info). --}}
@@ -110,20 +123,20 @@
                 <label @class([
                     'inline-flex items-center gap-2 rounded-md border px-3 py-2 cursor-pointer transition',
                     'border-emerald-300 bg-emerald-50 ring-1 ring-emerald-200' => $isShareholderType,
-                    'border-blue-300 bg-blue-50 ring-1 ring-blue-200' => $isLockedCustomer,
-                    'border-slate-200 bg-slate-50' => ! $isShareholderType && ! $isLockedCustomer,
+                    'border-blue-300 bg-blue-50 ring-1 ring-blue-200' => $isLockedType || $isLockedCustomer,
+                    'border-slate-200 bg-slate-50' => ! $isShareholderType && ! $isLockedType && ! $isLockedCustomer,
                 ])>
                     <input
                         type="checkbox"
                         name="types[]"
                         value="{{ $type->id }}"
                         @checked(in_array($type->id, $selectedTypeIds, true))
-                        @if($isLockedCustomer) checked onclick="return false;" @endif
+                        @if($isLockedType || $isLockedCustomer) checked onclick="return false;" @endif
                         @change="toggleType({{ $type->id }})"
                     >
                     <span @class([
                         'font-semibold text-emerald-900' => $isShareholderType,
-                        'font-semibold text-blue-900' => $isLockedCustomer,
+                        'font-semibold text-blue-900' => $isLockedType || $isLockedCustomer,
                     ])>{{ $type->title }}</span>
                 </label>
             @endforeach
@@ -131,6 +144,8 @@
         <p class="mt-2 text-xs text-slate-500">
             @if($lockCustomerType)
                 گروه «مشتری» برای ثبت از CRM الزامی است و قابل حذف نیست.
+            @elseif($lockedTypeId > 0)
+                گروه انتخاب‌شده برای این ثبت الزامی است و قابل حذف نیست.
             @else
                 برای استفاده در «حساب جاری شرکا»، گزینه «سهامدار/شریک» را فعال کنید.
             @endif
@@ -162,7 +177,7 @@
     @endunless
 
     <label class="grid gap-1">آدرس
-        <textarea name="address" class="w-full rounded-md border-gray-300" rows="3">{{ old('address', $party->address ?? '') }}</textarea>
+        <textarea name="address" @if($requireComplete) required @endif class="w-full rounded-md border-gray-300" rows="3">{{ old('address', $party->address ?? '') }}</textarea>
     </label>
 
     <label class="grid gap-1">یادداشت

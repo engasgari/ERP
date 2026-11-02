@@ -5,6 +5,7 @@ namespace App\Livewire\Payroll;
 use App\Models\BankAccount;
 use App\Models\Cashbox;
 use App\Models\PayrollCalculation;
+use App\Models\PayrollCalculationLine;
 use App\Models\PayrollPeriod;
 use App\Services\NewPayrollEngineService;
 use App\Services\PayrollAdjustmentService;
@@ -63,6 +64,8 @@ class Payments extends Component
 
     public function approvePeriod(): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.approve'), 403);
+
         $period = $this->currentPeriod();
         if (! $period) {
             session()->flash('error', 'برای این ماه دوره‌ای وجود ندارد.');
@@ -82,6 +85,8 @@ class Payments extends Component
 
     public function startEdit(int $calculationId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         $calculation = PayrollCalculation::with('lines')->findOrFail($calculationId);
 
         $this->editingId = $calculation->id;
@@ -93,7 +98,8 @@ class Payments extends Component
                 'code' => $line->code,
                 'title' => $line->title,
                 'type' => $line->type,
-                'amount' => (float) $line->amount,
+                // String keeps wire:model.blur stable with text inputs (no float morph wipe).
+                'amount' => (string) (int) round((float) $line->amount),
                 'locked' => in_array($line->code, ['insurance', 'tax', 'employee_insurance', 'employer_insurance', 'salary_tax'], true),
             ])
             ->all();
@@ -101,6 +107,50 @@ class Payments extends Component
         $this->newBonusAmount = '0';
         $this->newDeductionAmount = '0';
         $this->newDeductionTitle = 'کسورات متفرقه';
+    }
+
+    public function updatedEditLines($value, $key): void
+    {
+        // When JS/Livewire patches only *.amount, keep sibling keys (locked/title/id).
+        if (! is_string($key) || ! str_ends_with($key, '.amount')) {
+            return;
+        }
+
+        $index = (int) explode('.', $key)[0];
+        if (! isset($this->editLines[$index]) || ! is_array($this->editLines[$index])) {
+            return;
+        }
+
+        if (! array_key_exists('locked', $this->editLines[$index]) && $this->editingId) {
+            $this->restoreLockedEditLineAmounts();
+            $this->rehydrateEditLineMeta($index);
+        }
+    }
+
+    private function rehydrateEditLineMeta(int $index): void
+    {
+        $lineId = (int) ($this->editLines[$index]['id'] ?? 0);
+        if ($lineId <= 0 || ! $this->editingId) {
+            return;
+        }
+
+        $existing = PayrollCalculationLine::query()
+            ->where('payroll_calculation_id', $this->editingId)
+            ->whereKey($lineId)
+            ->first();
+
+        if (! $existing) {
+            return;
+        }
+
+        $this->editLines[$index]['id'] = $existing->id;
+        $this->editLines[$index]['code'] = (string) $existing->code;
+        $this->editLines[$index]['title'] = (string) $existing->title;
+        $this->editLines[$index]['type'] = (string) $existing->type;
+        $this->editLines[$index]['locked'] = in_array($existing->code, ['insurance', 'tax', 'employee_insurance', 'employer_insurance', 'salary_tax'], true);
+        if (! array_key_exists('amount', $this->editLines[$index]) || $this->editLines[$index]['amount'] === null || $this->editLines[$index]['amount'] === '') {
+            $this->editLines[$index]['amount'] = (string) (int) round((float) $existing->amount);
+        }
     }
 
     public function cancelEdit(): void
@@ -114,9 +164,15 @@ class Payments extends Component
 
     public function saveEdit(): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         if (! $this->editingId) {
             return;
         }
+
+        // Locked rows may arrive empty if the browser omitted disabled inputs on older markup.
+        $this->restoreLockedEditLineAmounts();
+        $this->normalizeEditMoneyFields();
 
         $this->validate([
             'editLines' => ['required', 'array', 'min:1'],
@@ -167,33 +223,49 @@ class Payments extends Component
 
     public function registerPayment(int $calculationId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         $calculation = PayrollCalculation::with(['period', 'employee.party', 'payments'])->findOrFail($calculationId);
+        $draftKey = (string) $calculationId;
+        $this->normalizePaymentDraftKey($calculationId);
+
+        $draft = $this->paymentDraftFor($calculationId);
+        if ($draft !== []) {
+            $this->paymentDrafts[$draftKey] = $draft;
+        }
+        if (isset($this->paymentDrafts[$draftKey])) {
+            $normalizedAmount = normalizeMoneyValue($this->paymentDrafts[$draftKey]['amount'] ?? null);
+            $this->paymentDrafts[$draftKey]['amount'] = $normalizedAmount === null ? '' : $normalizedAmount;
+        }
 
         $this->validate([
-            "paymentDrafts.$calculationId.payment_date" => ['required', 'string', 'max:20'],
-            "paymentDrafts.$calculationId.method" => ['required', 'in:cash,bank'],
-            "paymentDrafts.$calculationId.amount" => ['nullable', 'numeric', 'min:1'],
-            "paymentDrafts.$calculationId.bank_account_id" => ['nullable', 'required_if:paymentDrafts.'.$calculationId.'.method,bank', 'exists:bank_accounts,id'],
-            "paymentDrafts.$calculationId.cashbox_id" => ['nullable', 'required_if:paymentDrafts.'.$calculationId.'.method,cash', 'exists:cashboxes,id'],
-            "paymentDrafts.$calculationId.reference_number" => ['nullable', 'string', 'max:100'],
-            "paymentDrafts.$calculationId.description" => ['nullable', 'string', 'max:500'],
+            "paymentDrafts.$draftKey.payment_date" => ['required', 'string', 'max:20'],
+            "paymentDrafts.$draftKey.method" => ['required', 'in:cash,bank'],
+            "paymentDrafts.$draftKey.amount" => ['nullable', 'numeric', 'min:1'],
+            "paymentDrafts.$draftKey.bank_account_id" => ['nullable', 'required_if:paymentDrafts.'.$draftKey.'.method,bank', 'exists:bank_accounts,id'],
+            "paymentDrafts.$draftKey.cashbox_id" => ['nullable', 'required_if:paymentDrafts.'.$draftKey.'.method,cash', 'exists:cashboxes,id'],
+            "paymentDrafts.$draftKey.reference_number" => ['nullable', 'string', 'max:100'],
+            "paymentDrafts.$draftKey.description" => ['nullable', 'string', 'max:500'],
         ], [], [
-            "paymentDrafts.$calculationId.payment_date" => 'تاریخ پرداخت',
-            "paymentDrafts.$calculationId.method" => 'روش پرداخت',
-            "paymentDrafts.$calculationId.bank_account_id" => 'حساب بانکی',
-            "paymentDrafts.$calculationId.cashbox_id" => 'صندوق',
-            "paymentDrafts.$calculationId.amount" => 'مبلغ',
+            "paymentDrafts.$draftKey.payment_date" => 'تاریخ پرداخت',
+            "paymentDrafts.$draftKey.method" => 'روش پرداخت',
+            "paymentDrafts.$draftKey.bank_account_id" => 'حساب بانکی',
+            "paymentDrafts.$draftKey.cashbox_id" => 'صندوق',
+            "paymentDrafts.$draftKey.amount" => 'مبلغ',
         ]);
+
+        $draft = $this->paymentDraftFor($calculationId);
+        $draftAmount = normalizeMoneyValue($draft['amount'] ?? null);
 
         try {
             $payment = app(NewPayrollEngineService::class)->payWithDetails($calculation, [
-                'payment_date' => jalaliToGregorianDate($this->paymentDrafts[$calculationId]['payment_date']) ?: now()->toDateString(),
-                'amount' => $this->paymentDrafts[$calculationId]['amount'] ?? null,
-                'method' => $this->paymentDrafts[$calculationId]['method'] ?? 'bank',
-                'bank_account_id' => $this->paymentDrafts[$calculationId]['bank_account_id'] ?? null,
-                'cashbox_id' => $this->paymentDrafts[$calculationId]['cashbox_id'] ?? null,
-                'reference_number' => $this->paymentDrafts[$calculationId]['reference_number'] ?? null,
-                'description' => $this->paymentDrafts[$calculationId]['description'] ?? null,
+                'payment_date' => jalaliToGregorianDate($draft['payment_date'] ?? null) ?: now()->toDateString(),
+                'amount' => $draftAmount,
+                'method' => $draft['method'] ?? 'bank',
+                'bank_account_id' => ($draft['bank_account_id'] ?? null) ?: null,
+                'cashbox_id' => ($draft['cashbox_id'] ?? null) ?: null,
+                'reference_number' => $draft['reference_number'] ?? null,
+                'description' => $draft['description'] ?? null,
             ], auth()->id());
         } catch (\Throwable $e) {
             session()->flash('error', $e->getMessage());
@@ -201,12 +273,14 @@ class Payments extends Component
             return;
         }
 
-        unset($this->paymentDrafts[$calculationId]);
+        unset($this->paymentDrafts[$draftKey], $this->paymentDrafts[$calculationId]);
         session()->flash('success', 'پرداخت حقوق ثبت شد. سند حسابداری: ' . ($payment->accountingDocument?->number ?: '-'));
     }
 
     public function reversePayment(int $calculationId): void
     {
+        abort_unless(auth()->user()?->hasPermission('payroll.adjust'), 403);
+
         $calculation = PayrollCalculation::with(['period', 'payments'])->findOrFail($calculationId);
 
         try {
@@ -257,15 +331,30 @@ class Payments extends Component
                 continue;
             }
 
-            $this->paymentDrafts[$calculation->id] = array_merge([
-                'payment_date' => todayJalaliDate(),
-                'method' => 'bank',
-                'bank_account_id' => '',
-                'cashbox_id' => '',
-                'amount' => $remaining,
-                'reference_number' => '',
-                'description' => 'پرداخت حقوق',
-            ], $this->paymentDrafts[$calculation->id] ?? []);
+            $draftKey = (string) $calculation->id;
+            $existing = $this->paymentDrafts[$draftKey]
+                ?? $this->paymentDrafts[$calculation->id]
+                ?? null;
+
+            // Only seed once. Re-merging on every render wipes in-progress amount/bank
+            // after Livewire updates from date/bank fields (esp. with string/int key drift).
+            if (! is_array($existing)) {
+                $this->paymentDrafts[$draftKey] = [
+                    'payment_date' => todayJalaliDate(),
+                    'method' => 'bank',
+                    'bank_account_id' => '',
+                    'cashbox_id' => '',
+                    'amount' => $remaining,
+                    'reference_number' => '',
+                    'description' => 'پرداخت حقوق',
+                ];
+            } else {
+                $this->paymentDrafts[$draftKey] = $existing;
+                if (! array_key_exists('amount', $existing) || $existing['amount'] === null || $existing['amount'] === '') {
+                    $this->paymentDrafts[$draftKey]['amount'] = $remaining;
+                }
+            }
+            // Note: PHP treats 12 and "12" as the same array key — never unset one "variant".
         }
 
         $bankAccounts = BankAccount::query()
@@ -299,6 +388,74 @@ class Payments extends Component
 
         if ($this->month < 1 || $this->month > 12) {
             $this->month = (int) getCurrentPersianMonth();
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function paymentDraftFor(int $calculationId): array
+    {
+        $draftKey = (string) $calculationId;
+
+        return $this->paymentDrafts[$draftKey]
+            ?? $this->paymentDrafts[$calculationId]
+            ?? [];
+    }
+
+    private function restoreLockedEditLineAmounts(): void
+    {
+        if (! $this->editingId || $this->editLines === []) {
+            return;
+        }
+
+        $dbLines = PayrollCalculation::with('lines')->find($this->editingId)?->lines?->keyBy('id');
+        if (! $dbLines) {
+            return;
+        }
+
+        foreach ($this->editLines as $index => $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+
+            $id = isset($line['id']) ? (int) $line['id'] : 0;
+            $existing = $id > 0 ? $dbLines->get($id) : null;
+            $locked = ! empty($line['locked'])
+                || ($existing && in_array((string) $existing->code, ['insurance', 'tax', 'employee_insurance', 'employer_insurance', 'salary_tax'], true));
+
+            if (! $locked || ! $existing) {
+                continue;
+            }
+
+            $this->editLines[$index]['amount'] = (string) (int) round((float) $existing->amount);
+            $this->editLines[$index]['code'] = (string) $existing->code;
+            $this->editLines[$index]['title'] = (string) $existing->title;
+            $this->editLines[$index]['type'] = (string) $existing->type;
+            $this->editLines[$index]['locked'] = true;
+        }
+    }
+
+    private function normalizeEditMoneyFields(): void
+    {
+        foreach ($this->editLines as $index => $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+            $normalized = normalizeMoneyValue($line['amount'] ?? null);
+            $this->editLines[$index]['amount'] = $normalized === null ? '' : (string) $normalized;
+        }
+
+        $this->newBonusAmount = (string) (normalizeMoneyValue($this->newBonusAmount) ?? 0);
+        $this->newDeductionAmount = (string) (normalizeMoneyValue($this->newDeductionAmount) ?? 0);
+    }
+
+    private function normalizePaymentDraftKey(int $calculationId): void
+    {
+        // PHP stores 12 and "12" as the same array key — do not unset one "variant".
+        $draftKey = (string) $calculationId;
+        if (! is_array($this->paymentDrafts[$draftKey] ?? null)) {
+            return;
         }
     }
 }

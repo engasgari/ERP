@@ -160,6 +160,11 @@ class Index extends BaseLivewire
 
     public function save(): void
     {
+        $permission = $this->editingId
+            ? 'employment-orders.update'
+            : 'employment-orders.create';
+        abort_unless(auth()->user()?->hasPermission($permission), 403);
+
         $this->validate($this->rules());
 
         $issueDate = jalaliToGregorianDate($this->form['issue_date'] ?? '');
@@ -248,6 +253,8 @@ class Index extends BaseLivewire
 
     public function delete(int $id): void
     {
+        abort_unless(auth()->user()?->hasPermission('employment-orders.delete'), 403);
+
         try {
             $this->service()->deleteDraft($this->orders()->findWithDetails($id));
         } catch (\Throwable $e) {

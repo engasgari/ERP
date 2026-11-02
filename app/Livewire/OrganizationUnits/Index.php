@@ -53,6 +53,8 @@ class Index extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $data = $this->validate()['form'];
         $data['parent_id'] = $data['parent_id'] ?: null;
         $data['is_active'] = (string) $data['is_active'] === '1' || $data['is_active'] === true;
@@ -64,6 +66,8 @@ class Index extends Component
 
     public function delete(int $id): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $unit = OrganizationUnit::findOrFail($id);
         if ($unit->children()->exists() || $unit->positions()->exists()) {
             session()->flash('error', 'این واحد دارای زیرمجموعه یا پست سازمانی است و قابل حذف نیست.');

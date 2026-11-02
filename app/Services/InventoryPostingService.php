@@ -133,7 +133,7 @@ class InventoryPostingService
     {
         $invoice->loadMissing('lines.item');
 
-        if ($invoice->document_type !== 'invoice') {
+        if (! $invoice->postsInventoryAndAccounting()) {
             return null;
         }
 
@@ -149,19 +149,35 @@ class InventoryPostingService
             return null;
         }
 
-        if (!$invoice->warehouse_id) {
-            throw new RuntimeException('برای تایید فاکتور دارای کالا، انتخاب انبار الزامی است.');
+        if (! $invoice->warehouse_id) {
+            throw new RuntimeException('برای تایید سند دارای کالا، انتخاب انبار الزامی است.');
         }
 
-        if ($invoice->direction === 'sale') {
+        $isReturn = $invoice->isReturn();
+        $inventoryType = match (true) {
+            $invoice->direction === 'sale' && $isReturn => 'receipt',
+            $invoice->direction === 'sale' => 'issue',
+            $isReturn => 'issue',
+            default => 'receipt',
+        };
+
+        // Stock leaves warehouse on sale invoice and purchase return.
+        if ($inventoryType === 'issue') {
             $this->assertEnoughStock($productLines, (int) $invoice->warehouse_id);
         }
 
+        $description = match (true) {
+            $invoice->direction === 'sale' && $isReturn => 'رسید برگشت از فروش ',
+            $invoice->direction === 'sale' => 'حواله فروش فاکتور ',
+            $isReturn => 'حواله برگشت از خرید ',
+            default => 'رسید خرید فاکتور ',
+        };
+
         return $this->createDocument(
-            type: $invoice->direction === 'purchase' ? 'receipt' : 'issue',
+            type: $inventoryType,
             warehouseId: (int) $invoice->warehouse_id,
             source: $invoice,
-            description: ($invoice->direction === 'purchase' ? 'رسید خرید فاکتور ' : 'حواله فروش فاکتور ') . $invoice->number,
+            description: $description . $invoice->number,
             lines: $productLines->map(fn ($line) => [
                 'item_id' => $line->item_id,
                 'quantity' => (float) $line->quantity,

@@ -79,8 +79,8 @@
                 <td class="text-nowrap">{{ formatMoney((float) $document->lines->sum('credit')) }}</td>
                 <td>
                     <x-erp.ui.row-actions>
-                        <x-erp.ui.row-action icon="view" label="مشاهده" :href="route('accounting-documents.show', $document)" />
-                        <x-erp.ui.row-action icon="print" label="چاپ" :href="route('accounting-documents.print', $document)" target="_blank" />
+                        <x-erp.ui.row-action icon="view" label="مشاهده" :href="route('accounting-documents.show', ['accountingDocument' => $document->getKey()])" />
+                        <x-erp.ui.row-action icon="print" label="چاپ" :href="route('accounting-documents.print', ['accountingDocument' => $document->getKey()])" target="_blank" />
                     </x-erp.ui.row-actions>
                 </td>
             </tr>

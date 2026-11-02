@@ -24,9 +24,36 @@ class PartyController extends Controller
         return view('parties.index');
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return $this->createFormView(new Party(['kind' => 'person', 'is_active' => true]));
+        PartyType::ensureDefaults();
+
+        $lockType = trim((string) $request->get('lock_type', ''));
+        $lockedType = $lockType !== ''
+            ? PartyType::query()->where('name', $lockType)->first()
+            : null;
+        $lockedTypeId = (int) ($lockedType?->id ?? 0);
+
+        $selectedTypeIds = array_map('intval', (array) $request->old('types', []));
+        if ($lockedTypeId > 0 && ! in_array($lockedTypeId, $selectedTypeIds, true)) {
+            $selectedTypeIds[] = $lockedTypeId;
+        }
+
+        $pageTitle = match ($lockType) {
+            'customer' => 'تعریف مشتری جدید',
+            'vendor' => 'تعریف فروشنده جدید',
+            default => 'تعریف شخص/شرکت',
+        };
+
+        return $this->createFormView(
+            new Party(['kind' => 'person', 'is_active' => true]),
+            selectedTypeIds: $selectedTypeIds,
+            pageTitle: $pageTitle,
+            lockCustomerType: $lockType === 'customer',
+            embedded: $request->boolean('embedded') || $request->headers->get('Sec-Fetch-Dest') === 'iframe',
+            lockedTypeId: $lockedTypeId,
+            requireComplete: $request->boolean('require_complete'),
+        );
     }
 
     /**
@@ -42,6 +69,8 @@ class PartyController extends Controller
         ?string $pageTitle = null,
         bool $lockCustomerType = false,
         bool $embedded = false,
+        int $lockedTypeId = 0,
+        bool $requireComplete = false,
     ): View {
         $data = $this->formData($party);
 
@@ -50,13 +79,20 @@ class PartyController extends Controller
         }
 
         $isEdit = $party->exists;
+        $customerTypeId = (int) PartyType::where('name', 'customer')->value('id');
+
+        if ($lockCustomerType && $lockedTypeId <= 0) {
+            $lockedTypeId = $customerTypeId;
+        }
 
         $payload = $data + [
             'formAction' => $formAction ?? ($isEdit ? route('parties.update', $party) : route('parties.store')),
             'cancelUrl' => $cancelUrl ?? route('parties.index'),
             'pageTitle' => $pageTitle ?? ($isEdit ? 'ویرایش شخص/شرکت' : 'تعریف شخص/شرکت'),
             'lockCustomerType' => $lockCustomerType,
-            'customerTypeId' => (int) PartyType::where('name', 'customer')->value('id'),
+            'customerTypeId' => $customerTypeId,
+            'lockedTypeId' => $lockedTypeId,
+            'requireComplete' => $requireComplete,
         ];
 
         if ($embedded) {
@@ -70,7 +106,7 @@ class PartyController extends Controller
     {
         $party = $this->storeParty($request, $numbering);
 
-        if ($request->expectsJson()) {
+        if ($this->wantsPartyJson($request)) {
             return response()->json([
                 'party' => [
                     'id' => $party->id,
@@ -101,7 +137,10 @@ class PartyController extends Controller
         $party->types()->sync($typeIds);
 
         if ($this->isCustomerTypeSelected($typeIds) && $request->user()) {
-            app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+            $profile = app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+            if (! empty($validated['city'])) {
+                $profile->update(['city' => $validated['city']]);
+            }
         }
 
         return $party->load('types');
@@ -144,7 +183,10 @@ class PartyController extends Controller
         $party->types()->sync($typeIds);
 
         if ($this->isCustomerTypeSelected($typeIds) && $request->user()) {
-            app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+            $profile = app(CrmCustomerService::class)->ensureProfile($party, $request->user());
+            if (array_key_exists('city', $validated)) {
+                $profile->update(['city' => $validated['city'] ?: null]);
+            }
         }
 
         return $party->fresh(['types', 'crmProfile.assignedUser']);
@@ -295,18 +337,24 @@ class PartyController extends Controller
         $typeIds = array_map('intval', (array) $request->input('types', []));
         $isShareholder = $shareholderId && in_array($shareholderId, $typeIds, true);
 
+        $requireComplete = $request->boolean('require_complete');
+        $kind = (string) $request->input('kind', 'person');
+
         $validated = $request->validate([
             'kind' => 'required|in:person,company',
             'name' => 'required|string|max:255',
-            'economic_code' => 'nullable|string|max:255',
+            'economic_code' => [$requireComplete && $kind === 'company' ? 'required' : 'nullable', 'string', 'max:255'],
             'registration_number' => 'nullable|string|max:255',
-            'national_id' => 'nullable|string|max:255',
+            'national_id' => [$requireComplete && $kind === 'person' ? 'required' : 'nullable', 'string', 'max:255'],
             'phone' => 'nullable|string|max:255',
-            'mobile' => 'nullable|string|max:255',
+            'mobile' => [$requireComplete ? 'required' : 'nullable', 'string', 'max:255'],
             'email' => 'nullable|email|max:255',
-            'postal_code' => 'nullable|string|max:20',
-            'address' => 'nullable|string',
+            'postal_code' => [$requireComplete ? 'required' : 'nullable', 'string', 'max:20'],
+            'province' => [$requireComplete ? 'required' : 'nullable', 'string', 'max:100'],
+            'city' => [$requireComplete ? 'required' : 'nullable', 'string', 'max:100'],
+            'address' => [$requireComplete ? 'required' : 'nullable', 'string'],
             'notes' => 'nullable|string',
+            'require_complete' => 'nullable|boolean',
             'types' => 'array',
             'types.*' => 'exists:party_types,id',
             'partner_chart_account_code' => [
@@ -321,7 +369,16 @@ class PartyController extends Controller
         ], [
             'partner_chart_account_code.required' => 'برای شریک/سهامدار، انتخاب حساب جاری (گروه ۳۲) الزامی است.',
             'partner_chart_account_code.exists' => 'حساب انتخاب‌شده در کدینگ گروه ۳۲ یافت نشد.',
+            'national_id.required' => 'شناسه/کد ملی الزامی است.',
+            'economic_code.required' => 'کد اقتصادی برای شرکت الزامی است.',
+            'mobile.required' => 'موبایل الزامی است.',
+            'postal_code.required' => 'کد پستی الزامی است.',
+            'province.required' => 'استان الزامی است.',
+            'city.required' => 'شهر الزامی است.',
+            'address.required' => 'آدرس الزامی است.',
         ]);
+
+        unset($validated['require_complete']);
 
         $this->assertUniqueCustomerParty($validated, $typeIds, $party?->id);
 

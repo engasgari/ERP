@@ -1,8 +1,16 @@
+@php
+    $authUser = auth()->user();
+    $canCreateEmployee = (bool) $authUser?->hasPermission('employees.create');
+    $canUpdateEmployee = (bool) $authUser?->hasPermission('employees.update');
+    $canDeleteEmployee = (bool) $authUser?->hasPermission('employees.delete');
+@endphp
 <div class="py-4 py-md-5">
     <div class="bg-white rounded-lg shadow-md p-3 p-md-4 space-y-4">
         <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center justify-content-between gap-3">
             <h2 class="text-2xl font-bold mb-0">لیست پرسنل</h2>
-            <a href="{{ route('employees.create') }}" class="erp-action-btn erp-action-edit text-center">پرسنل جدید</a>
+            @if($canCreateEmployee)
+                <a href="{{ route('employees.create') }}" class="erp-action-btn erp-action-edit text-center">پرسنل جدید</a>
+            @endif
         </div>
 
         @include('livewire.partials.flash')
@@ -85,16 +93,20 @@
                         <td onclick="event.stopPropagation()">
                             <x-erp.ui.row-actions>
                                 <x-erp.ui.row-action icon="view" label="جزئیات" :href="route('employees.show', $employee)" />
-                                <x-erp.ui.row-action icon="edit" label="ویرایش پرونده" :href="route('employees.edit', $employee)" />
-                                <x-erp.ui.row-action
-                                    icon="delete"
-                                    label="حذف"
-                                    tone="danger"
-                                    wire:click="delete({{ $employee->id }})"
-                                    wire:confirm="آیا از حذف این پرسنل مطمئن هستید؟"
-                                    wire:loading.attr="disabled"
-                                    wire:target="delete({{ $employee->id }})"
-                                />
+                                @if($canUpdateEmployee)
+                                    <x-erp.ui.row-action icon="edit" label="ویرایش پرونده" :href="route('employees.edit', $employee)" />
+                                @endif
+                                @if($canDeleteEmployee)
+                                    <x-erp.ui.row-action
+                                        icon="delete"
+                                        label="حذف"
+                                        tone="danger"
+                                        wire:click="delete({{ $employee->id }})"
+                                        wire:confirm="آیا از حذف این پرسنل مطمئن هستید؟"
+                                        wire:loading.attr="disabled"
+                                        wire:target="delete({{ $employee->id }})"
+                                    />
+                                @endif
                             </x-erp.ui.row-actions>
                         </td>
                     </tr>

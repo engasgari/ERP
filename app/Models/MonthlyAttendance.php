@@ -12,7 +12,7 @@ class MonthlyAttendance extends Model
         'absence_days',
         'required_hours', 'worked_hours', 'normal_hours', 'break_minutes', 'delay_minutes', 'delay_hours',
         'early_leave_minutes', 'early_leave_hours', 'absence_minutes', 'absence_hours', 'leave_hours',
-        'mission_hours', 'overtime_hours', 'night_hours', 'holiday_hours', 'payable_hours',
+        'mission_hours', 'overtime_hours', 'night_hours', 'holiday_hours', 'friday_hours', 'payable_hours',
         'net_payable_hours', 'status', 'meta',
     ];
 
@@ -21,7 +21,8 @@ class MonthlyAttendance extends Model
         'required_hours' => 'decimal:2', 'worked_hours' => 'decimal:2', 'normal_hours' => 'decimal:2',
         'overtime_hours' => 'decimal:2', 'delay_hours' => 'decimal:2', 'early_leave_hours' => 'decimal:2',
         'absence_hours' => 'decimal:2', 'leave_hours' => 'decimal:2', 'mission_hours' => 'decimal:2',
-        'night_hours' => 'decimal:2', 'holiday_hours' => 'decimal:2', 'payable_hours' => 'decimal:2',
+        'night_hours' => 'decimal:2', 'holiday_hours' => 'decimal:2', 'friday_hours' => 'decimal:2',
+        'payable_hours' => 'decimal:2',
         'net_payable_hours' => 'decimal:2', 'meta' => 'array',
     ];
 

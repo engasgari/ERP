@@ -29,6 +29,8 @@ class Index extends Component
 
     public function delete(int $groupId): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         $group = WorkGroup::findOrFail($groupId);
 
         if ($group->employees()->exists()) {
@@ -43,6 +45,8 @@ class Index extends Component
 
     public function updateField(int $groupId, string $field, mixed $value): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         abort_unless(in_array($field, ['name', 'is_active'], true), 403);
 
         $group = WorkGroup::findOrFail($groupId);

@@ -58,6 +58,8 @@ class Index extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $data = $this->validate()['form'];
         foreach (['job_id', 'organization_unit_id', 'supervisor_position_id'] as $key) {
             $data[$key] = $data[$key] ?: null;
@@ -70,6 +72,8 @@ class Index extends Component
 
     public function delete(int $id): void
     {
+        abort_unless(auth()->user()?->hasPermission('hr.organization.manage'), 403);
+
         $position = Position::findOrFail($id);
         if ($position->employees()->exists()) {
             session()->flash('error', 'این پست به پرسنل تخصیص داده شده است.');

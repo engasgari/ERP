@@ -1,10 +1,15 @@
+@php
+    $canCreateProject = (bool) auth()->user()?->hasPermission('projects.create');
+    $canUpdateProject = (bool) auth()->user()?->hasPermission('projects.update');
+    $headerActions = $canCreateProject
+        ? [['label' => 'پروژه جدید', 'url' => route('projects.create'), 'class' => 'erp-action-edit']]
+        : [];
+@endphp
 <x-erp.ui.list-page
     title="لیست پروژه‌ها"
     description="پروژه‌ها مرکز هزینه تولید، کارکرد، انبار و مالی هستند."
     route="projects.index"
-    :actions="[
-        ['label' => 'پروژه جدید', 'url' => route('projects.create'), 'class' => 'erp-action-edit'],
-    ]"
+    :actions="$headerActions"
 >
     <x-slot name="filters">
         <x-erp.ui.filter-bar wire:submit.prevent>
@@ -57,12 +62,17 @@
                     <span class="font-bold {{ $profit >= 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ formatMoney($profit) }}</span>
                 </td>
                 <td>
-                    <x-erp.ui.action-menu :actions="[
-                        ['label' => 'جزئیات', 'url' => route('projects.show', $project), 'class' => 'erp-action-detail'],
-                        ['label' => 'بهای تمام‌شده', 'url' => route('projects.costing', $project), 'class' => 'erp-action-detail'],
-                        ['label' => 'سفارش تولید', 'url' => route('production-orders.create', ['project_id' => $project->id]), 'icon' => 'production', 'class' => 'erp-action-edit'],
-                        ['label' => 'ویرایش کامل', 'url' => route('projects.edit', $project), 'class' => 'erp-action-edit'],
-                    ]" />
+                    @php
+                        $projectActions = [
+                            ['label' => 'جزئیات', 'url' => route('projects.show', $project), 'class' => 'erp-action-detail'],
+                            ['label' => 'بهای تمام‌شده', 'url' => route('projects.costing', $project), 'class' => 'erp-action-detail'],
+                            ['label' => 'سفارش تولید', 'url' => route('production-orders.create', ['project_id' => $project->id]), 'icon' => 'production', 'class' => 'erp-action-edit'],
+                        ];
+                        if ($canUpdateProject) {
+                            $projectActions[] = ['label' => 'ویرایش کامل', 'url' => route('projects.edit', $project), 'class' => 'erp-action-edit'];
+                        }
+                    @endphp
+                    <x-erp.ui.action-menu :actions="$projectActions" />
                 </td>
             </tr>
         @endforeach

@@ -24,7 +24,7 @@ class FinancialReportRepository
             ->select('accounting_document_lines.*')
             ->join('accounting_documents', 'accounting_documents.id', '=', 'accounting_document_lines.accounting_document_id')
             ->where('accounting_documents.status', 'posted')
-            ->with(['account', 'detailAccount', 'document', 'party', 'project', 'bankAccount', 'cashbox']);
+            ->with(['account', 'detailAccount', 'document.source', 'party', 'project', 'bankAccount', 'cashbox']);
 
         if (Schema::hasColumn('accounting_documents', 'deleted_at')) {
             $query->whereNull('accounting_documents.deleted_at');
@@ -225,7 +225,10 @@ class FinancialReportRepository
 
     private function applyLineFilters(Builder $query, array $filters): void
     {
-        if (! empty($filters['account_id'])) {
+        // Exact match used by trial-balance drilldown so popup totals match the row.
+        if (! empty($filters['exact_chart_account_id'])) {
+            $query->where('accounting_document_lines.chart_account_id', (int) $filters['exact_chart_account_id']);
+        } elseif (! empty($filters['account_id'])) {
             $accountIds = $this->accountAndDescendantIds((int) $filters['account_id']);
 
             $query->where(function (Builder $scope) use ($accountIds) {

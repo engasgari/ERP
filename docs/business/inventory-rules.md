@@ -64,6 +64,26 @@ Standard Cost
 
 ---
 
+## Permissions
+
+- `inventory.view`
+- `inventory.manage`
+- `inventory.documents.create`
+- `inventory.documents.update`
+- `inventory.documents.delete`
+- `inventory.documents.confirm`
+- `warehouse.view`
+- `warehouse.manage`
+- `warehouse.create`
+- `warehouse.update`
+- `warehouse.delete`
+
+Having `inventory.manage` implies the granular document and warehouse action permissions above.
+
+Having `warehouse.manage` implies `warehouse.create`, `warehouse.update`, and `warehouse.delete`.
+
+---
+
 ## Forbidden
 
 Negative Stock

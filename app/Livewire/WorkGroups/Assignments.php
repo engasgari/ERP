@@ -34,6 +34,8 @@ class Assignments extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         $data = $this->validate([
             'employee_id' => ['required', 'exists:employees,id'],
             'work_group_id' => ['required', 'exists:work_groups,id'],
@@ -85,6 +87,8 @@ class Assignments extends Component
 
     public function delete(int $assignmentId): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         WorkGroupEmployee::findOrFail($assignmentId)->delete();
         session()->flash('success', 'تخصیص گروه کاری حذف شد.');
     }

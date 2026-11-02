@@ -32,6 +32,8 @@ class Party extends Model
         'mobile',
         'email',
         'postal_code',
+        'province',
+        'city',
         'address',
         'is_active',
         'notes',

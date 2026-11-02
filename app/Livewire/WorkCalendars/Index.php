@@ -29,6 +29,8 @@ class Index extends Component
 
     public function delete(int $calendarId): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         $calendar = WorkCalendar::findOrFail($calendarId);
 
         if ($calendar->workGroups()->exists()) {
@@ -43,6 +45,8 @@ class Index extends Component
 
     public function updateField(int $calendarId, string $field, mixed $value): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.setup.manage'), 403);
+
         abort_unless(in_array($field, ['name', 'jalali_year', 'is_default', 'is_active'], true), 403);
 
         $calendar = WorkCalendar::findOrFail($calendarId);

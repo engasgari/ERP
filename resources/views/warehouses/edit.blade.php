@@ -49,25 +49,26 @@
             </div>
         </form>
 
-        <!-- بخش حذف انبار -->
-        <div class="mt-8 pt-6 border-t border-gray-200">
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                <h3 class="font-semibold text-red-800 mb-2">حذف انبار</h3>
-                <p class="text-sm text-red-700 mb-4">
-                    توجه: با حذف این انبار، تمام تراکنش‌های مربوطه نیز حذف خواهند شد.
-                    این عمل غیرقابل بازگشت است.
-                </p>
-                <form action="{{ route('warehouses.destroy', $warehouse) }}" method="POST"
-                      onsubmit="return confirm('آیا از حذف این انبار مطمئن هستید؟ تمام تراکنش‌های مربوطه نیز حذف خواهند شد.')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit"
-                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm transition duration-200">
-                        حذف انبار
-                    </button>
-                </form>
+        @if(auth()->user()?->hasPermission('warehouse.delete'))
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 class="font-semibold text-red-800 mb-2">حذف انبار</h3>
+                    <p class="text-sm text-red-700 mb-4">
+                        توجه: با حذف این انبار، تمام تراکنش‌های مربوطه نیز حذف خواهند شد.
+                        این عمل غیرقابل بازگشت است.
+                    </p>
+                    <form action="{{ route('warehouses.destroy', $warehouse) }}" method="POST"
+                          onsubmit="return confirm('آیا از حذف این انبار مطمئن هستید؟ تمام تراکنش‌های مربوطه نیز حذف خواهند شد.')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit"
+                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm transition duration-200">
+                            حذف انبار
+                        </button>
+                    </form>
+                </div>
             </div>
-        </div>
+        @endif
     </div>
     </div>
 </x-app-layout>

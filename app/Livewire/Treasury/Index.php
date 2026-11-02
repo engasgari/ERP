@@ -52,6 +52,8 @@ class Index extends BaseListPage
 
     public function delete(int $transactionId): void
     {
+        abort_unless(auth()->user()?->hasPermission('treasury.delete'), 403);
+
         $transaction = TreasuryTransaction::findOrFail($transactionId);
 
         app(TreasuryService::class)->deleteWithAccounting($transaction, auth()->id());

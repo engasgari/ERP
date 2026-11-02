@@ -1,4 +1,5 @@
 @php
+    $documentId = (int) ($documentId ?? $document->getKey());
     $typeLabels = [
         'manual' => 'دستی',
         'sale_invoice' => 'فاکتور فروش',
@@ -30,26 +31,26 @@
     >
         <x-slot name="toolbar">
             @if($document->is_automatic && $document->status === 'draft')
-                <a href="{{ route('accounting-documents.edit', $document) }}" class="erp-action-btn erp-action-edit text-center">ویرایش سند سیستمی</a>
+                <a href="{{ route('accounting-documents.edit', ['accountingDocument' => $documentId]) }}" class="erp-action-btn erp-action-edit text-center">ویرایش سند سیستمی</a>
             @elseif($document->is_automatic)
                 <span class="erp-action-btn erp-action-detail">سند سیستمی</span>
             @elseif($document->status === 'draft')
-                <a href="{{ route('accounting-documents.edit', $document) }}" class="erp-action-btn erp-action-edit text-center">ویرایش</a>
-                <form method="post" action="{{ route('accounting-documents.destroy', $document) }}" onsubmit="return confirm('آیا از حذف این سند حسابداری مطمئن هستید؟')">
+                <a href="{{ route('accounting-documents.edit', ['accountingDocument' => $documentId]) }}" class="erp-action-btn erp-action-edit text-center">ویرایش</a>
+                <form method="post" action="{{ route('accounting-documents.destroy', ['accountingDocument' => $documentId]) }}" onsubmit="return confirm('آیا از حذف این سند حسابداری مطمئن هستید؟')">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="erp-action-btn erp-action-delete">حذف</button>
                 </form>
             @endif
-            <a href="{{ route('accounting-documents.print', $document) }}" target="_blank" class="erp-action-btn erp-action-edit text-center">چاپ</a>
-            <a href="{{ route('accounting-documents.pdf', $document) }}" class="erp-action-btn erp-action-detail text-center" data-no-spa>PDF</a>
+            <a href="{{ route('accounting-documents.print', ['accountingDocument' => $documentId]) }}" target="_blank" class="erp-action-btn erp-action-edit text-center">چاپ</a>
+            <a href="{{ route('accounting-documents.pdf', ['accountingDocument' => $documentId]) }}" class="erp-action-btn erp-action-detail text-center" data-no-spa>PDF</a>
             @if($document->status === 'draft')
-                <form method="post" action="{{ route('accounting-documents.post', $document) }}">
+                <form method="post" action="{{ route('accounting-documents.post', ['accountingDocument' => $documentId]) }}">
                     @csrf
                     <button type="submit" class="erp-action-btn erp-action-edit">ثبت قطعی</button>
                 </form>
             @elseif($document->status === 'posted' && ! $document->voided_at)
-                <form method="post" action="{{ route('accounting-documents.unpost', $document) }}" onsubmit="return confirm('{{ $document->is_automatic ? 'سند سیستمی به پیش‌نویس برگردد؟ تا ثبت قطعی دوباره، در گزارش‌ها و مانده‌ها محاسبه نمی‌شود.' : 'سند به پیش‌نویس برگردد و قابل ویرایش شود؟' }}')">
+                <form method="post" action="{{ route('accounting-documents.unpost', ['accountingDocument' => $documentId]) }}" onsubmit="return confirm('{{ $document->is_automatic ? 'سند سیستمی به پیش‌نویس برگردد؟ تا ثبت قطعی دوباره، در گزارش‌ها و مانده‌ها محاسبه نمی‌شود.' : 'سند به پیش‌نویس برگردد و قابل ویرایش شود؟' }}')">
                     @csrf
                     <button type="submit" class="erp-action-btn erp-action-detail">برگشت به پیش‌نویس</button>
                 </form>
@@ -72,9 +73,9 @@
         </div>
 
         <x-erp.ui.data-table
-            :headers="['حساب', 'تفصیل', 'شخص/شرکت', 'پروژه', 'شرح', 'بدهکار (ریال)', 'بستانکار (ریال)']"
+            :headers="['حساب', 'شخص/شرکت', 'پروژه', 'شرح', 'بدهکار (ریال)', 'بستانکار (ریال)']"
             empty-message="ردیفی ثبت نشده است."
-            :colspan="7"
+            :colspan="6"
         >
             @foreach($document->lines as $line)
                 <tr>
@@ -84,8 +85,16 @@
                             <div class="mt-1 text-xs text-slate-500">بانک: {{ $line->bankAccount->bank_name }} - {{ $line->bankAccount->code }}</div>
                         @endif
                     </td>
-                    <td>{{ chartAccountDisplayLabel($line->detailAccount) }}</td>
-                    <td>{{ $line->party?->name ?: '-' }}</td>
+                    <td>
+                        @if($line->party)
+                            <div>{{ $line->party->name }}</div>
+                            @if($line->party->code || $line->party->detail_code)
+                                <div class="mt-1 text-xs text-slate-500">{{ $line->party->code ?: $line->party->detail_code }}</div>
+                            @endif
+                        @else
+                            -
+                        @endif
+                    </td>
                     <td>{{ $line->project?->name ?: '-' }}</td>
                     <td>{{ $line->description ?: '-' }}</td>
                     <td class="text-nowrap">{{ formatMoney((float) $line->debit) }}</td>

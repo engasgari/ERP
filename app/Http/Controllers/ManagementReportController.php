@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChartAccount;
 use App\Models\CompanySetting;
 use App\Models\FinancialTransaction;
 use App\Models\Employee;
@@ -20,8 +21,10 @@ use App\Models\Payslip;
 use App\Models\Project;
 use App\Models\Warehouse;
 use App\Services\FinancialReportService;
+use App\Services\FiscalPeriodService;
 use App\Services\ManagementReportService;
 use App\Support\Hr\IranLaborEmploymentOrderCatalog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -89,9 +92,64 @@ class ManagementReportController extends Controller
         return view('management-reports.index', compact('groups'));
     }
 
-    public function trialBalance(FinancialReportService $reports): View
+    public function trialBalance(Request $request, FinancialReportService $reports): View
     {
-        return view('management-reports.trial-balance', $this->trialBalanceData($reports));
+        return view('management-reports.trial-balance', $this->trialBalanceData($request, $reports));
+    }
+
+    public function trialBalanceAccountLedger(
+        Request $request,
+        ChartAccount $account,
+        FinancialReportService $reports,
+    ): JsonResponse {
+        $filters = $this->trialBalanceLedgerFilters($request);
+        $summary = $reports->trialBalanceAccountLedgerSummary($account, $filters);
+
+        $lines = collect($summary['lines'] ?? [])->map(function (array $line) {
+            $document = $line['document'] ?? null;
+
+            return [
+                'date' => $line['date'] ?? '-',
+                'document_number' => $line['document_number']
+                    ?? (is_object($document) ? ($document->number ?? '-') : '-'),
+                'document_id' => is_object($document) ? (int) ($document->id ?? 0) : null,
+                'party' => is_object($line['party'] ?? null)
+                    ? ($line['party']->name ?? '-')
+                    : (string) ($line['party'] ?? '-'),
+                'project' => is_object($line['project'] ?? null)
+                    ? ($line['project']->name ?? '-')
+                    : (string) ($line['project'] ?? '-'),
+                'description' => (string) ($line['description'] ?? '-'),
+                'debit' => (float) ($line['debit'] ?? 0),
+                'credit' => (float) ($line['credit'] ?? 0),
+                'running_balance' => (float) ($line['running_balance'] ?? 0),
+            ];
+        })->values();
+
+        return response()->json([
+            'account' => [
+                'id' => (int) $account->id,
+                'code' => (string) $account->code,
+                'title' => (string) $account->title,
+            ],
+            'filters' => [
+                'fiscal_year_id' => $filters['fiscal_year_id'] ?? null,
+                'date_from' => $filters['date_from'] ?? null,
+                'date_to' => $filters['date_to'] ?? null,
+                'search' => $filters['search'] ?? null,
+            ],
+            'opening_debit' => (float) ($summary['opening_debit'] ?? 0),
+            'opening_credit' => (float) ($summary['opening_credit'] ?? 0),
+            'period_debit' => (float) ($summary['period_debit'] ?? 0),
+            'period_credit' => (float) ($summary['period_credit'] ?? 0),
+            'closing_debit' => (float) ($summary['closing_debit'] ?? 0),
+            'closing_credit' => (float) ($summary['closing_credit'] ?? 0),
+            'debit' => (float) ($summary['debit'] ?? 0),
+            'credit' => (float) ($summary['credit'] ?? 0),
+            'balance' => (float) ($summary['balance'] ?? 0),
+            'balance_type' => (string) ($summary['balance_type'] ?? ''),
+            'lines' => $lines,
+        ]);
     }
 
     public function warehouseCardex(Request $request): View
@@ -297,29 +355,118 @@ class ManagementReportController extends Controller
         ];
     }
 
-    private function trialBalanceData(FinancialReportService $reports): array
+    private function trialBalanceData(Request $request, FinancialReportService $reports): array
     {
-        $report = $reports->report('trial-balance', []);
+        $scope = $this->trialBalanceActiveYearScope();
+
+        $report = $reports->report('trial-balance', [
+            'fiscal_year_id' => $scope['fiscal_year_id'],
+            'date_from' => $scope['date_from'],
+            'date_to' => $scope['date_to'],
+        ]);
         $rows = collect($report['sections'][0]['rows'] ?? []);
-        $summary = $report['summary'] ?? [];
+
+        $rows = $rows->map(function (array $row): array {
+            $account = $row['account'] ?? null;
+            $row['account_id'] = is_object($account)
+                ? (int) $account->getKey()
+                : (int) ($row['account_id'] ?? 0);
+
+            return $row;
+        });
 
         $totals = [
-            'opening_debit' => (float) ($summary['opening_debit'] ?? 0),
-            'opening_credit' => (float) ($summary['opening_credit'] ?? 0),
-            'period_debit' => (float) ($summary['period_debit'] ?? 0),
-            'period_credit' => (float) ($summary['period_credit'] ?? 0),
-            'closing_debit' => (float) ($summary['closing_debit'] ?? 0),
-            'closing_credit' => (float) ($summary['closing_credit'] ?? 0),
+            'opening_debit' => (float) $rows->sum('opening_debit'),
+            'opening_credit' => (float) $rows->sum('opening_credit'),
+            'period_debit' => (float) $rows->sum('period_debit'),
+            'period_credit' => (float) $rows->sum('period_credit'),
+            'closing_debit' => (float) $rows->sum('closing_debit'),
+            'closing_credit' => (float) $rows->sum('closing_credit'),
         ];
 
-        $summary = [
-            'opening' => $totals['opening_debit'] - $totals['opening_credit'],
-            'period' => $totals['period_debit'] - $totals['period_credit'],
-            'closing' => $totals['closing_debit'] - $totals['closing_credit'],
-            'is_balanced' => abs(($totals['opening_debit'] + $totals['period_debit']) - ($totals['opening_credit'] + $totals['period_credit'])) < 0.01,
+        $ledgerDefaults = [
+            'fiscal_year_id' => $scope['fiscal_year_id'],
+            'fiscal_year_title' => $scope['fiscal_year_title'],
+            'date_from' => $scope['date_from_display'],
+            'date_to' => $scope['date_to_display'],
         ];
 
-        return compact('rows', 'totals', 'summary');
+        return compact('rows', 'totals', 'ledgerDefaults');
+    }
+
+    /**
+     * Active fiscal-year defaults for trial balance and ledger popup.
+     *
+     * @return array<string, mixed>
+     */
+    private function trialBalanceActiveYearScope(): array
+    {
+        $activeYear = $this->resolveActiveFiscalYear();
+        $dateFrom = $activeYear?->start_date?->toDateString();
+        $dateTo = $activeYear?->end_date?->toDateString();
+
+        return [
+            'fiscal_year_id' => $activeYear?->id,
+            'fiscal_year_title' => $activeYear?->title,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'date_from_display' => $dateFrom ? gregorianToJalaliDate($dateFrom) : '',
+            'date_to_display' => $dateTo ? gregorianToJalaliDate($dateTo) : '',
+        ];
+    }
+
+    /**
+     * Ledger popup filters: always scoped to active fiscal year, with optional date/search overrides.
+     *
+     * @return array<string, mixed>
+     */
+    private function trialBalanceLedgerFilters(Request $request): array
+    {
+        $scope = $this->trialBalanceActiveYearScope();
+
+        $dateFromInput = $request->input('date_from');
+        $dateToInput = $request->input('date_to');
+
+        $dateFrom = filled($dateFromInput)
+            ? (jalaliToGregorianDate((string) $dateFromInput) ?: null)
+            : ($scope['date_from'] ?? null);
+        $dateTo = filled($dateToInput)
+            ? (jalaliToGregorianDate((string) $dateToInput) ?: null)
+            : ($scope['date_to'] ?? null);
+
+        $search = filled($request->input('search'))
+            ? trim((string) $request->input('search'))
+            : null;
+
+        return array_filter([
+            'fiscal_year_id' => $scope['fiscal_year_id'] ?? null,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'search' => $search,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    private function resolveActiveFiscalYear(): ?FiscalYear
+    {
+        $period = app(FiscalPeriodService::class)->getActiveFiscalPeriod();
+        $period?->loadMissing('fiscalYear');
+
+        if ($period?->fiscalYear) {
+            return $period->fiscalYear;
+        }
+
+        $today = now()->toDateString();
+
+        return FiscalYear::query()
+            ->where('status', 'open')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->orderByDesc('start_date')
+            ->first()
+            ?? FiscalYear::query()
+                ->where('status', 'open')
+                ->orderByDesc('start_date')
+                ->first();
     }
 
     private function warehouseCardexData(Request $request): array

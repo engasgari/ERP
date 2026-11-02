@@ -16,6 +16,16 @@ Transfer
 
 ---
 
+## Permissions
+
+- `treasury.view` / `treasury.manage`
+- `treasury.create` / `treasury.update` / `treasury.delete`
+- `treasury.partners.manage`
+
+`treasury.manage` implies the granular treasury action permissions.
+
+---
+
 ## Cashbox
 
 Balance is calculated.

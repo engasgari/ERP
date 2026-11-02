@@ -21,11 +21,15 @@ class Index extends BaseListPage
         'manual' => 'دستی',
         'sale_invoice' => 'فاکتور فروش',
         'purchase_invoice' => 'فاکتور خرید',
+        'sale_return' => 'برگشت از فروش',
+        'purchase_return' => 'برگشت از خرید',
         'payment' => 'پرداخت',
         'receipt' => 'دریافت',
         'inventory' => 'انبار',
         'opening' => 'افتتاحیه',
         'closing' => 'اختتامیه',
+        'partner_current' => 'جاری شرکا',
+        'payroll' => 'حقوق و دستمزد',
     ];
 
     public array $statusLabels = [

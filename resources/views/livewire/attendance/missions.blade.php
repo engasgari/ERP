@@ -1,6 +1,11 @@
+@php
+    $canCreateMission = (bool) auth()->user()?->hasPermission('attendance.missions.create');
+    $canApproveMission = (bool) auth()->user()?->hasPermission('attendance.missions.approve');
+@endphp
 <div dir="rtl" class="space-y-6">
     @include('livewire.partials.flash')
 
+    @if($canCreateMission)
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="mb-4">
             <h3 class="text-lg font-bold text-slate-900">ثبت درخواست ماموریت</h3>
@@ -95,6 +100,7 @@
             </div>
         </form>
     </div>
+    @endif
 
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -146,15 +152,24 @@
                         </td>
                         <td>@include('livewire.attendance.partials.status-badge', ['status' => $mission->status])</td>
                         <td>
-                            @if($mission->status === 'pending')
-                                <x-erp.ui.row-actions>
-                                    <x-erp.ui.row-action icon="confirm" label="تایید" tone="success" wire:click="approve({{ $mission->id }})" />
-                                    <x-erp.ui.row-action icon="reject" label="رد" tone="danger" wire:click="reject({{ $mission->id }})" />
-                                    <x-erp.ui.row-action icon="close" label="لغو" wire:click="cancel({{ $mission->id }})" />
-                                </x-erp.ui.row-actions>
-                            @else
-                                <span class="text-xs text-slate-500">اقدام فعال ندارد</span>
-                            @endif
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action
+                                    icon="print"
+                                    label="چاپ فرم"
+                                    :href="route('attendance.missions.print', $mission)"
+                                    target="_blank"
+                                    data-no-spa
+                                />
+                                @if($mission->status === 'pending')
+                                    @if($canApproveMission)
+                                        <x-erp.ui.row-action icon="confirm" label="تایید" tone="success" wire:click="approve({{ $mission->id }})" />
+                                        <x-erp.ui.row-action icon="reject" label="رد" tone="danger" wire:click="reject({{ $mission->id }})" />
+                                    @endif
+                                    @if($canCreateMission)
+                                        <x-erp.ui.row-action icon="close" label="لغو" wire:click="cancel({{ $mission->id }})" />
+                                    @endif
+                                @endif
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty

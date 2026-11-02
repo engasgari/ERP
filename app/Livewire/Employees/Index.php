@@ -39,12 +39,15 @@ class Index extends Component
 
     public function delete(int $employeeId): void
     {
+        abort_unless(auth()->user()?->hasPermission('employees.delete'), 403);
+
         Employee::findOrFail($employeeId)->delete();
         session()->flash('success', 'پرسنل با موفقیت حذف شد!');
     }
 
     public function updateField(int $employeeId, string $field, mixed $value): void
     {
+        abort_unless(auth()->user()?->hasPermission('employees.update'), 403);
         abort_unless(in_array($field, ['first_name', 'last_name', 'national_code', 'position', 'phone', 'is_active'], true), 403);
 
         $employee = Employee::findOrFail($employeeId);

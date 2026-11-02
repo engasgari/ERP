@@ -15,7 +15,9 @@ class NumberingService
     public const FISCAL_YEAR_KEYS = [
         'sale_proforma',
         'sale_invoice',
+        'sale_return',
         'purchase_invoice',
+        'purchase_return',
         'inventory_receipt',
         'inventory_issue',
         'inventory_transfer',
@@ -44,7 +46,9 @@ class NumberingService
             ['key' => 'crm_opportunity', 'label' => 'فرصت CRM', 'scope' => 'global', 'default_prefix' => 'OPP-', 'default_padding' => 5, 'sort_order' => 56],
             ['key' => 'sale_proforma', 'label' => 'پیش‌فاکتور فروش', 'scope' => 'fiscal_year', 'default_prefix' => 'SP-', 'default_padding' => 5, 'sort_order' => 110],
             ['key' => 'sale_invoice', 'label' => 'فاکتور فروش', 'scope' => 'fiscal_year', 'default_prefix' => 'SI-', 'default_padding' => 5, 'sort_order' => 120],
+            ['key' => 'sale_return', 'label' => 'برگشت از فروش', 'scope' => 'fiscal_year', 'default_prefix' => 'SR-', 'default_padding' => 5, 'sort_order' => 125],
             ['key' => 'purchase_invoice', 'label' => 'فاکتور خرید', 'scope' => 'fiscal_year', 'default_prefix' => 'PI-', 'default_padding' => 5, 'sort_order' => 130],
+            ['key' => 'purchase_return', 'label' => 'برگشت از خرید', 'scope' => 'fiscal_year', 'default_prefix' => 'PR-', 'default_padding' => 5, 'sort_order' => 135],
             ['key' => 'inventory_receipt', 'label' => 'رسید انبار', 'scope' => 'fiscal_year', 'default_prefix' => 'IR-', 'default_padding' => 5, 'sort_order' => 210],
             ['key' => 'inventory_issue', 'label' => 'حواله انبار', 'scope' => 'fiscal_year', 'default_prefix' => 'II-', 'default_padding' => 5, 'sort_order' => 220],
             ['key' => 'inventory_transfer', 'label' => 'انتقال انبار', 'scope' => 'fiscal_year', 'default_prefix' => 'IT-', 'default_padding' => 5, 'sort_order' => 230],
@@ -162,6 +166,98 @@ class NumberingService
 
             return $number;
         });
+    }
+
+    /**
+     * Preview the next automatic number without consuming the counter.
+     */
+    public function peek(string $key, ?string $fallbackPrefix = null, ?int $fiscalYearId = null): string
+    {
+        $this->ensureDefaults();
+
+        $template = $this->templateFor($key, $fallbackPrefix);
+        $prefix = $template['prefix'];
+        $padding = $template['padding'];
+        $reuseDeleted = $template['reuse_deleted_numbers'];
+
+        if ($this->isFiscalYearScoped($key)) {
+            $fiscalYearId = $this->resolveFiscalYearId($fiscalYearId);
+            $storedNext = $this->storedNextNumber($key, $fiscalYearId);
+            $sequence = $this->resolveNextSequence($key, $prefix, $fiscalYearId, $reuseDeleted, $storedNext);
+        } else {
+            $storedNext = $this->storedNextNumber($key);
+            $sequence = $this->resolveNextSequence($key, $prefix, null, $reuseDeleted, $storedNext);
+        }
+
+        return $prefix . str_pad((string) $sequence, $padding, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Use an explicit number when provided (and advance the counter past it),
+     * otherwise consume the next automatic number.
+     */
+    public function allocate(string $key, ?string $requestedNumber, ?string $fallbackPrefix = null, ?int $fiscalYearId = null): string
+    {
+        $requested = trim((string) ($requestedNumber ?? ''));
+
+        if ($requested === '') {
+            return $this->next($key, $fallbackPrefix, $fiscalYearId);
+        }
+
+        return DB::transaction(function () use ($key, $requested, $fallbackPrefix, $fiscalYearId) {
+            $this->ensureDefaults();
+            $template = $this->templateFor($key, $fallbackPrefix);
+            $sequence = $this->extractSequence($requested, $template['prefix']);
+
+            if ($sequence > 0) {
+                $this->advanceCounterAtLeast($key, $sequence + 1, $fiscalYearId);
+            }
+
+            return $requested;
+        });
+    }
+
+    private function advanceCounterAtLeast(string $key, int $minimumNext, ?int $fiscalYearId = null): void
+    {
+        if ($minimumNext < 1) {
+            return;
+        }
+
+        if ($this->isFiscalYearScoped($key)) {
+            $fiscalYearId = $this->resolveFiscalYearId($fiscalYearId);
+            $counter = $this->counterFor($fiscalYearId, $key);
+
+            if ((int) $counter->next_number < $minimumNext) {
+                $counter->update(['next_number' => $minimumNext]);
+            }
+
+            return;
+        }
+
+        $setting = NumberingSetting::query()
+            ->where('document_key', $key)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $setting) {
+            $definition = $this->definition($key);
+            $template = $this->templateFor($key, null);
+
+            $setting = NumberingSetting::create(array_merge(
+                ['document_key' => $key],
+                $definition
+                    ? $this->defaultSettingAttributes($definition)
+                    : [
+                        'prefix' => $template['prefix'],
+                        'next_number' => 1,
+                        'padding' => $template['padding'],
+                    ]
+            ));
+        }
+
+        if ((int) $setting->next_number < $minimumNext) {
+            $setting->update(['next_number' => $minimumNext]);
+        }
     }
 
     public function storedNextNumber(string $key, ?int $fiscalYearId = null): int
@@ -361,7 +457,9 @@ class NumberingService
             'treasury_transaction' => $this->sequencesFromTable('treasury_transactions', $prefix, $fiscalYearId, true),
             'sale_proforma' => $this->sequencesFromInvoices($prefix, $fiscalYearId, 'sale', 'proforma'),
             'sale_invoice' => $this->sequencesFromInvoices($prefix, $fiscalYearId, 'sale', 'invoice'),
+            'sale_return' => $this->sequencesFromInvoices($prefix, $fiscalYearId, 'sale', 'return'),
             'purchase_invoice' => $this->sequencesFromInvoices($prefix, $fiscalYearId, 'purchase', 'invoice'),
+            'purchase_return' => $this->sequencesFromInvoices($prefix, $fiscalYearId, 'purchase', 'return'),
             'inventory_receipt', 'inventory_issue', 'inventory_transfer', 'inventory_closing', 'inventory_opening', 'inventory_consumption'
                 => $this->sequencesFromInventory($prefix, $fiscalYearId, $key),
             default => [],

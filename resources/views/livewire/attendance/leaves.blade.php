@@ -1,6 +1,11 @@
+@php
+    $canCreateLeave = (bool) auth()->user()?->hasPermission('attendance.leaves.create');
+    $canApproveLeave = (bool) auth()->user()?->hasPermission('attendance.leaves.approve');
+@endphp
 <div dir="rtl" class="space-y-6">
     @include('livewire.partials.flash')
 
+    @if($canCreateLeave)
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="mb-4">
             <h3 class="text-lg font-bold text-slate-900">ثبت درخواست مرخصی</h3>
@@ -75,6 +80,7 @@
             </div>
         </form>
     </div>
+    @endif
 
     <div class="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -126,15 +132,24 @@
                         </td>
                         <td>@include('livewire.attendance.partials.status-badge', ['status' => $leave->status])</td>
                         <td>
-                            @if($leave->status === 'pending')
-                                <x-erp.ui.row-actions>
-                                    <x-erp.ui.row-action icon="confirm" label="تایید" tone="success" wire:click="approve({{ $leave->id }})" />
-                                    <x-erp.ui.row-action icon="reject" label="رد" tone="danger" wire:click="reject({{ $leave->id }})" />
-                                    <x-erp.ui.row-action icon="close" label="لغو" wire:click="cancel({{ $leave->id }})" />
-                                </x-erp.ui.row-actions>
-                            @else
-                                <span class="text-xs text-slate-500">اقدام فعال ندارد</span>
-                            @endif
+                            <x-erp.ui.row-actions>
+                                <x-erp.ui.row-action
+                                    icon="print"
+                                    label="چاپ فرم"
+                                    :href="route('attendance.leaves.print', $leave)"
+                                    target="_blank"
+                                    data-no-spa
+                                />
+                                @if($leave->status === 'pending')
+                                    @if($canApproveLeave)
+                                        <x-erp.ui.row-action icon="confirm" label="تایید" tone="success" wire:click="approve({{ $leave->id }})" />
+                                        <x-erp.ui.row-action icon="reject" label="رد" tone="danger" wire:click="reject({{ $leave->id }})" />
+                                    @endif
+                                    @if($canCreateLeave)
+                                        <x-erp.ui.row-action icon="close" label="لغو" wire:click="cancel({{ $leave->id }})" />
+                                    @endif
+                                @endif
+                            </x-erp.ui.row-actions>
                         </td>
                     </tr>
                 @empty

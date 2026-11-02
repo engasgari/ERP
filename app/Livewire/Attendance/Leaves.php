@@ -50,6 +50,8 @@ class Leaves extends Component
 
     public function save(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.leaves.create'), 403);
+
         $data = $this->validate([
             'employee_id' => ['required', 'exists:employees,id'],
             'request_type' => ['required', 'in:hourly,daily'],
@@ -71,7 +73,7 @@ class Leaves extends Component
             return;
         }
 
-        app(LeaveManagementService::class)->request([
+        $leave = app(LeaveManagementService::class)->request([
             'employee_id' => $data['employee_id'],
             'request_type' => $data['request_type'],
             'start_date' => $startDate,
@@ -88,10 +90,14 @@ class Leaves extends Component
 
         $this->resetForm();
         session()->flash('success', 'درخواست مرخصی ثبت شد و در انتظار تایید قرار گرفت.');
+
+        $this->redirect(route('attendance.leaves.print', $leave), navigate: false);
     }
 
     public function approve(int $leaveId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.leaves.approve'), 403);
+
         $leave = AttendanceLeave::findOrFail($leaveId);
         app(LeaveManagementService::class)->approve($leave, auth()->id());
 
@@ -100,6 +106,8 @@ class Leaves extends Component
 
     public function reject(int $leaveId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.leaves.approve'), 403);
+
         $leave = AttendanceLeave::findOrFail($leaveId);
         app(LeaveManagementService::class)->reject($leave, auth()->id(), $this->rejection_reason ?: null);
         $this->rejection_reason = '';
@@ -109,6 +117,8 @@ class Leaves extends Component
 
     public function cancel(int $leaveId): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.leaves.create'), 403);
+
         $leave = AttendanceLeave::findOrFail($leaveId);
 
         if ($leave->status === 'approved') {

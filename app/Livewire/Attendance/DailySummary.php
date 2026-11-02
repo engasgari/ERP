@@ -39,9 +39,11 @@ class DailySummary extends Component
 
     public string $leave_reason = '';
 
-    public string $mission_request_type = 'daily';
+    public string $mission_request_type = 'hourly';
 
-    public string $mission_hours = '';
+    public string $mission_start_time = '';
+
+    public string $mission_end_time = '';
 
     public string $mission_description = '';
 
@@ -87,8 +89,9 @@ class DailySummary extends Component
     {
         $this->actionDate = $workDate;
         $this->actionDateJalali = $jalali;
-        $this->mission_request_type = 'daily';
-        $this->mission_hours = '';
+        $this->mission_request_type = 'hourly';
+        $this->mission_start_time = '';
+        $this->mission_end_time = '';
         $this->mission_description = '';
         $this->showMissionModal = true;
     }
@@ -113,6 +116,8 @@ class DailySummary extends Component
 
     public function saveLeave(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.leaves.create'), 403);
+
         $this->normalizeFilters();
 
         $rules = [
@@ -147,7 +152,7 @@ class DailySummary extends Component
             }
         }
 
-        app(LeaveManagementService::class)->request([
+        $leave = app(LeaveManagementService::class)->request([
             'employee_id' => $this->employee_id,
             'request_type' => $this->leave_request_type,
             'start_date' => $this->actionDate,
@@ -162,39 +167,97 @@ class DailySummary extends Component
             'status' => 'pending',
         ], auth()->id());
 
+        // Daily summary is an ops screen ("ثبت"), so apply immediately to attendance.
+        app(LeaveManagementService::class)->approve($leave, (int) auth()->id());
+
         $this->closeModals();
-        session()->flash('success', 'درخواست مرخصی ثبت شد (در انتظار تایید).');
+        session()->flash('success', 'مرخصی ثبت و در کارکرد اعمال شد.');
+
+        $back = route('attendance.daily-summary', [
+            'employee_id' => $this->employee_id,
+            'year' => $this->year,
+            'month' => $this->month,
+        ]);
+
+        $this->redirect(route('attendance.leaves.print', [
+            'leave' => $leave,
+            'back' => $back,
+        ]), navigate: false);
     }
 
     public function saveMission(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.missions.create'), 403);
+
         $this->normalizeFilters();
-        $this->validate([
+
+        $rules = [
             'employee_id' => ['required', 'exists:employees,id'],
             'actionDate' => ['required', 'date'],
             'mission_request_type' => ['required', 'in:hourly,daily'],
-            'mission_hours' => ['nullable', 'numeric', 'min:0'],
             'mission_description' => ['nullable', 'string', 'max:1000'],
+        ];
+
+        if ($this->mission_request_type === 'hourly') {
+            $rules['mission_start_time'] = ['required', 'date_format:H:i'];
+            $rules['mission_end_time'] = ['required', 'date_format:H:i'];
+        }
+
+        $this->validate($rules, [], [
+            'mission_start_time' => 'شروع ماموریت',
+            'mission_end_time' => 'پایان ماموریت',
         ]);
 
-        app(MissionManagementService::class)->request([
+        $hours = null;
+        if ($this->mission_request_type === 'hourly') {
+            $startAt = \Carbon\Carbon::createFromFormat('H:i', $this->mission_start_time);
+            $endAt = \Carbon\Carbon::createFromFormat('H:i', $this->mission_end_time);
+            if ($endAt->lessThanOrEqualTo($startAt)) {
+                $endAt->addDay();
+            }
+            $hours = round($startAt->diffInMinutes($endAt) / 60, 2);
+            if ($hours <= 0) {
+                $this->addError('mission_end_time', 'پایان ماموریت باید بعد از شروع باشد.');
+                return;
+            }
+        }
+
+        $mission = app(MissionManagementService::class)->request([
             'employee_id' => $this->employee_id,
             'request_type' => $this->mission_request_type,
             'start_date' => $this->actionDate,
             'end_date' => $this->actionDate,
             'mission_date' => $this->actionDate,
-            'hours' => $this->mission_request_type === 'hourly' ? ($this->mission_hours ?: null) : null,
+            'start_time' => $this->mission_request_type === 'hourly' ? $this->mission_start_time : null,
+            'end_time' => $this->mission_request_type === 'hourly' ? $this->mission_end_time : null,
+            'hours' => $hours,
             'total_days' => $this->mission_request_type === 'daily' ? 1 : null,
             'description' => $this->mission_description ?: null,
             'status' => 'pending',
         ], auth()->id());
 
+        // Daily summary is an ops screen ("ثبت"), so apply immediately to attendance.
+        app(MissionManagementService::class)->approve($mission, (int) auth()->id());
+
         $this->closeModals();
-        session()->flash('success', 'درخواست ماموریت ثبت شد (در انتظار تایید).');
+        session()->flash('success', 'ماموریت ثبت و در کارکرد اعمال شد.');
+
+        $back = route('attendance.daily-summary', [
+            'employee_id' => $this->employee_id,
+            'year' => $this->year,
+            'month' => $this->month,
+        ]);
+
+        $this->redirect(route('attendance.missions.print', [
+            'mission' => $mission,
+            'back' => $back,
+        ]), navigate: false);
     }
 
     public function saveEdit(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.daily.edit'), 403);
+
         $this->normalizeFilters();
         $this->validate([
             'employee_id' => ['required', 'exists:employees,id'],

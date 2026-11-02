@@ -36,7 +36,7 @@ class ProjectController extends Controller
         ]);
 
         $data = $this->validated($request);
-        $data['project_number'] = $data['project_number'] ?: $numbering->next('project', 'PRJ-');
+        $data['project_number'] = $numbering->allocate('project', $data['project_number'] ?? null, 'PRJ-');
         $data['status'] = $data['status'] ?? 'planning';
 
         Project::create($data);
@@ -92,11 +92,22 @@ class ProjectController extends Controller
 
     private function formData(Project $project): array
     {
+        $suggestedNumber = null;
+
+        if (! $project->exists) {
+            try {
+                $suggestedNumber = app(NumberingService::class)->peek('project', 'PRJ-');
+            } catch (\RuntimeException) {
+                $suggestedNumber = null;
+            }
+        }
+
         return [
             'project' => $project,
             'statuses' => Project::STATUSES,
             'parties' => Party::where('is_active', true)->orderBy('name')->get(),
             'users' => User::orderBy('name')->get(),
+            'suggestedNumber' => $suggestedNumber,
         ];
     }
 }

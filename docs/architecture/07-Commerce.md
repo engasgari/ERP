@@ -10,6 +10,11 @@ Returns
 
 Price Lists
 
+- Route: `commerce.item-pricing.index`
+- Livewire: `Commerce\ItemPricing\Index`
+- Service: `ItemSalePriceService`
+- Repository: `ItemRepository`
+
 Customers
 
 Suppliers
@@ -25,6 +30,10 @@ Invoice generates Accounting.
 Invoice updates Inventory.
 
 Invoice updates Customer Balance.
+
+Permissions are granular under `commerce.invoices.*` and `commerce.pricing.manage`.
+
+`commerce.manage` still implies all commerce action permissions for backward compatibility.
 
 ---
 

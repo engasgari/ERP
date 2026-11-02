@@ -38,6 +38,8 @@ use App\Http\Controllers\EmploymentOrderController;
 use App\Http\Controllers\EmploymentContractController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\PayslipController;
+use App\Http\Controllers\AttendanceDailySummaryController;
+use App\Http\Controllers\AttendanceRequestPrintController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AppSwitchController;
 use App\Http\Controllers\ProfileController;
@@ -74,14 +76,27 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.print');
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.pdf');
     Route::get('invoices/{invoice}/excel', [InvoiceController::class, 'downloadExcel'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.excel');
-    Route::resource('invoices', InvoiceController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])->whereNumber('invoice')->middleware('permission:commerce.view');
-    Route::post('invoices/{invoice}/confirm', [InvoiceController::class, 'confirm'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.confirm');
-    Route::post('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.settle');
-    Route::post('invoices/{invoice}/unsettle', [InvoiceController::class, 'unsettle'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.unsettle');
-    Route::post('invoices/{invoice}/convert', [InvoiceController::class, 'convert'])->whereNumber('invoice')->middleware('permission:commerce.manage')->name('invoices.convert');
+
+    Route::get('invoices', [InvoiceController::class, 'index'])->middleware('permission:commerce.view')->name('invoices.index');
+    Route::get('invoices/create', [InvoiceController::class, 'create'])->middleware('permission:commerce.invoices.create')->name('invoices.create');
+    Route::post('invoices', [InvoiceController::class, 'store'])->middleware('permission:commerce.invoices.create')->name('invoices.store');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->whereNumber('invoice')->middleware('permission:commerce.view')->name('invoices.show');
+    Route::get('invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->whereNumber('invoice')->middleware('permission:commerce.invoices.update')->name('invoices.edit');
+    Route::put('invoices/{invoice}', [InvoiceController::class, 'update'])->whereNumber('invoice')->middleware('permission:commerce.invoices.update')->name('invoices.update');
+    Route::patch('invoices/{invoice}', [InvoiceController::class, 'update'])->whereNumber('invoice')->middleware('permission:commerce.invoices.update');
+    Route::delete('invoices/{invoice}', [InvoiceController::class, 'destroy'])->whereNumber('invoice')->middleware('permission:commerce.invoices.delete')->name('invoices.destroy');
+
+    Route::post('invoices/{invoice}/confirm', [InvoiceController::class, 'confirm'])->whereNumber('invoice')->middleware('permission:commerce.invoices.confirm')->name('invoices.confirm');
+    Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->whereNumber('invoice')->middleware('permission:commerce.invoices.cancel')->name('invoices.cancel');
+    Route::post('invoices/{invoice}/settle', [InvoiceController::class, 'settle'])->whereNumber('invoice')->middleware('permission:commerce.invoices.settle')->name('invoices.settle');
+    Route::post('invoices/{invoice}/unsettle', [InvoiceController::class, 'unsettle'])->whereNumber('invoice')->middleware('permission:commerce.invoices.settle')->name('invoices.unsettle');
+    Route::post('invoices/{invoice}/convert', [InvoiceController::class, 'convert'])->whereNumber('invoice')->middleware('permission:commerce.invoices.convert')->name('invoices.convert');
     Route::view('commerce/contractor-service-purchases', 'commerce.contractor-service-purchases.index')
         ->middleware('permission:commerce.view')
         ->name('commerce.contractor-service-purchases.index');
+    Route::view('commerce/item-pricing', 'commerce.item-pricing.index')
+        ->middleware('permission:commerce.view')
+        ->name('commerce.item-pricing.index');
 
     Route::get('sales/intelligence', fn () => view('sales.intelligence'))
         ->middleware('permission:reports.sales.view')
@@ -106,16 +121,16 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::post('accounting-documents/{accountingDocument}/post', [AccountingDocumentController::class, 'post'])->middleware('permission:accounting.documents.post')->name('accounting-documents.post');
     Route::post('accounting-documents/{accountingDocument}/unpost', [AccountingDocumentController::class, 'unpost'])->middleware('permission:accounting.documents.edit')->name('accounting-documents.unpost');
 
-    Route::get('treasury', [TreasuryController::class, 'index'])->middleware('permission:treasury.manage')->name('treasury.index');
-    Route::get('treasury/create', [TreasuryController::class, 'create'])->middleware('permission:treasury.manage')->name('treasury.create');
-    Route::post('treasury', [TreasuryController::class, 'store'])->middleware('permission:treasury.manage')->name('treasury.store');
-    Route::get('treasury/{transaction}/edit', [TreasuryController::class, 'edit'])->whereNumber('transaction')->middleware('permission:treasury.manage')->name('treasury.edit');
-    Route::put('treasury/{transaction}', [TreasuryController::class, 'update'])->whereNumber('transaction')->middleware('permission:treasury.manage')->name('treasury.update');
-    Route::delete('treasury/{transaction}', [TreasuryController::class, 'destroy'])->whereNumber('transaction')->middleware('permission:treasury.manage')->name('treasury.destroy');
+    Route::get('treasury', [TreasuryController::class, 'index'])->middleware('permission:treasury.view')->name('treasury.index');
+    Route::get('treasury/create', [TreasuryController::class, 'create'])->middleware('permission:treasury.create')->name('treasury.create');
+    Route::post('treasury', [TreasuryController::class, 'store'])->middleware('permission:treasury.create')->name('treasury.store');
+    Route::get('treasury/{transaction}/edit', [TreasuryController::class, 'edit'])->whereNumber('transaction')->middleware('permission:treasury.update')->name('treasury.edit');
+    Route::put('treasury/{transaction}', [TreasuryController::class, 'update'])->whereNumber('transaction')->middleware('permission:treasury.update')->name('treasury.update');
+    Route::delete('treasury/{transaction}', [TreasuryController::class, 'destroy'])->whereNumber('transaction')->middleware('permission:treasury.delete')->name('treasury.destroy');
 
-    Route::get('partner-current-accounts', [PartnerCurrentAccountController::class, 'index'])->middleware('permission:treasury.manage')->name('partner-current-accounts.index');
-    Route::get('partner-current-accounts/create', [PartnerCurrentAccountController::class, 'create'])->middleware('permission:treasury.manage')->name('partner-current-accounts.create');
-    Route::post('partner-current-accounts', [PartnerCurrentAccountController::class, 'store'])->middleware('permission:treasury.manage')->name('partner-current-accounts.store');
+    Route::get('partner-current-accounts', [PartnerCurrentAccountController::class, 'index'])->middleware('permission:treasury.partners.manage')->name('partner-current-accounts.index');
+    Route::get('partner-current-accounts/create', [PartnerCurrentAccountController::class, 'create'])->middleware('permission:treasury.partners.manage')->name('partner-current-accounts.create');
+    Route::post('partner-current-accounts', [PartnerCurrentAccountController::class, 'store'])->middleware('permission:treasury.partners.manage')->name('partner-current-accounts.store');
 
     Route::get('fiscal-periods', [FiscalPeriodController::class, 'index'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.index');
     Route::post('fiscal-periods', [FiscalPeriodController::class, 'store'])->middleware('permission:fiscal-years.manage')->name('fiscal-periods.store');
@@ -140,9 +155,13 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::get('financial-reports/{report}/pdf', [FinancialReportController::class, 'pdf'])->middleware('permission:financial.reports.view')->name('financial-reports.report.pdf');
     Route::get('financial-reports/{report}/excel', [FinancialReportController::class, 'excel'])->middleware('permission:financial.reports.view')->name('financial-reports.report.excel');
     Route::get('financial-reports/{report}', [FinancialReportController::class, 'show'])->middleware('permission:financial.reports.view')->name('financial-reports.show');
-    Route::resource('inventory-documents', InventoryDocumentController::class)
-        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
-        ->middleware('permission:inventory.view');
+    Route::get('inventory-documents', [InventoryDocumentController::class, 'index'])->middleware('permission:inventory.view')->name('inventory-documents.index');
+    Route::get('inventory-documents/create', [InventoryDocumentController::class, 'create'])->middleware('permission:inventory.documents.create')->name('inventory-documents.create');
+    Route::post('inventory-documents', [InventoryDocumentController::class, 'store'])->middleware('permission:inventory.documents.create')->name('inventory-documents.store');
+    Route::get('inventory-documents/{inventory_document}/edit', [InventoryDocumentController::class, 'edit'])->middleware('permission:inventory.documents.update')->name('inventory-documents.edit');
+    Route::put('inventory-documents/{inventory_document}', [InventoryDocumentController::class, 'update'])->middleware('permission:inventory.documents.update')->name('inventory-documents.update');
+    Route::patch('inventory-documents/{inventory_document}', [InventoryDocumentController::class, 'update'])->middleware('permission:inventory.documents.update');
+    Route::delete('inventory-documents/{inventory_document}', [InventoryDocumentController::class, 'destroy'])->middleware('permission:inventory.documents.delete')->name('inventory-documents.destroy');
 
     Route::middleware('permission:users.manage')->prefix('access')->name('access.')->group(function () {
         Route::resource('users', AccessUserController::class)->except(['show']);
@@ -160,6 +179,10 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::get('/management-reports/trial-balance', [ManagementReportController::class, 'trialBalance'])
         ->middleware('permission:reports.view')
         ->name('management-reports.trial-balance');
+    Route::get('/management-reports/trial-balance/accounts/{account}/ledger', [ManagementReportController::class, 'trialBalanceAccountLedger'])
+        ->whereNumber('account')
+        ->middleware('permission:reports.view')
+        ->name('management-reports.trial-balance.account-ledger');
 
     Route::get('/management-reports/warehouse-cardex', [ManagementReportController::class, 'warehouseCardex'])
         ->middleware('permission:reports.view')
@@ -226,8 +249,14 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::resource('project-boms', BomVersionController::class)
         ->parameters(['project-boms' => 'projectBom'])
         ->middleware('permission:projects.view');
-    Route::resource('projects', ProjectController::class)->except(['index', 'show'])->middleware('permission:projects.manage');
-    Route::resource('projects', ProjectController::class)->only(['index', 'show'])->middleware('permission:projects.view');
+    Route::get('projects', [ProjectController::class, 'index'])->middleware('permission:projects.view')->name('projects.index');
+    Route::get('projects/create', [ProjectController::class, 'create'])->middleware('permission:projects.create')->name('projects.create');
+    Route::post('projects', [ProjectController::class, 'store'])->middleware('permission:projects.create')->name('projects.store');
+    Route::get('projects/{project}', [ProjectController::class, 'show'])->middleware('permission:projects.view')->name('projects.show');
+    Route::get('projects/{project}/edit', [ProjectController::class, 'edit'])->middleware('permission:projects.update')->name('projects.edit');
+    Route::put('projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.update')->name('projects.update');
+    Route::patch('projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.update');
+    Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('permission:projects.delete')->name('projects.destroy');
     Route::get('organization-units', [OrganizationUnitController::class, 'index'])->middleware('permission:hr.view')->name('organization-units.index');
     Route::get('jobs', [JobController::class, 'index'])->middleware('permission:hr.view')->name('jobs.index');
     Route::get('positions', [PositionController::class, 'index'])->middleware('permission:hr.view')->name('positions.index');
@@ -235,9 +264,20 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::post('employment-orders/{employmentOrder}/approve', [EmploymentOrderController::class, 'approve'])->middleware('permission:employment-orders.approve')->name('employment-orders.approve');
     Route::get('employment-contracts', [EmploymentContractController::class, 'index'])->middleware('permission:contracts.view')->name('employment-contracts.index');
     Route::get('employee-documents', [EmployeeDocumentController::class, 'index'])->middleware('permission:hr.view')->name('employee-documents.index');
-    Route::resource('employees', EmployeeController::class)->except(['index', 'show'])->middleware('permission:employees.manage');
-    Route::resource('employees', EmployeeController::class)->only(['index', 'show'])->middleware('permission:employees.view');
-    Route::resource('work-logs', WorkLogController::class)->except(['index', 'show'])->middleware('permission:worklogs.manage');
+    Route::get('employees', [EmployeeController::class, 'index'])->middleware('permission:employees.view')->name('employees.index');
+    Route::get('employees/create', [EmployeeController::class, 'create'])->middleware('permission:employees.create')->name('employees.create');
+    Route::post('employees', [EmployeeController::class, 'store'])->middleware('permission:employees.create')->name('employees.store');
+    Route::get('employees/{employee}', [EmployeeController::class, 'show'])->middleware('permission:employees.view')->name('employees.show');
+    Route::get('employees/{employee}/edit', [EmployeeController::class, 'edit'])->middleware('permission:employees.update')->name('employees.edit');
+    Route::put('employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update')->name('employees.update');
+    Route::patch('employees/{employee}', [EmployeeController::class, 'update'])->middleware('permission:employees.update');
+    Route::delete('employees/{employee}', [EmployeeController::class, 'destroy'])->middleware('permission:employees.delete')->name('employees.destroy');
+    Route::get('work-logs/create', [WorkLogController::class, 'create'])->middleware('permission:worklogs.create')->name('work-logs.create');
+    Route::post('work-logs', [WorkLogController::class, 'store'])->middleware('permission:worklogs.create')->name('work-logs.store');
+    Route::get('work-logs/{work_log}/edit', [WorkLogController::class, 'edit'])->middleware('permission:worklogs.update')->name('work-logs.edit');
+    Route::put('work-logs/{work_log}', [WorkLogController::class, 'update'])->middleware('permission:worklogs.update')->name('work-logs.update');
+    Route::patch('work-logs/{work_log}', [WorkLogController::class, 'update'])->middleware('permission:worklogs.update');
+    Route::delete('work-logs/{work_log}', [WorkLogController::class, 'destroy'])->middleware('permission:worklogs.delete')->name('work-logs.destroy');
     Route::resource('financial-transactions', FinancialTransactionController::class)->except(['index', 'show'])->middleware('permission:financial.manage');
 
 // ط¹آ¯ط·آ²ط·آ§ط·آ±ط·آ´أ¢â‚¬إ’ط¸â€،ط·آ§ط؛إ’ ط¸â€¦ط·آ§ط¸â€‍ط؛إ’
@@ -258,34 +298,42 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
         ->middleware('permission:worklogs.view')
         ->name('work-logs.project-report');
     Route::resource('work-logs', WorkLogController::class)->only(['index', 'show'])->middleware('permission:worklogs.view');
-    Route::resource('work-shifts', WorkShiftController::class)->except(['show'])->middleware('permission:worklogs.manage');
-    Route::resource('work-calendars', WorkCalendarController::class)->except(['show'])->middleware('permission:worklogs.manage');
-    Route::view('work-groups/assignments', 'work-groups.assignments')->middleware('permission:worklogs.manage')->name('work-groups.assignments');
-    Route::resource('work-groups', WorkGroupController::class)->except(['show'])->middleware('permission:worklogs.manage');
+    Route::resource('work-shifts', WorkShiftController::class)->except(['show'])->middleware('permission:worklogs.setup.manage');
+    Route::resource('work-calendars', WorkCalendarController::class)->except(['show'])->middleware('permission:worklogs.setup.manage');
+    Route::view('work-groups/assignments', 'work-groups.assignments')->middleware('permission:worklogs.setup.manage')->name('work-groups.assignments');
+    Route::resource('work-groups', WorkGroupController::class)->except(['show'])->middleware('permission:worklogs.setup.manage');
     Route::view('attendance/calculations', 'attendance.calculations')->middleware('permission:attendance.view')->name('attendance.calculations');
     Route::view('attendance/daily-summary', 'attendance.daily-summary')->middleware('permission:attendance.view')->name('attendance.daily-summary');
+    Route::get('attendance/daily-summary/print', [AttendanceDailySummaryController::class, 'print'])
+        ->middleware('permission:attendance.view')
+        ->name('attendance.daily-summary.print');
     Route::view('attendance/leaves', 'attendance.leaves')->middleware('permission:attendance.view')->name('attendance.leaves');
+    Route::get('attendance/leaves/{leave}/print', [AttendanceRequestPrintController::class, 'leave'])
+        ->name('attendance.leaves.print');
     Route::view('attendance/missions', 'attendance.missions')->middleware('permission:attendance.view')->name('attendance.missions');
+    Route::get('attendance/missions/{mission}/print', [AttendanceRequestPrintController::class, 'mission'])
+        ->name('attendance.missions.print');
     Route::view('attendance/summaries', 'attendance.summaries')->middleware('permission:attendance.view')->name('attendance.summaries');
 
 
-// ط·آ§ط¸â€ ط·آ¨ط·آ§ط·آ±
-    Route::resource('warehouses', WarehouseController::class)->except(['index', 'show'])->middleware('permission:warehouse.manage');
+    Route::get('warehouses', [WarehouseController::class, 'index'])->middleware('permission:warehouse.view')->name('warehouses.index');
+    Route::get('warehouses/create', [WarehouseController::class, 'create'])->middleware('permission:warehouse.create')->name('warehouses.create');
+    Route::post('warehouses', [WarehouseController::class, 'store'])->middleware('permission:warehouse.create')->name('warehouses.store');
+    Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->middleware('permission:warehouse.view')->name('warehouses.show');
+    Route::get('warehouses/{warehouse}/edit', [WarehouseController::class, 'edit'])->middleware('permission:warehouse.update')->name('warehouses.edit');
+    Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware('permission:warehouse.update')->name('warehouses.update');
+    Route::patch('warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware('permission:warehouse.update');
+    Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->middleware('permission:warehouse.delete')->name('warehouses.destroy');
 
-// Route ط·آ¨ط·آ±ط·آ§ط؛إ’ ط·آ¯ط·آ±ط؛إ’ط·آ§ط¸ظ¾ط·ع¾ ط¹آ©ط·آ§ط¸â€‍ط·آ§ط¸â€،ط·آ§ط؛إ’ ط¸â€¦ط¸ث†ط·آ¬ط¸ث†ط·آ¯ ط·آ¯ط·آ± ط·آ§ط¸â€ ط·آ¨ط·آ§ط·آ±
-
-// ط¸â€ڑط·آ¨ط¸â€‍ ط·آ§ط·آ² ط¸â€،ط¸â€¦ط¸â€، Routeط¸â€،ط·آ§ ط·آ§ط؛إ’ط¸â€  ط·آ±ط·آ§ ط·آ§ط·آ¶ط·آ§ط¸ظ¾ط¸â€، ط¹آ©ط¸â€ ط؛إ’ط·آ¯
-    Route::resource('warehouses', WarehouseController::class)->only(['index', 'show'])->middleware('permission:warehouse.view');
-
-    Route::get('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'index'])->middleware('permission:salaries.manage')->name('payroll.accounting-settings.index');
-    Route::put('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'update'])->middleware('permission:salaries.manage')->name('payroll.accounting-settings.update');
-    Route::view('payroll/periods', 'payroll.periods.index')->middleware('permission:salaries.manage')->name('payroll.periods.index');
-    Route::view('payroll/payments', 'payroll.payments.index')->middleware('permission:salaries.manage')->name('payroll.payments.index');
+    Route::get('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'index'])->middleware('permission:payroll.settings.manage')->name('payroll.accounting-settings.index');
+    Route::put('payroll/accounting-settings', [PayrollAccountingSettingController::class, 'update'])->middleware('permission:payroll.settings.manage')->name('payroll.accounting-settings.update');
+    Route::view('payroll/periods', 'payroll.periods.index')->middleware('permission:payroll.view')->name('payroll.periods.index');
+    Route::view('payroll/payments', 'payroll.payments.index')->middleware('permission:payroll.view')->name('payroll.payments.index');
     Route::view('insurance/periods', 'insurance.periods.index')->middleware('permission:insurance.view')->name('insurance.periods.index');
     Route::view('insurance/payments', 'insurance.payments.index')->middleware('permission:insurance.view')->name('insurance.payments.index');
     Route::get('insurance/payments/{payment}', [InsurancePaymentController::class, 'show'])->middleware('permission:insurance.view')->name('insurance.payments.show');
-    Route::get('payslips/{payslip}/print', [PayslipController::class, 'print'])->middleware('permission:salaries.view')->name('payslips.print');
-    Route::get('payslips/{payslip}/download', [PayslipController::class, 'download'])->middleware('permission:salaries.view')->name('payslips.download');
+    Route::get('payslips/{payslip}/print', [PayslipController::class, 'print'])->middleware('permission:payroll.view')->name('payslips.print');
+    Route::get('payslips/{payslip}/download', [PayslipController::class, 'download'])->middleware('permission:payroll.view')->name('payslips.download');
 
 
 });
@@ -311,7 +359,7 @@ Route::middleware(['auth', 'permission:projects.manage', 'active.erp'])->group(f
 
 use App\Http\Controllers\WorkLogExcelController;
 
-Route::middleware(['auth', 'permission:worklogs.manage', 'active.erp'])->prefix('worklog')->group(function () {
+Route::middleware(['auth', 'permission:worklogs.create', 'active.erp'])->prefix('worklog')->group(function () {
     Route::get('/import', [WorkLogExcelController::class, 'importView'])->name('worklog.import.view');
     Route::post('/import', [WorkLogExcelController::class, 'import'])->name('worklog.import');
     Route::get('/export', [WorkLogExcelController::class, 'export'])->name('worklog.export');

@@ -31,7 +31,7 @@
 
             @if($isAutomatic)
                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">
-                    این سند سیستمی است. تاریخ، شرح، حساب، تفصیل، شخص و پروژه قابل تغییر است؛ مبالغ و حساب معین ردیف‌های بانک/صندوق قفل هستند (تفصیل آن‌ها قابل اصلاح است).
+                    این سند سیستمی است. تاریخ، شرح، حساب، شخص و پروژه قابل تغییر است؛ مبالغ و حساب معین ردیف‌های بانک/صندوق قفل هستند.
                     اگر سند مادر بعداً ویرایش شود، این سند دوباره از روی آن ساخته می‌شود.
                 </div>
             @endif
@@ -40,7 +40,7 @@
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <label class="block text-sm font-medium text-slate-700">
                         شماره سند
-                        <input name="number" value="{{ old('number', $document->number) }}" placeholder="ثبت خودکار در صورت خالی بودن" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                        <input name="number" value="{{ old('number', $document->number ?: ($suggestedNumber ?? '')) }}" placeholder="شماره پیشنهادی — قابل ویرایش" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500">
                     </label>
 
                     <label class="block text-sm font-medium text-slate-700">
@@ -80,7 +80,31 @@
                     ['debit' => 0, 'credit' => 0],
                     ['debit' => 0, 'credit' => 0],
                 ]);
+                $accountLevelLabels = [
+                    'group' => 'گروه',
+                    'ledger' => 'کل',
+                    'subsidiary' => 'معین',
+                    'detail' => 'تفصیل',
+                ];
+                $accountOptions = searchSelectOptions(
+                    $accounts->map(fn ($account) => [
+                        'id' => $account->id,
+                        'label' => (string) ($account->title ?: ''),
+                        'code' => $account->code ?? null,
+                        'type' => $accountLevelLabels[$account->level] ?? $account->level,
+                    ])
+                );
+                $partyOptions = searchSelectOptions(
+                    $parties,
+                    fn ($party) => (string) ($party->name ?: ''),
+                    fn ($party) => $party->code ?? $party->detail_code ?? null,
+                );
             @endphp
+
+            <script>
+                window.__erpChartAccountOptions = @json($accountOptions);
+                window.__erpPartyOptions = @json($partyOptions);
+            </script>
 
             <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -92,13 +116,12 @@
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-slate-200">
-                    <table class="erp-ui-data-table min-w-[1120px] table-fixed md:min-w-[1280px]">
+                    <table class="erp-ui-data-table accounting-document-lines-table min-w-[1080px] table-fixed md:min-w-[1220px]">
                         <thead class="sticky top-0 bg-slate-100">
                         <tr>
-                            <th class="w-[120px] md:w-[135px] bg-slate-100">حساب</th>
-                            <th class="w-[110px] md:w-[125px] bg-slate-100">تفصیل</th>
-                            <th class="w-[140px] md:w-[160px] bg-slate-100">شخص/شرکت</th>
-                            <th class="w-[140px] md:w-[160px] bg-slate-100">پروژه</th>
+                            <th class="w-[220px] md:w-[250px] bg-slate-100">حساب</th>
+                            <th class="w-[200px] md:w-[230px] bg-slate-100">شخص/شرکت</th>
+                            <th class="w-[160px] md:w-[180px] bg-slate-100">پروژه</th>
                             <th class="bg-slate-100">شرح ردیف</th>
                             <th class="w-[170px] md:w-[190px] bg-emerald-50 text-emerald-800">بدهکار (ریال)</th>
                             <th class="w-[170px] md:w-[190px] bg-amber-50 text-amber-800">بستانکار (ریال)</th>
@@ -116,32 +139,38 @@
                                         <input type="hidden" name="lines[{{ $i }}][id]" value="{{ $line['id'] }}">
                                     @endif
                                     @if($lockAccount)
+                                        @php
+                                            $lockedAccount = $accounts->firstWhere('id', (int) ($line['chart_account_id'] ?? 0));
+                                        @endphp
                                         <input type="hidden" name="lines[{{ $i }}][chart_account_id]" value="{{ $line['chart_account_id'] ?? '' }}">
+                                        <input type="hidden" name="lines[{{ $i }}][detail_account_id]" value="{{ $line['detail_account_id'] ?? '' }}">
+                                        @if(! empty($line['bank_account_id']))
+                                            <input type="hidden" name="lines[{{ $i }}][bank_account_id]" value="{{ $line['bank_account_id'] }}">
+                                        @endif
+                                        @if(! empty($line['cashbox_id']))
+                                            <input type="hidden" name="lines[{{ $i }}][cashbox_id]" value="{{ $line['cashbox_id'] }}">
+                                        @endif
+                                        <div class="rounded-md border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700">
+                                            {{ $lockedAccount ? chartAccountDisplayLabel($lockedAccount) : 'حساب قفل‌شده' }}
+                                        </div>
+                                    @else
+                                        <x-erp.ui.search-select
+                                            name="lines[{{ $i }}][chart_account_id]"
+                                            :value="($line['detail_account_id'] ?? null) ?: ($line['chart_account_id'] ?? '')"
+                                            placeholder="جستجو گروه، کل، معین یا تفصیل..."
+                                            options-source="chart-accounts"
+                                            class="w-full"
+                                        />
                                     @endif
-                                    <select @if($lockAccount) disabled @else name="lines[{{ $i }}][chart_account_id]" @endif class="w-full max-w-[135px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[150px] md:px-3 md:text-sm">
-                                        <option value="">انتخاب حساب</option>
-                                        @foreach($accounts as $account)
-                                            <option value="{{ $account->id }}" @selected(($line['chart_account_id'] ?? null) == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
-                                        @endforeach
-                                    </select>
                                 </td>
                                 <td>
-                                    <select name="lines[{{ $i }}][detail_account_id]" class="w-full max-w-[125px] rounded-md border-slate-300 bg-white px-2 py-2 text-[11px] shadow-sm focus:border-primary-500 focus:ring-primary-500 md:max-w-[140px] md:px-3 md:text-sm">
-                                        <option value="">انتخاب تفصیل</option>
-                                        @foreach($accounts as $account)
-                                            @if($account->level === 'detail' && (! $lockAccount || (int) $account->parent_id === (int) ($line['chart_account_id'] ?? 0) || (int) $account->id === (int) ($line['detail_account_id'] ?? 0)))
-                                                <option value="{{ $account->id }}" @selected(($line['detail_account_id'] ?? null) == $account->id)>{{ chartAccountDisplayLabel($account) }}</option>
-                                            @endif
-                                        @endforeach
-                                    </select>
-                                </td>
-                                <td>
-                                    <select name="lines[{{ $i }}][party_id]" class="w-full rounded-md border-slate-300 bg-white px-2 py-2 text-xs shadow-sm focus:border-primary-500 focus:ring-primary-500 md:px-3 md:text-sm">
-                                        <option value="">بدون شخص</option>
-                                        @foreach($parties as $party)
-                                            <option value="{{ $party->id }}" @selected(($line['party_id'] ?? null) == $party->id)>{{ $party->name }}</option>
-                                        @endforeach
-                                    </select>
+                                    <x-erp.ui.search-select
+                                        name="lines[{{ $i }}][party_id]"
+                                        :value="$line['party_id'] ?? ''"
+                                        placeholder="جستجو نام یا کد شخص/شرکت..."
+                                        options-source="parties"
+                                        class="w-full"
+                                    />
                                 </td>
                                 <td>
                                     <select name="lines[{{ $i }}][project_id]" class="w-full rounded-md border-slate-300 bg-white px-2 py-2 text-xs shadow-sm focus:border-primary-500 focus:ring-primary-500 md:px-3 md:text-sm">
@@ -178,6 +207,13 @@
                     </table>
                 </div>
             </section>
+
+            <style>
+                .accounting-document-lines-table .erp-search-select {
+                    min-width: 100%;
+                    width: 100%;
+                }
+            </style>
 
             <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
                 <label class="block text-sm font-medium text-slate-700">

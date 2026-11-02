@@ -3,9 +3,21 @@
         $isEdit = $isEdit ?? false;
         $invoice = $invoice ?? null;
         $draftDefaults = $draftDefaults ?? [];
-        $title = ($direction === 'sale' ? 'فروش' : 'خرید') . ' / ' . ($documentType === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور');
+        $title = match (true) {
+            $documentType === 'proforma' => 'پیش‌فاکتور فروش',
+            $documentType === 'return' && $direction === 'sale' => 'برگشت از فروش',
+            $documentType === 'return' => 'برگشت از خرید',
+            $direction === 'sale' => 'فاکتور فروش',
+            default => 'فاکتور خرید',
+        };
         $partyLabel = $direction === 'purchase' ? 'فروشنده' : 'مشتری';
-        $warehouseLabel = $direction === 'purchase' ? 'انبار ورودی' : 'انبار خروجی';
+        // Sale return receives stock; purchase return issues stock.
+        $warehouseLabel = match (true) {
+            $documentType === 'return' && $direction === 'sale' => 'انبار ورودی',
+            $documentType === 'return' => 'انبار خروجی',
+            $direction === 'purchase' => 'انبار ورودی',
+            default => 'انبار خروجی',
+        };
         $catalogItems = $items;
         if ($invoice?->lines) {
             $invoice->loadMissing('lines.item.unit');
@@ -24,8 +36,8 @@
                 : $salePriceService->resolveSaleUnitPrice($item, $lastSaleUnitPrices);
 
             return [
-                $item->id => [
-                    'unit' => $item->unit?->name ?? '',
+                (string) $item->id => [
+                    'unit' => trim((string) ($item->unit?->name ?: $item->unit?->code ?: '')),
                     'price' => $price,
                 ],
             ];
@@ -34,7 +46,6 @@
         $existingLines = $invoice
             ? $invoice->lines->map(fn ($line) => [
                 'item_id' => $line->item_id,
-                'description' => $line->description,
                 'quantity' => $line->quantity,
                 'unit_price' => $line->unit_price,
                 'discount_amount' => $line->discount_amount,
@@ -56,9 +67,16 @@
             $invoiceKey = $invoiceKey ?? ($invoice->id ?? null);
         }
         $canEditExisting = $isEdit && filled($invoiceKey);
+        $cancelledSources = $cancelledSources ?? collect();
+        $cancelledSourcePayload = $cancelledSourcePayload ?? [];
         $formAction = $formAction ?? ($canEditExisting
             ? route('invoices.update', $invoiceKey)
             : route('invoices.store'));
+        $partyCreateUrl = route('parties.create', [
+            'embedded' => 1,
+            'require_complete' => 1,
+            'lock_type' => ($direction ?? 'sale') === 'purchase' ? 'vendor' : 'customer',
+        ]);
     @endphp
 
     <form method="POST" action="{{ $formAction }}" class="invoice-editor space-y-4">
@@ -91,7 +109,7 @@
             <div class="invoice-header-grid">
                 <label>
                     شماره فاکتور
-                    <input name="number" value="{{ old('number', $invoice?->number) }}" placeholder="خالی = شماره اتوماتیک">
+                    <input name="number" value="{{ old('number', $invoice?->number ?? ($suggestedNumber ?? '')) }}" placeholder="شماره پیشنهادی — قابل ویرایش">
                 </label>
                 <label>
                     تاریخ
@@ -131,6 +149,20 @@
                     نوع سند
                     <input value="{{ $title }}" disabled>
                 </label>
+                @if($documentType === 'return')
+                    <label class="md:col-span-2">
+                        فاکتور ابطالی مبنا
+                        <select name="returned_from_id" id="invoice-returned-from" required>
+                            <option value="">انتخاب فاکتور ابطال‌شده</option>
+                            @foreach(($cancelledSources ?? []) as $source)
+                                <option value="{{ $source->id }}" @selected(old('returned_from_id', $invoice?->returned_from_id) == $source->id)>
+                                    {{ $source->number }} — {{ $source->party?->name ?: 'طرف حساب' }} — {{ gregorianToJalaliDate($source->invoice_date) }} — {{ formatMoney((float) $source->total_amount) }} ریال
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="invoice-field-hint">ابتدا فاکتور فروش/خرید را ابطال کنید، سپس اینجا انتخاب شود تا ردیف‌ها پر شوند.</small>
+                    </label>
+                @endif
             </div>
 
             <label class="invoice-description">
@@ -147,6 +179,9 @@
                 </div>
             </div>
 
+            @error('returned_from_id')
+                <div class="invoice-error">{{ $message }}</div>
+            @enderror
             @error('lines')
                 <div class="invoice-error">{{ $message }}</div>
             @enderror
@@ -157,8 +192,7 @@
                     <tr>
                         <th>#</th>
                         <th>کالا/خدمت</th>
-                        <th>شرح</th>
-                        <th>واحد</th>
+                        <th>واحد سنجش</th>
                         <th>تعداد</th>
                         <th>قیمت فی (ریال)</th>
                         <th>تخفیف</th>
@@ -192,64 +226,34 @@
         </section>
     </form>
 
-    <div class="party-modal-backdrop" id="party-modal" hidden>
-        <div class="party-modal" role="dialog" aria-modal="true" aria-labelledby="party-modal-title">
+    <div class="party-modal-backdrop invoice-party-iframe-modal" id="party-modal" hidden>
+        <div class="party-modal party-modal--iframe" role="dialog" aria-modal="true" aria-labelledby="party-modal-title">
             <div class="party-modal-header">
                 <h3 id="party-modal-title">تعریف {{ $partyLabel }} جدید</h3>
-                <button type="button" id="close-party-modal">×</button>
+                <button type="button" id="close-party-modal" aria-label="بستن">×</button>
             </div>
-            <form id="quick-party-form" class="party-modal-body">
-                @csrf
-                @if($partyTypeId)
-                    <input type="hidden" name="types[]" value="{{ $partyTypeId }}">
-                @endif
-                <div class="party-modal-grid">
-                    <label>نوع
-                        <select name="kind" required>
-                            <option value="company">شرکت</option>
-                            <option value="person">شخص</option>
-                        </select>
-                    </label>
-                    <label>نام
-                        <input name="name" required>
-                    </label>
-                    <label>شناسه/کد ملی
-                        <input name="national_id">
-                    </label>
-                    <label>کد اقتصادی
-                        <input name="economic_code">
-                    </label>
-                    <label>تلفن
-                        <input name="phone">
-                    </label>
-                    <label>موبایل
-                        <input name="mobile">
-                    </label>
-                </div>
-                <label>آدرس
-                    <textarea name="address" rows="2"></textarea>
-                </label>
-                <div class="party-modal-error" id="party-modal-error" hidden></div>
-                <div class="party-modal-actions">
-                    <button type="button" id="cancel-party-modal">انصراف</button>
-                    <button type="submit">ثبت و انتخاب</button>
-                </div>
-            </form>
+            <div class="party-modal-iframe-body">
+                <iframe
+                    id="party-create-iframe"
+                    title="تعریف {{ $partyLabel }}"
+                    class="party-create-iframe"
+                    src="about:blank"
+                ></iframe>
+            </div>
         </div>
     </div>
 
     <template id="invoice-line-template">
         <tr class="invoice-line">
             <td class="line-index"></td>
-            <td>
+            <td class="line-item-cell">
                 <div class="erp-search-select" data-erp-search-select data-options-source="invoice-items">
                     <input type="hidden" class="line-item" value="">
                     <input type="text" class="erp-search-select__input" placeholder="جستجو نام، کد یا دسته..." autocomplete="off" spellcheck="false">
                     <div class="erp-search-select__list" hidden></div>
                 </div>
             </td>
-            <td><input class="line-description"></td>
-            <td><input class="line-unit" readonly tabindex="-1"></td>
+            <td><input class="line-unit" readonly tabindex="-1" placeholder="—"></td>
             <td><input class="line-quantity" type="text" inputmode="decimal" autocomplete="off" dir="ltr" data-erp-money="0" data-erp-number="0"></td>
             <td><input class="line-price" type="text" inputmode="decimal" autocomplete="off" dir="ltr" data-erp-money="0" data-erp-number="0"></td>
             <td><input class="line-discount" type="text" inputmode="decimal" autocomplete="off" dir="ltr" value="0" data-erp-money="0" data-erp-number="0"></td>
@@ -274,14 +278,20 @@
         .party-select-row { display: grid; grid-template-columns: minmax(0, 1fr) 2rem; gap: .25rem; align-items: end; }
         .party-add-button { display: grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: .32rem; background: #0d9488; color: #fff; font-size: 1.05rem; font-weight: 900; line-height: 1; }
         .invoice-table-wrap { overflow-x: auto; }
-        .invoice-entry-table { min-width: 1180px; width: 100%; border-collapse: collapse; font-size: .76rem; }
+        .invoice-entry-table { min-width: 1080px; width: 100%; border-collapse: collapse; font-size: .76rem; table-layout: fixed; }
         .invoice-entry-table th { border: 1px solid #cbd5e1; background: #f8fafc; padding: .45rem; color: #334155; text-align: center; }
         .invoice-entry-table td { border: 1px solid #e2e8f0; padding: .3rem; background: #fff; }
-        .invoice-entry-table th:nth-child(1), .invoice-entry-table td:nth-child(1) { width: 2.5rem; text-align: center; }
-        .invoice-entry-table th:nth-child(4), .invoice-entry-table td:nth-child(4) { width: 6rem; }
-        .invoice-entry-table th:nth-child(5), .invoice-entry-table td:nth-child(5) { width: 7rem; }
-        .invoice-entry-table th:nth-child(6), .invoice-entry-table td:nth-child(6), .invoice-entry-table th:nth-child(7), .invoice-entry-table td:nth-child(7), .invoice-entry-table th:nth-child(9), .invoice-entry-table td:nth-child(9) { width: 9rem; }
-        .line-unit, .line-total { background: #f8fafc; font-weight: 800; }
+        .invoice-entry-table th:nth-child(1), .invoice-entry-table td:nth-child(1) { width: 2.4rem; text-align: center; }
+        .invoice-entry-table th:nth-child(2), .invoice-entry-table td:nth-child(2) { width: auto; min-width: 18rem; }
+        .invoice-entry-table th:nth-child(3), .invoice-entry-table td:nth-child(3) { width: 7.5rem; }
+        .invoice-entry-table th:nth-child(4), .invoice-entry-table td:nth-child(4) { width: 7rem; }
+        .invoice-entry-table th:nth-child(5), .invoice-entry-table td:nth-child(5),
+        .invoice-entry-table th:nth-child(6), .invoice-entry-table td:nth-child(6),
+        .invoice-entry-table th:nth-child(8), .invoice-entry-table td:nth-child(8) { width: 9rem; }
+        .invoice-entry-table th:nth-child(7), .invoice-entry-table td:nth-child(7) { width: 7rem; }
+        .invoice-entry-table th:nth-child(9), .invoice-entry-table td:nth-child(9) { width: 2.4rem; }
+        .line-item-cell .erp-search-select { min-width: 100%; width: 100%; }
+        .line-unit, .line-total { background: #f8fafc; font-weight: 800; text-align: center; }
         .line-quantity, .line-price, .line-discount, .line-tax-rate {
             color: #475569;
             font-weight: 700;
@@ -300,22 +310,17 @@
         .invoice-actions a, .invoice-actions button { border: 0; border-radius: .35rem; background: #475569; color: #fff; padding: .55rem .85rem; font-size: .78rem; font-weight: 800; }
         .invoice-actions button[type="submit"] { background: #2563eb; }
         .invoice-error { margin-bottom: .75rem; border-radius: .35rem; background: #fef2f2; padding: .65rem; color: #b91c1c; font-size: .8rem; font-weight: 800; }
+        .invoice-field-hint { display: block; margin-top: .25rem; color: #64748b; font-size: .68rem; font-weight: 700; }
         .party-modal-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: rgba(15, 23, 42, .42); padding: 1rem; }
         .party-modal-backdrop[hidden] { display: none; }
-        .party-modal { width: min(46rem, 100%); max-height: calc(100vh - 2rem); overflow: auto; border-radius: .5rem; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .22); }
+        .party-modal { width: min(56rem, 100%); max-height: calc(100vh - 2rem); overflow: hidden; border-radius: .5rem; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .22); display: flex; flex-direction: column; }
         .party-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid #e2e8f0; padding: .75rem 1rem; }
         .party-modal-header h3 { margin: 0; font-size: .95rem; font-weight: 900; }
         .party-modal-header button { display: grid; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: .35rem; background: #f1f5f9; color: #334155; font-size: 1.2rem; font-weight: 900; }
-        .party-modal-body { display: grid; gap: .75rem; padding: 1rem; }
-        .party-modal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
-        .party-modal label { display: grid; gap: .25rem; color: #475569; font-size: .75rem; font-weight: 800; }
-        .party-modal input, .party-modal select, .party-modal textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: .35rem; padding: .45rem .55rem; font-size: .8rem; }
-        .party-modal-error { border-radius: .35rem; background: #fef2f2; color: #b91c1c; padding: .55rem .65rem; font-size: .78rem; font-weight: 800; }
-        .party-modal-actions { display: flex; justify-content: flex-end; gap: .5rem; }
-        .party-modal-actions button { border: 0; border-radius: .35rem; background: #64748b; color: #fff; padding: .5rem .8rem; font-size: .78rem; font-weight: 800; }
-        .party-modal-actions button[type="submit"] { background: #0d9488; }
+        .party-modal-iframe-body { flex: 1; min-height: min(70vh, 42rem); background: #f8fafc; }
+        .party-create-iframe { width: 100%; height: min(70vh, 42rem); border: 0; background: #fff; }
         @media (max-width: 1100px) { .invoice-header-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 900px) { .invoice-header-grid, .invoice-summary, .party-modal-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 900px) { .invoice-header-grid, .invoice-summary { grid-template-columns: 1fr; } }
         @media print { .erp-top-nav, header, .invoice-actions { display: none !important; } .invoice-panel { box-shadow: none; } }
     </style>
 
@@ -324,72 +329,73 @@
         const invoiceItems = @json($itemData);
         const oldLines = @json($oldLines);
         window.__erpInvoiceItemOptions = @json($itemOptions);
+        const cancelledSourcePayload = @json($cancelledSourcePayload ?? []);
         const initialRows = {{ $initialRows }};
         const linesBody = document.getElementById('invoice-lines-body');
         const template = document.getElementById('invoice-line-template');
         const partyModal = document.getElementById('party-modal');
-        const quickPartyForm = document.getElementById('quick-party-form');
         const partySelect = document.getElementById('invoice-party-select');
-        const partyModalError = document.getElementById('party-modal-error');
+        const partyCreateIframe = document.getElementById('party-create-iframe');
+        const returnedFromSelect = document.getElementById('invoice-returned-from');
+        const projectSelect = document.querySelector('select[name="project_id"]');
+        const warehouseSelect = document.querySelector('select[name="warehouse_id"]');
+        const descriptionInput = document.querySelector('textarea[name="description"]');
+        const partyCreateUrl = @json($partyCreateUrl);
 
         function openPartyModal() {
+            if (!partyModal || !partyCreateIframe) {
+                return;
+            }
+            partyCreateIframe.src = partyCreateUrl;
             partyModal.hidden = false;
-            partyModal.querySelector('input[name="name"]').focus();
         }
 
         function closePartyModal() {
+            if (!partyModal || !partyCreateIframe) {
+                return;
+            }
             partyModal.hidden = true;
-            quickPartyForm.reset();
-            partyModalError.hidden = true;
-            partyModalError.textContent = '';
+            partyCreateIframe.src = 'about:blank';
+        }
+
+        function selectCreatedParty(party) {
+            if (!partySelect || !party?.id) {
+                return;
+            }
+
+            if (![...partySelect.options].some((option) => String(option.value) === String(party.id))) {
+                partySelect.add(new Option(party.name, party.id, true, true));
+            }
+
+            partySelect.value = String(party.id);
+            partySelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
         document.getElementById('open-party-modal')?.addEventListener('click', openPartyModal);
         document.getElementById('close-party-modal')?.addEventListener('click', closePartyModal);
-        document.getElementById('cancel-party-modal')?.addEventListener('click', closePartyModal);
         partyModal?.addEventListener('click', (event) => {
             if (event.target === partyModal) {
                 closePartyModal();
             }
         });
 
-        quickPartyForm?.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            partyModalError.hidden = true;
-            partyModalError.textContent = '';
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
 
-            const submitButton = quickPartyForm.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.textContent = 'در حال ثبت...';
-
-            try {
-                const response = await fetch(@json(route('parties.store')), {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: new FormData(quickPartyForm),
-                });
-
-                const payload = await response.json();
-
-                if (!response.ok) {
-                    const errors = payload.errors ? Object.values(payload.errors).flat() : [payload.message || 'ثبت مشتری انجام نشد.'];
-                    throw new Error(errors.join(' '));
-                }
-
-                const option = new Option(payload.party.name, payload.party.id, true, true);
-                partySelect.add(option);
-                partySelect.value = payload.party.id;
-                partySelect.dispatchEvent(new Event('change', { bubbles: true }));
+            const type = event.data?.type;
+            if (type === 'party-edit-cancel') {
                 closePartyModal();
-            } catch (error) {
-                partyModalError.textContent = error.message || 'ثبت مشتری انجام نشد.';
-                partyModalError.hidden = false;
-            } finally {
-                submitButton.disabled = false;
-                submitButton.textContent = 'ثبت و انتخاب';
+                return;
+            }
+
+            if (type === 'party-saved') {
+                selectCreatedParty(event.data.party);
+                closePartyModal();
+                if (typeof window.showErpToast === 'function') {
+                    window.showErpToast(event.data.message || 'طرف حساب ثبت شد.');
+                }
             }
         });
 
@@ -467,7 +473,6 @@
                 row.dataset.index = index;
                 row.querySelector('.line-index').textContent = index + 1;
                 getLineItemInput(row).name = `lines[${index}][item_id]`;
-                row.querySelector('.line-description').name = `lines[${index}][description]`;
                 row.querySelector('.line-quantity').name = `lines[${index}][quantity]`;
                 row.querySelector('.line-price').name = `lines[${index}][unit_price]`;
                 row.querySelector('.line-discount').name = `lines[${index}][discount_amount]`;
@@ -476,9 +481,30 @@
             });
         }
 
+        function applyItemMeta(row, itemId, options = {}) {
+            const overwritePrice = options.overwritePrice !== false;
+            const itemMeta = invoiceItems[String(itemId || '')] || {};
+            const unit = row.querySelector('.line-unit');
+            const price = row.querySelector('.line-price');
+            const quantity = row.querySelector('.line-quantity');
+
+            if (unit) {
+                unit.value = itemId ? (itemMeta.unit || '—') : '';
+            }
+
+            if (price && itemId && overwritePrice) {
+                price.value = itemMeta.price != null && itemMeta.price !== '' ? itemMeta.price : '';
+            }
+
+            if (itemId && quantity && !quantity.value) {
+                quantity.value = 1;
+            }
+
+            row.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach(setFormattedValue);
+        }
+
         function addRow(values = {}) {
             const row = template.content.firstElementChild.cloneNode(true);
-            row.querySelector('.line-description').value = values.description || '';
             row.querySelector('.line-quantity').value = values.quantity || '';
             row.querySelector('.line-price').value = values.unit_price || '';
             row.querySelector('.line-discount').value = values.discount_amount ?? 0;
@@ -487,6 +513,9 @@
             linesBody.appendChild(row);
             window.ErpSearchSelect?.bind(getLineItemSearch(row));
             window.ErpSearchSelect?.setValue(getLineItemSearch(row), values.item_id || '');
+            applyItemMeta(row, values.item_id || getLineItemInput(row).value, {
+                overwritePrice: values.unit_price === undefined || values.unit_price === null || values.unit_price === '',
+            });
             renameRows();
             recalculateInvoice();
         }
@@ -511,15 +540,17 @@
 
             linesBody.querySelectorAll('.invoice-line').forEach((row) => {
                 const item = getLineItemInput(row);
-                const unit = row.querySelector('.line-unit');
                 const quantity = row.querySelector('.line-quantity');
                 const price = row.querySelector('.line-price');
                 const discount = row.querySelector('.line-discount');
                 const taxRate = row.querySelector('.line-tax-rate');
                 const total = row.querySelector('.line-total');
-                const itemMeta = invoiceItems[item.value] || {};
+                const itemMeta = invoiceItems[String(item.value || '')] || {};
+                const unit = row.querySelector('.line-unit');
 
-                unit.value = itemMeta.unit || '';
+                if (unit) {
+                    unit.value = item.value ? (itemMeta.unit || '—') : '';
+                }
 
                 const baseAmount = toNumber(quantity.value) * toNumber(price.value);
                 const discountAmount = Math.min(toNumber(discount.value), baseAmount);
@@ -584,12 +615,7 @@
         linesBody.addEventListener('change', (event) => {
             if (event.target.classList.contains('line-item')) {
                 const row = event.target.closest('.invoice-line');
-                const itemMeta = invoiceItems[event.target.value] || {};
-                row.querySelector('.line-price').value = itemMeta.price || '';
-                if (!row.querySelector('.line-quantity').value && event.target.value) {
-                    row.querySelector('.line-quantity').value = 1;
-                }
-                row.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach(setFormattedValue);
+                applyItemMeta(row, event.target.value);
                 maybeAddNextRow();
                 recalculateInvoice();
             }
@@ -605,10 +631,59 @@
             }
         });
 
+        function clearLines() {
+            linesBody.innerHTML = '';
+        }
+
+        function applyCancelledSource(sourceId, { forceLines = true } = {}) {
+            const source = cancelledSourcePayload[String(sourceId || '')];
+            if (!source) {
+                return;
+            }
+
+            if (partySelect && source.party_id) {
+                if (![...partySelect.options].some((option) => String(option.value) === String(source.party_id))) {
+                    partySelect.add(new Option(source.party_name || ('طرف حساب #' + source.party_id), source.party_id));
+                }
+                partySelect.value = String(source.party_id);
+            }
+
+            if (projectSelect) {
+                projectSelect.value = source.project_id ? String(source.project_id) : '';
+            }
+
+            if (warehouseSelect) {
+                warehouseSelect.value = source.warehouse_id ? String(source.warehouse_id) : '';
+            }
+
+            if (descriptionInput && !descriptionInput.value && source.description) {
+                descriptionInput.value = source.description;
+            }
+
+            if (!forceLines) {
+                return;
+            }
+
+            clearLines();
+            (source.lines || []).forEach((line) => addRow(line));
+            addRow();
+            linesBody.querySelectorAll('.line-quantity, .line-price, .line-discount, .line-tax-rate').forEach((input) => {
+                input.dataset.erpMoney = '0';
+                input.dataset.erpNumber = '0';
+            });
+            recalculateInvoice();
+        }
+
+        returnedFromSelect?.addEventListener('change', () => {
+            applyCancelledSource(returnedFromSelect.value, { forceLines: true });
+        });
+
         function bootstrapInvoiceLines() {
             if (oldLines.length) {
                 oldLines.forEach((line) => addRow(line));
                 addRow();
+            } else if (returnedFromSelect?.value && cancelledSourcePayload[String(returnedFromSelect.value)]) {
+                applyCancelledSource(returnedFromSelect.value, { forceLines: true });
             } else {
                 for (let i = 0; i < initialRows; i++) {
                     addRow();

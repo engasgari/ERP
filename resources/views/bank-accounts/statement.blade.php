@@ -35,7 +35,7 @@
                 </div>
             </div>
 
-            <form method="get" class="erp-ui-filter-bar mt-5">
+            <form method="get" action="{{ $statementUrl }}" class="erp-ui-filter-bar mt-5">
                 <div class="erp-filter-row bank-statement-filter-row">
                     <label class="erp-filter-field">از تاریخ
                         <x-erp.ui.jalali-date-input name="date_from" :value="request('date_from') ? jalaliDateInputValue(request('date_from')) : ''" placeholder="1404/08/01" class="w-full" />
@@ -62,10 +62,7 @@
                             @endforeach
                         </select>
                     </label>
-                    <div class="erp-filter-actions">
-                        <button type="submit" class="erp-filter-submit">اعمال فیلتر</button>
-                        <a href="{{ route('bank-accounts.statement', ['bankAccount' => $bankAccount->id]) }}" class="erp-filter-reset">پاک کردن</a>
-                    </div>
+                    <x-filter-actions :reset-route="$statementUrl" />
                 </div>
             </form>
         </section>

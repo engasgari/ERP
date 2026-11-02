@@ -43,6 +43,8 @@ class Index extends Component
 
     public function delete(int $warehouseId): void
     {
+        abort_unless(auth()->user()?->hasPermission('warehouse.delete'), 403);
+
         $warehouse = Warehouse::findOrFail($warehouseId);
         $details = $this->relatedDetails($warehouse);
 
@@ -58,6 +60,7 @@ class Index extends Component
 
     public function updateField(int $warehouseId, string $field, mixed $value): void
     {
+        abort_unless(auth()->user()?->hasPermission('warehouse.update'), 403);
         abort_unless(in_array($field, ['name', 'description', 'is_active'], true), 403);
 
         $warehouse = Warehouse::findOrFail($warehouseId);

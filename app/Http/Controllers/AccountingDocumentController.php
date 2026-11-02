@@ -9,8 +9,10 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Repositories\AccountingDocumentRepository;
 use App\Services\AccountingPostingService;
+use App\Services\NumberingService;
 use App\Support\PersianPdf;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class AccountingDocumentController extends Controller
 {
@@ -38,30 +40,50 @@ class AccountingDocumentController extends Controller
             $request->user()->id
         );
 
-        return redirect()->route('accounting-documents.show', $document)->with('success', 'سند حسابداری ذخیره شد.');
+        return redirect()
+            ->route('accounting-documents.show', ['accountingDocument' => $document->getKey()])
+            ->with('success', 'سند حسابداری ذخیره شد.');
     }
 
-    public function show(AccountingDocument $accountingDocument)
+    public function show(Request $request, AccountingDocument $accountingDocument)
     {
+        $documentId = $this->resolveDocumentId($request, $accountingDocument);
+        $document = AccountingDocument::query()
+            ->with(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount', 'audits'])
+            ->findOrFail($documentId);
+
         return view('accounting-documents.show', [
-            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount', 'audits']),
+            'document' => $document,
+            'documentId' => $documentId,
         ]);
     }
 
-    public function print(AccountingDocument $accountingDocument)
+    public function print(Request $request, AccountingDocument $accountingDocument)
     {
+        $documentId = $this->resolveDocumentId($request, $accountingDocument);
+        $document = AccountingDocument::query()
+            ->with(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount'])
+            ->findOrFail($documentId);
+
         return view('accounting-documents.print', [
-            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount']),
+            'document' => $document,
+            'documentId' => $documentId,
         ]);
     }
 
-    public function pdf(AccountingDocument $accountingDocument)
+    public function pdf(Request $request, AccountingDocument $accountingDocument)
     {
+        $documentId = $this->resolveDocumentId($request, $accountingDocument);
+        $document = AccountingDocument::query()
+            ->with(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount'])
+            ->findOrFail($documentId);
+
         $pdf = PersianPdf::loadView('accounting-documents.print', [
-            'document' => $accountingDocument->load(['lines.account', 'lines.detailAccount', 'lines.party', 'lines.project', 'lines.bankAccount']),
+            'document' => $document,
+            'documentId' => $documentId,
         ], 'a4', 'landscape');
 
-        return $pdf->download('accounting-document-' . $accountingDocument->number . '.pdf');
+        return $pdf->download('accounting-document-' . $document->number . '.pdf');
     }
 
     public function edit(AccountingDocument $accountingDocument)
@@ -87,7 +109,9 @@ class AccountingDocumentController extends Controller
                 $request->user()->id
             );
 
-            return redirect()->route('accounting-documents.show', $accountingDocument)->with('success', 'سند سیستمی ویرایش شد. برای اعمال در گزارش‌ها آن را ثبت قطعی کنید.');
+            return redirect()
+                ->route('accounting-documents.show', ['accountingDocument' => $accountingDocument->getKey()])
+                ->with('success', 'سند سیستمی ویرایش شد. برای اعمال در گزارش‌ها آن را ثبت قطعی کنید.');
         }
 
         $this->posting->updateManual(
@@ -97,7 +121,9 @@ class AccountingDocumentController extends Controller
             $request->user()->id
         );
 
-        return redirect()->route('accounting-documents.show', $accountingDocument)->with('success', 'سند حسابداری ویرایش شد.');
+        return redirect()
+            ->route('accounting-documents.show', ['accountingDocument' => $accountingDocument->getKey()])
+            ->with('success', 'سند حسابداری ویرایش شد.');
     }
 
     public function destroy(Request $request, AccountingDocument $accountingDocument)
@@ -117,24 +143,51 @@ class AccountingDocumentController extends Controller
 
     public function post(Request $request, AccountingDocument $accountingDocument)
     {
-        $this->posting->post($accountingDocument, $request->user()->id);
+        $documentId = $this->resolveDocumentId($request, $accountingDocument);
+        $document = AccountingDocument::query()->findOrFail($documentId);
+        $this->posting->post($document, $request->user()->id);
 
-        return back()->with('success', 'سند حسابداری ثبت قطعی شد.');
+        return redirect()
+            ->route('accounting-documents.show', ['accountingDocument' => $documentId])
+            ->with('success', 'سند حسابداری ثبت قطعی شد.');
     }
 
     public function unpost(Request $request, AccountingDocument $accountingDocument)
     {
-        if ($redirect = $this->redirectIfNotPosted($accountingDocument, 'فقط اسناد ثبت قطعی را می‌توان به پیش‌نویس برگرداند.')) {
+        $documentId = $this->resolveDocumentId($request, $accountingDocument);
+        $document = AccountingDocument::query()->findOrFail($documentId);
+
+        if ($redirect = $this->redirectIfNotPosted($document, 'فقط اسناد ثبت قطعی را می‌توان به پیش‌نویس برگرداند.')) {
             return $redirect;
         }
 
-        if ($redirect = $this->redirectIfVoided($accountingDocument)) {
+        if ($redirect = $this->redirectIfVoided($document)) {
             return $redirect;
         }
 
-        $this->posting->unpost($accountingDocument, $request->user()->id);
+        $this->posting->unpost($document, $request->user()->id);
 
-        return back()->with('success', 'سند حسابداری به حالت پیش‌نویس برگشت و اکنون قابل ویرایش است.');
+        return redirect()
+            ->route('accounting-documents.show', ['accountingDocument' => $documentId])
+            ->with('success', 'سند حسابداری به حالت پیش‌نویس برگشت و اکنون قابل ویرایش است.');
+    }
+
+    /**
+     * Capture the path id up front — never rebuild URLs via route($model)
+     * when the route-key may be unavailable (UrlGenerationException).
+     */
+    private function resolveDocumentId(Request $request, AccountingDocument $accountingDocument): int
+    {
+        $routeParam = $request->route('accountingDocument');
+        $documentId = (int) ($accountingDocument->getKey()
+            ?: (is_numeric($routeParam) ? $routeParam : null)
+            ?: $request->segment(2));
+
+        if ($documentId <= 0) {
+            abort(404);
+        }
+
+        return $documentId;
     }
 
     private function formData(AccountingDocument $document): array
@@ -142,6 +195,16 @@ class AccountingDocumentController extends Controller
         $usedAccountIds = $document->relationLoaded('lines')
             ? $document->lines->pluck('chart_account_id')->merge($document->lines->pluck('detail_account_id'))->filter()->unique()->all()
             : [];
+
+        $suggestedNumber = null;
+
+        if (! $document->exists) {
+            try {
+                $suggestedNumber = app(NumberingService::class)->peek('accounting_document', 'ACC-');
+            } catch (RuntimeException) {
+                $suggestedNumber = null;
+            }
+        }
 
         return [
             'document' => $document,
@@ -151,6 +214,7 @@ class AccountingDocumentController extends Controller
                 ->get(),
             'parties' => Party::where('is_active', true)->orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
+            'suggestedNumber' => $suggestedNumber,
         ];
     }
 
@@ -174,7 +238,7 @@ class AccountingDocumentController extends Controller
         }
 
         return redirect()
-            ->route('accounting-documents.show', $document)
+            ->route('accounting-documents.show', ['accountingDocument' => $document->getKey()])
             ->with('error', 'این سند حسابداری به صورت خودکار توسط سیستم ثبت شده و از این صفحه قابل حذف نیست.')
             ->with('error_details', [
                 'سند حسابداری: ' . $document->number,
@@ -190,7 +254,7 @@ class AccountingDocumentController extends Controller
         }
 
         return redirect()
-            ->route('accounting-documents.show', $document)
+            ->route('accounting-documents.show', ['accountingDocument' => $document->getKey()])
             ->with('error', 'این سند حسابداری ثبت قطعی شده است. برای ویرایش یا حذف، ابتدا آن را به پیش‌نویس برگردانید.');
     }
 
@@ -201,7 +265,7 @@ class AccountingDocumentController extends Controller
         }
 
         return redirect()
-            ->route('accounting-documents.show', $document)
+            ->route('accounting-documents.show', ['accountingDocument' => $document->getKey()])
             ->with('error', $message);
     }
 
@@ -212,7 +276,7 @@ class AccountingDocumentController extends Controller
         }
 
         return redirect()
-            ->route('accounting-documents.show', $document)
+            ->route('accounting-documents.show', ['accountingDocument' => $document->getKey()])
             ->with('error', 'سند باطل‌شده قابل برگشت به پیش‌نویس نیست.');
     }
 }

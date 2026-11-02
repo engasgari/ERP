@@ -79,10 +79,16 @@
                     @endforeach
                 </select>
             </label>
+            @php
+                $canConfirmDocument = (bool) auth()->user()?->hasPermission('inventory.documents.confirm');
+                $currentStatus = old('status', $document->status ?: 'draft');
+            @endphp
             <label>وضعیت
                 <select name="status" class="w-full">
-                    <option value="draft" @selected(old('status', $document->status ?: 'draft') === 'draft')>موقت</option>
-                    <option value="confirmed" @selected(old('status', $document->status) === 'confirmed')>تایید شده</option>
+                    <option value="draft" @selected($currentStatus === 'draft')>موقت</option>
+                    @if($canConfirmDocument || $currentStatus === 'confirmed')
+                        <option value="confirmed" @selected($currentStatus === 'confirmed') @disabled(! $canConfirmDocument)>تایید شده</option>
+                    @endif
                 </select>
             </label>
         </div>

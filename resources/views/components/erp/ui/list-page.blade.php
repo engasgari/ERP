@@ -6,7 +6,7 @@
     'panelClass' => '',
     'showLoading' => true,
 ])
-<x-erp.ui.panel :class="$panelClass">
+<x-erp.ui.panel :class="$panelClass" data-erp-preserve-scroll="1">
     <x-erp.ui.page-header :title="$title" :description="$description" :actions="$actions" />
 
     @include('livewire.partials.flash')

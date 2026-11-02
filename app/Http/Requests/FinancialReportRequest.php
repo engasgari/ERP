@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class FinancialReportRequest extends FormRequest
 {
@@ -10,6 +12,7 @@ class FinancialReportRequest extends FormRequest
     {
         return $this->user()?->hasPermission('financial.reports.view')
             || $this->user()?->hasPermission('reports.view')
+            || $this->user()?->hasPermission('financial.manage')
             || false;
     }
 
@@ -19,7 +22,13 @@ class FinancialReportRequest extends FormRequest
 
         foreach (['date_from', 'date_to'] as $key) {
             if (! empty($filters[$key])) {
-                $filters[$key] = jalaliToGregorianDate($filters[$key]) ?: $filters[$key];
+                $converted = jalaliToGregorianDate($filters[$key]);
+                if ($converted) {
+                    $filters[$key] = $converted;
+                } else {
+                    // Drop unparseable dates so GET filter pages do not redirect-loop.
+                    unset($filters[$key]);
+                }
             }
         }
 
@@ -88,5 +97,39 @@ class FinancialReportRequest extends FormRequest
             'report' => ['nullable', 'string', 'max:100'],
             'format' => ['nullable', 'in:html,pdf,excel,print'],
         ];
+    }
+
+    /**
+     * GET report filters must not use redirect()->back() with the same invalid
+     * query string — that creates ERR_TOO_MANY_REDIRECTS.
+     */
+    protected function failedValidation(Validator $validator): void
+    {
+        if (! $this->isMethod('GET')) {
+            parent::failedValidation($validator);
+
+            return;
+        }
+
+        $route = $this->route();
+        $name = $route?->getName();
+        $parameters = [];
+
+        foreach ($route?->parameters() ?? [] as $key => $value) {
+            $parameters[$key] = is_object($value) && method_exists($value, 'getRouteKey')
+                ? $value->getRouteKey()
+                : $value;
+        }
+
+        $target = ($name && $parameters !== [])
+            ? route($name, $parameters)
+            : ($name ? route($name) : $this->path());
+
+        throw new HttpResponseException(
+            redirect()
+                ->to($target)
+                ->withErrors($validator)
+                ->with('error', 'فیلتر گزارش نامعتبر بود و پاک شد.')
+        );
     }
 }

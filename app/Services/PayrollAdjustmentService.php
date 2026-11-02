@@ -48,8 +48,15 @@ class PayrollAdjustmentService
                 ]);
             }
 
+            // Keep paid/partial; otherwise stay calculated so the payments screen can still pay
+            // after a manual tweak on an already-approved period.
+            $nextStatus = match (true) {
+                $calculation->status === 'failed' => 'failed',
+                in_array($calculation->status, ['paid', 'partial'], true) => $calculation->status,
+                default => 'calculated',
+            };
             $fresh->update([
-                'status' => $calculation->status === 'failed' ? 'failed' : 'calculated',
+                'status' => $nextStatus,
                 'failure_reason' => null,
             ]);
 

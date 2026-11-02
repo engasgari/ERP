@@ -165,25 +165,33 @@
 
                     @if($isEditing)
                         <tr class="bg-slate-50" wire:key="payroll-edit-{{ $calculation->id }}">
-                            <td colspan="8" class="p-4">
+                            <td colspan="8" class="p-4" data-erp-skip-money>
                                 <div class="mb-3 text-sm font-semibold text-slate-800">ویرایش مبالغ: {{ $calculation->employee?->full_name }}</div>
                                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                                     @foreach($editLines as $index => $line)
-                                        <label class="block rounded-md border border-slate-200 bg-white p-3 text-xs">
+                                        <label class="block rounded-md border border-slate-200 bg-white p-3 text-xs" wire:key="payroll-edit-line-{{ $calculation->id }}-{{ $line['id'] ?? $index }}">
                                             <div class="flex items-center justify-between gap-2">
-                                                <span class="font-semibold text-slate-800">{{ $line['title'] }}</span>
-                                                <span class="rounded-full px-2 py-0.5 {{ $line['type'] === 'earning' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700' }}">
-                                                    {{ $line['type'] === 'earning' ? 'مزایا' : 'کسورات' }}
+                                                <span class="font-semibold text-slate-800">{{ $line['title'] ?? '—' }}</span>
+                                                <span class="rounded-full px-2 py-0.5 {{ ($line['type'] ?? '') === 'earning' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700' }}">
+                                                    {{ ($line['type'] ?? '') === 'earning' ? 'مزایا' : 'کسورات' }}
                                                 </span>
                                             </div>
-                                            <input type="number"
-                                                   step="1"
-                                                   min="0"
-                                                   wire:model="editLines.{{ $index }}.amount"
-                                                   @disabled(!empty($line['locked']))
-                                                   class="mt-2 w-full rounded-md border-gray-300 text-sm disabled:bg-slate-100">
                                             @if(!empty($line['locked']))
+                                                {{-- Locked: formatted display only; amount restored from DB on save. --}}
+                                                <input type="text"
+                                                       readonly
+                                                       dir="ltr"
+                                                       data-erp-money="0"
+                                                       value="{{ moneyInputValue($line['amount'] ?? 0) }}"
+                                                       class="mt-2 w-full rounded-md border-gray-300 bg-slate-100 text-sm text-slate-500 tabular-nums">
                                                 <div class="mt-1 text-[11px] text-slate-500">بیمه/مالیات سیستمی است و اینجا قفل است.</div>
+                                            @else
+                                                <div class="mt-2">
+                                                    <x-erp.ui.money-input
+                                                        wire:model.blur="editLines.{{ $index }}.amount"
+                                                        class="mt-0"
+                                                    />
+                                                </div>
                                             @endif
                                         </label>
                                     @endforeach
@@ -192,15 +200,19 @@
                                 <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                                     <label class="block text-xs font-medium text-slate-700">
                                         افزودن پاداش
-                                        <input type="number" step="1" min="0" wire:model="newBonusAmount" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                        <div class="mt-1">
+                                            <x-erp.ui.money-input wire:model.blur="newBonusAmount" />
+                                        </div>
                                     </label>
                                     <label class="block text-xs font-medium text-slate-700">
                                         عنوان کسورات دستی
-                                        <input type="text" wire:model="newDeductionTitle" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                        <input type="text" wire:model.blur="newDeductionTitle" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                     </label>
                                     <label class="block text-xs font-medium text-slate-700">
                                         مبلغ کسورات دستی
-                                        <input type="number" step="1" min="0" wire:model="newDeductionAmount" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                        <div class="mt-1">
+                                            <x-erp.ui.money-input wire:model.blur="newDeductionAmount" />
+                                        </div>
                                     </label>
                                 </div>
 
@@ -224,7 +236,7 @@
                                             تاریخ پرداخت
                                             <div class="mt-1">
                                                 <x-erp.ui.jalali-date-input
-                                                    wire:model.live="paymentDrafts.{{ $calculation->id }}.payment_date"
+                                                    wire:model.blur="paymentDrafts.{{ $calculation->id }}.payment_date"
                                                     placeholder="1405/01/01"
                                                     class="w-full"
                                                 />
@@ -233,15 +245,15 @@
                                         </label>
                                         <label class="block text-xs font-medium text-slate-700">
                                             روش
-                                            <select wire:model.live="paymentDrafts.{{ $calculation->id }}.method" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                            <select wire:model.live="paymentDrafts.{{ $calculation->id }}.method" data-erp-no-lookup="1" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                                 <option value="bank">بانکی</option>
                                                 <option value="cash">نقدی</option>
                                             </select>
                                         </label>
-                                        @if(($paymentDrafts[$calculation->id]['method'] ?? 'bank') === 'bank')
+                                        @if(($paymentDrafts[$calculation->id]['method'] ?? $paymentDrafts[(string) $calculation->id]['method'] ?? 'bank') === 'bank')
                                             <label class="block text-xs font-medium text-slate-700 xl:col-span-2">
                                                 حساب بانکی پرداخت‌کننده
-                                                <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.bank_account_id" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                                <select wire:model="paymentDrafts.{{ $calculation->id }}.bank_account_id" data-erp-no-lookup="1" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                                     <option value="">انتخاب کنید</option>
                                                     @foreach($bankAccounts as $bank)
                                                         <option value="{{ $bank->id }}">{{ $bank->bank_name }} — {{ $bank->account_number ?: $bank->code }}</option>
@@ -252,7 +264,7 @@
                                         @else
                                             <label class="block text-xs font-medium text-slate-700 xl:col-span-2">
                                                 صندوق
-                                                <select wire:model.defer="paymentDrafts.{{ $calculation->id }}.cashbox_id" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                                <select wire:model="paymentDrafts.{{ $calculation->id }}.cashbox_id" data-erp-no-lookup="1" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                                     <option value="">انتخاب کنید</option>
                                                     @foreach($cashboxes as $cashbox)
                                                         <option value="{{ $cashbox->id }}">{{ $cashbox->name }}</option>
@@ -263,11 +275,14 @@
                                         @endif
                                         <label class="block text-xs font-medium text-slate-700">
                                             مبلغ
-                                            <input type="number" step="1" min="1" wire:model.defer="paymentDrafts.{{ $calculation->id }}.amount" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                            <div class="mt-1">
+                                                <x-erp.ui.money-input wire:model.blur="paymentDrafts.{{ $calculation->id }}.amount" />
+                                            </div>
+                                            @error('paymentDrafts.'.$calculation->id.'.amount') <span class="text-red-600">{{ $message }}</span> @enderror
                                         </label>
                                         <label class="block text-xs font-medium text-slate-700">
                                             شماره مرجع
-                                            <input type="text" wire:model.defer="paymentDrafts.{{ $calculation->id }}.reference_number" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                            <input type="text" wire:model="paymentDrafts.{{ $calculation->id }}.reference_number" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                         </label>
                                     </div>
                                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">

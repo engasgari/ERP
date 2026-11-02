@@ -12,6 +12,8 @@ class CompanySetting extends Model
         'economic_code',
         'national_id',
         'postal_code',
+        'province',
+        'city',
         'phone',
         'address',
         'default_vat_rate',

@@ -21,6 +21,7 @@ class Invoice extends Model
         'project_id',
         'warehouse_id',
         'converted_from_id',
+        'returned_from_id',
         'status',
         'subtotal',
         'discount_amount',
@@ -69,6 +70,16 @@ class Invoice extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(InvoiceLine::class);
+    }
+
+    public function returnedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'returned_from_id');
+    }
+
+    public function returnInvoices(): HasMany
+    {
+        return $this->hasMany(self::class, 'returned_from_id');
     }
 
     public function contractorAllocation(): HasOne
@@ -138,5 +149,36 @@ class Invoice extends Model
     public function getIsSettledAttribute(): bool
     {
         return (bool) $this->settled_at;
+    }
+
+    public function isReturn(): bool
+    {
+        return $this->document_type === 'return';
+    }
+
+    public function isProforma(): bool
+    {
+        return $this->document_type === 'proforma';
+    }
+
+    public function postsInventoryAndAccounting(): bool
+    {
+        return in_array($this->document_type, ['invoice', 'return'], true);
+    }
+
+    public function typeLabel(): string
+    {
+        return match (true) {
+            $this->document_type === 'proforma' => 'پیش‌فاکتور فروش',
+            $this->document_type === 'return' && $this->direction === 'sale' => 'برگشت از فروش',
+            $this->document_type === 'return' && $this->direction === 'purchase' => 'برگشت از خرید',
+            $this->direction === 'sale' => 'فاکتور فروش',
+            default => 'فاکتور خرید',
+        };
+    }
+
+    public function canCancel(): bool
+    {
+        return ! $this->isReturn() && $this->status !== 'cancelled';
     }
 }

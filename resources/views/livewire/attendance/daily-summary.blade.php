@@ -66,6 +66,12 @@
                     {{ $employee?->full_name }} — {{ getPersianMonthName($month) }} {{ toPersianDigits($year) }}
                 </h3>
                 <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <a
+                        href="{{ route('attendance.daily-summary.print', ['employee_id' => $employee_id, 'year' => $year, 'month' => $month]) }}"
+                        target="_blank"
+                        data-no-spa
+                        class="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                    >چاپ فرم امضا</a>
                     <span class="font-semibold text-red-600">قرمز: تعطیل رسمی / پنجشنبه و جمعه</span>
                     <span class="font-semibold text-orange-600">نارنجی: غیبت</span>
                     <span class="font-semibold text-amber-700">کهربایی: تردد ناقص</span>
@@ -109,12 +115,23 @@
                             <td>
                                 @if($day['is_off_day'] ?? $day['is_holiday'] ?? false)
                                     <span class="daily-att-badge daily-att-badge--off">{{ $day['day_type'] }}</span>
+                                @elseif(($day['mission_minutes'] ?? 0) > 0 && ($day['worked_minutes'] ?? 0) <= 0)
+                                    <span class="daily-att-badge daily-att-badge--ok">ماموریت</span>
+                                @elseif(($day['leave_minutes'] ?? 0) > 0 && ($day['worked_minutes'] ?? 0) <= 0)
+                                    <span class="daily-att-badge daily-att-badge--ok">مرخصی</span>
                                 @elseif($day['is_absence'] ?? false)
                                     <span class="daily-att-badge daily-att-badge--absence">غیبت</span>
                                 @elseif($day['is_incomplete'])
                                     <span class="daily-att-badge daily-att-badge--incomplete">تردد ناقص</span>
                                 @elseif($day['first_in'] !== '-' && $day['last_out'] !== '-')
-                                    <span class="daily-att-badge daily-att-badge--ok">حاضر</span>
+                                    <span class="daily-att-badge daily-att-badge--ok">حاضر
+                                        @if(($day['mission_minutes'] ?? 0) > 0) + ماموریت @endif
+                                        @if(($day['leave_minutes'] ?? 0) > 0) + مرخصی @endif
+                                    </span>
+                                @elseif(($day['mission_minutes'] ?? 0) > 0)
+                                    <span class="daily-att-badge daily-att-badge--ok">ماموریت</span>
+                                @elseif(($day['leave_minutes'] ?? 0) > 0)
+                                    <span class="daily-att-badge daily-att-badge--ok">مرخصی</span>
                                 @else
                                     <span class="daily-att-badge">—</span>
                                 @endif
@@ -259,6 +276,7 @@
                     <label class="block">علت
                         <input wire:model="leave_reason" class="mt-1 w-full rounded-md border-gray-300">
                     </label>
+                    <p class="text-xs text-slate-500">پس از ثبت، مرخصی تایید می‌شود و در خلاصه کارکرد لحاظ می‌گردد.</p>
                 </div>
                 <div class="erp-modal-actions">
                     <button type="button" class="erp-action-btn" wire:click="closeModals">انصراف</button>
@@ -279,18 +297,26 @@
                 <div class="erp-modal-body space-y-3">
                     <label class="block">نوع
                         <select wire:model.live="mission_request_type" class="mt-1 w-full rounded-md border-gray-300">
-                            <option value="daily">روزانه</option>
                             <option value="hourly">ساعتی</option>
+                            <option value="daily">روزانه</option>
                         </select>
                     </label>
                     @if($mission_request_type === 'hourly')
-                        <label class="block">ساعت
-                            <input type="number" step="0.25" wire:model="mission_hours" class="mt-1 w-full rounded-md border-gray-300">
-                        </label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="block">شروع ماموریت
+                                <input type="time" wire:model="mission_start_time" class="mt-1 w-full rounded-md border-gray-300" dir="ltr">
+                                @error('mission_start_time') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                            <label class="block">پایان ماموریت
+                                <input type="time" wire:model="mission_end_time" class="mt-1 w-full rounded-md border-gray-300" dir="ltr">
+                                @error('mission_end_time') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                            </label>
+                        </div>
                     @endif
                     <label class="block">توضیح
                         <input wire:model="mission_description" class="mt-1 w-full rounded-md border-gray-300">
                     </label>
+                    <p class="text-xs text-slate-500">پس از ثبت، ماموریت تایید می‌شود و در خلاصه کارکرد لحاظ می‌گردد.</p>
                 </div>
                 <div class="erp-modal-actions">
                     <button type="button" class="erp-action-btn" wire:click="closeModals">انصراف</button>

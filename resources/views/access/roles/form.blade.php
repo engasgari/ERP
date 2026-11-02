@@ -34,16 +34,78 @@
                 <div class="mt-5">
                     <div class="mb-2 text-sm font-bold text-gray-700">مجوزها</div>
                     @foreach($permissions as $group => $groupPermissions)
+                        @php
+                            $primaryKeys = match ($group) {
+                                'بازرگانی' => \App\Support\CommercePermissions::primaryKeys(),
+                                'انبار' => \App\Support\InventoryPermissions::primaryKeys(),
+                                'پروژه‌ها' => \App\Support\ProjectPermissions::primaryKeys(),
+                                'پرسنل' => \App\Support\EmployeePermissions::primaryKeys(),
+                                'حضور و غیاب' => \App\Support\AttendancePermissions::primaryKeys(),
+                                'حقوق و دستمزد' => \App\Support\PayrollPermissions::primaryKeys(),
+                                'کارکرد' => \App\Support\WorklogPermissions::primaryKeys(),
+                                'منابع انسانی' => \App\Support\HrPermissions::primaryKeys(),
+                                'خزانه' => \App\Support\TreasuryPermissions::primaryKeys(),
+                                default => [],
+                            };
+                            $actionHint = match ($group) {
+                                'بازرگانی' => 'مجوزهای جزئی فاکتور و قیمت‌گذاری',
+                                'انبار' => 'مجوزهای جزئی اسناد و تعریف انبار',
+                                'پروژه‌ها' => 'مجوزهای جزئی پروژه',
+                                'پرسنل' => 'مجوزهای جزئی پرسنل',
+                                'حضور و غیاب' => 'مجوزهای جزئی حضور، مرخصی و ماموریت',
+                                'حقوق و دستمزد' => 'مجوزهای جزئی محاسبه، تایید، پرداخت و بیمه',
+                                'کارکرد' => 'مجوزهای جزئی ثبت، ویرایش و تنظیمات کارکرد',
+                                'منابع انسانی' => 'مجوزهای جزئی احکام، قرارداد و ساختار سازمانی',
+                                'خزانه' => 'مجوزهای جزئی تراکنش خزانه و حساب شرکا',
+                                default => null,
+                            };
+                            $primaryPermissions = $primaryKeys !== []
+                                ? $groupPermissions
+                                    ->filter(fn ($permission) => in_array($permission->key, $primaryKeys, true))
+                                    ->sortBy(fn ($permission) => array_search($permission->key, $primaryKeys, true))
+                                    ->values()
+                                : collect();
+                            $actionPermissions = $primaryKeys !== []
+                                ? $groupPermissions
+                                    ->reject(fn ($permission) => in_array($permission->key, $primaryKeys, true))
+                                    ->sortBy('title')
+                                    ->values()
+                                : $groupPermissions;
+                        @endphp
                         <section class="mb-3 rounded bg-gray-50 p-3">
                             <h3 class="mb-2 font-bold">{{ $group }}</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                @foreach($groupPermissions as $permission)
-                                    <label class="flex items-center gap-2 text-sm">
-                                        <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked($role->name === 'admin' || in_array($permission->id, old('permissions', $selectedPermissions))) @disabled($role->name === 'admin')>
-                                        <span>{{ $permission->title }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
+                            @if($primaryKeys !== [])
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    @foreach($primaryPermissions as $permission)
+                                        <label class="flex items-center gap-2 text-sm font-semibold">
+                                            <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked($role->name === 'admin' || in_array($permission->id, old('permissions', $selectedPermissions))) @disabled($role->name === 'admin')>
+                                            <span>{{ $permission->title }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                @if($actionPermissions->isNotEmpty())
+                                    <div class="mt-5 border-t border-gray-200 pt-4">
+                                        <div class="mb-2 text-xs font-medium text-gray-500">{{ $actionHint }}</div>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            @foreach($actionPermissions as $permission)
+                                                <label class="flex items-center gap-2 text-sm">
+                                                    <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked($role->name === 'admin' || in_array($permission->id, old('permissions', $selectedPermissions))) @disabled($role->name === 'admin')>
+                                                    <span>{{ $permission->title }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+                            @else
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    @foreach($actionPermissions as $permission)
+                                        <label class="flex items-center gap-2 text-sm">
+                                            <input type="checkbox" name="permissions[]" value="{{ $permission->id }}" @checked($role->name === 'admin' || in_array($permission->id, old('permissions', $selectedPermissions))) @disabled($role->name === 'admin')>
+                                            <span>{{ $permission->title }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            @endif
                         </section>
                     @endforeach
                 </div>

@@ -349,9 +349,13 @@
 <body class="{{ ($forPdf ?? false) ? 'pdf-document' : '' }}">
 @php
     $isSale = $invoice->direction === 'sale';
-    $documentTitle = $invoice->document_type === 'proforma'
-        ? 'پیش فاکتور فروش کالا و خدمات'
-        : ($isSale ? 'فاکتور فروش کالا و خدمات' : 'صورتحساب خرید کالا و خدمات');
+    $documentTitle = match (true) {
+        $invoice->document_type === 'proforma' => 'پیش فاکتور فروش کالا و خدمات',
+        $invoice->document_type === 'return' && $isSale => 'فاکتور برگشت از فروش کالا و خدمات',
+        $invoice->document_type === 'return' => 'فاکتور برگشت از خرید کالا و خدمات',
+        $isSale => 'فاکتور فروش کالا و خدمات',
+        default => 'صورتحساب خرید کالا و خدمات',
+    };
 
     // Official invoice layout: seller block first, buyer block second.
     // Sale: company = seller, party = buyer

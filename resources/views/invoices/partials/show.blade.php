@@ -16,11 +16,20 @@
         $urlExcel = $routes['excel']
             ?? ($invoiceKey ? route('invoices.excel', $invoiceKey) : null);
         $isSale = $invoice->direction === 'sale';
-        $documentTitle = $invoice->document_type === 'proforma'
-            ? 'پیش فاکتور فروش کالا و خدمات'
-            : ($isSale ? 'صورتحساب فروش کالا و خدمات' : 'صورتحساب خرید کالا و خدمات');
+        $documentTitle = match (true) {
+            $invoice->document_type === 'proforma' => 'پیش فاکتور فروش کالا و خدمات',
+            $invoice->document_type === 'return' && $isSale => 'فاکتور برگشت از فروش کالا و خدمات',
+            $invoice->document_type === 'return' => 'فاکتور برگشت از خرید کالا و خدمات',
+            $isSale => 'صورتحساب فروش کالا و خدمات',
+            default => 'صورتحساب خرید کالا و خدمات',
+        };
         $partyLabel = $isSale ? 'خریدار' : 'فروشنده';
-        $warehouseLabel = $invoice->direction === 'purchase' ? 'انبار ورودی' : 'انبار خروجی';
+        $warehouseLabel = match (true) {
+            $invoice->document_type === 'return' && $isSale => 'انبار ورودی',
+            $invoice->document_type === 'return' => 'انبار خروجی',
+            $invoice->direction === 'purchase' => 'انبار ورودی',
+            default => 'انبار خروجی',
+        };
         $inventoryDocument = $invoice->inventoryDocuments->first();
         $rowBaseTotal = $invoice->lines->sum(fn ($line) => (float) $line->quantity * (float) $line->unit_price);
         $discountTotal = (float) $invoice->discount_amount;
@@ -34,6 +43,13 @@
                 'cancelled' => 'ابطال‌شده',
                 default => 'ثبت موقت',
             };
+        $authUser = auth()->user();
+        $canUpdateInvoice = (bool) $authUser?->hasPermission('commerce.invoices.update');
+        $canDeleteInvoice = (bool) $authUser?->hasPermission('commerce.invoices.delete');
+        $canCancelInvoice = (bool) $authUser?->hasPermission('commerce.invoices.cancel');
+        $canConfirmInvoice = (bool) $authUser?->hasPermission('commerce.invoices.confirm');
+        $canSettleInvoice = (bool) $authUser?->hasPermission('commerce.invoices.settle');
+        $canConvertInvoice = (bool) $authUser?->hasPermission('commerce.invoices.convert');
     @endphp
 
         <div class="invoice-print-actions">
@@ -42,12 +58,12 @@
             @else
                 <a href="{{ route('invoices.index') }}">بازگشت به فهرست</a>
             @endif
-            @if($invoiceKey && $embedded && (! ($crmContext ?? false) || ($invoice->document_type === 'proforma' && $invoice->status === 'draft')))
+            @if($canUpdateInvoice && $invoiceKey && $embedded && (! ($crmContext ?? false) || ($invoice->document_type === 'proforma' && $invoice->status === 'draft')))
                 <button type="button" id="invoice-show-embedded-edit">
-                    {{ $invoice->document_type === 'proforma' ? 'ویرایش پیش‌فاکتور' : 'ویرایش فاکتور' }}
+                    {{ $invoice->document_type === 'proforma' ? 'ویرایش پیش‌فاکتور' : 'ویرایش ' . $invoice->typeLabel() }}
                 </button>
-            @elseif($invoiceKey && ! $embedded)
-                <a href="{{ $routes['edit'] ?? route('invoices.edit', $invoiceKey) }}">ویرایش فاکتور</a>
+            @elseif($canUpdateInvoice && $invoiceKey && ! $embedded)
+                <a href="{{ $routes['edit'] ?? route('invoices.edit', $invoiceKey) }}">ویرایش {{ $invoice->typeLabel() }}</a>
             @endif
             @if($urlPrint)
                 <a href="{{ $urlPrint }}" @if($embedded) data-embedded-open @else target="_blank" data-no-spa @endif>چاپ نهایی</a>
@@ -60,31 +76,47 @@
             @endif
             @unless($crmContext)
             @if($invoiceKey)
+            @if($canDeleteInvoice)
             <form method="POST" action="{{ $routes['destroy'] ?? route('invoices.destroy', $invoiceKey) }}" class="invoice-embedded-action-form" @unless($embedded) onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')" @endunless>
             @csrf
             @method('DELETE')
             <button type="submit">حذف فاکتور</button>
         </form>
+            @endif
 
-        @if($invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
+        @if($canConvertInvoice && $invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
             <form method="POST" action="{{ $routes['convert'] ?? route('invoices.convert', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit">تبدیل به فاکتور</button>
             </form>
-        @elseif($invoice->document_type !== 'proforma' && $invoice->status === 'draft')
+        @elseif($canConfirmInvoice && $invoice->document_type !== 'proforma' && $invoice->status === 'draft')
             <form method="POST" action="{{ $routes['confirm'] ?? route('invoices.confirm', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
-                <button type="submit" class="primary">{{ $invoice->direction === 'purchase' ? 'تایید نهایی و ثبت رسید انبار' : 'تایید نهایی و ثبت حواله انبار' }}</button>
+                @php
+                    $confirmLabel = match (true) {
+                        $invoice->isReturn() && $invoice->direction === 'sale' => 'تایید نهایی و ثبت رسید انبار',
+                        $invoice->isReturn() => 'تایید نهایی و ثبت حواله انبار',
+                        $invoice->direction === 'purchase' => 'تایید نهایی و ثبت رسید انبار',
+                        default => 'تایید نهایی و ثبت حواله انبار',
+                    };
+                @endphp
+                <button type="submit" class="primary">{{ $confirmLabel }}</button>
             </form>
-        @elseif($invoice->status === 'confirmed' && ! $invoice->settled_at)
+        @elseif($canSettleInvoice && $invoice->status === 'confirmed' && ! $invoice->settled_at)
             <form method="POST" action="{{ $routes['settle'] ?? route('invoices.settle', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">تسویه فاکتور</button>
             </form>
-        @elseif($invoice->settled_at)
+        @elseif($canSettleInvoice && $invoice->settled_at)
             <form method="POST" action="{{ $routes['unsettle'] ?? route('invoices.unsettle', $invoiceKey) }}" class="invoice-embedded-action-form">
                 @csrf
                 <button type="submit" class="primary">خروج از تسویه</button>
+            </form>
+        @endif
+        @if($canCancelInvoice && $invoice->canCancel())
+            <form method="POST" action="{{ $routes['cancel'] ?? route('invoices.cancel', $invoiceKey) }}" class="invoice-embedded-action-form" @unless($embedded) onsubmit="return confirm('این سند ابطال شود؟')" @endunless>
+                @csrf
+                <button type="submit">ابطال سند</button>
             </form>
         @endif
             @endif
@@ -100,7 +132,7 @@
     @endif
 
     <section class="tax-invoice-sheet">
-        <div class="tax-invoice-watermark">{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'confirmed' ? '' : 'ثبت موقت') }}</div>
+        <div class="tax-invoice-watermark">{{ $invoice->settled_at ? 'تسویه شده' : ($invoice->status === 'cancelled' ? 'ابطال‌شده' : ($invoice->status === 'confirmed' ? '' : 'ثبت موقت')) }}</div>
 
         <header class="tax-invoice-header">
             <div class="tax-invoice-title">
@@ -124,6 +156,12 @@
                     <span>وضعیت</span>
                     <strong>{{ $statusLabel }}</strong>
                 </div>
+                @if($invoice->returnedFrom)
+                    <div>
+                        <span>فاکتور ابطالی مبنا</span>
+                        <strong>{{ $invoice->returnedFrom->number }}</strong>
+                    </div>
+                @endif
             </div>
         </header>
 
@@ -706,8 +744,13 @@
 
                     const isDelete = form.querySelector('[name="_method"]')?.value === 'DELETE'
                         || form.getAttribute('method')?.toUpperCase() === 'DELETE';
+                    const isCancel = String(form.action || '').includes('/cancel');
 
                     if (isDelete && !window.confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')) {
+                        return;
+                    }
+
+                    if (isCancel && !window.confirm('این سند ابطال شود؟')) {
                         return;
                     }
 

@@ -81,6 +81,67 @@ class User extends Authenticatable
             return true;
         }
 
+        if ($this->hasExactPermission($key)) {
+            return true;
+        }
+
+        // salaries.* and payroll.view/manage are aliases of one payroll module.
+        if (
+            $key === \App\Support\PayrollPermissions::SALARIES_VIEW
+            && $this->hasExactPermission(\App\Support\PayrollPermissions::VIEW)
+        ) {
+            return true;
+        }
+        if (
+            $key === \App\Support\PayrollPermissions::VIEW
+            && $this->hasExactPermission(\App\Support\PayrollPermissions::SALARIES_VIEW)
+        ) {
+            return true;
+        }
+        if (
+            $key === \App\Support\PayrollPermissions::SALARIES_MANAGE
+            && $this->hasExactPermission(\App\Support\PayrollPermissions::MANAGE)
+        ) {
+            return true;
+        }
+        if (
+            $key === \App\Support\PayrollPermissions::MANAGE
+            && $this->hasExactPermission(\App\Support\PayrollPermissions::SALARIES_MANAGE)
+        ) {
+            return true;
+        }
+
+        $impliedMaps = [
+            [\App\Support\CommercePermissions::MANAGE, \App\Support\CommercePermissions::manageImpliedKeys()],
+            [\App\Support\InventoryPermissions::MANAGE, \App\Support\InventoryPermissions::manageImpliedKeys()],
+            [\App\Support\InventoryPermissions::WAREHOUSE_MANAGE, \App\Support\InventoryPermissions::warehouseManageImpliedKeys()],
+            [\App\Support\ProjectPermissions::MANAGE, \App\Support\ProjectPermissions::manageImpliedKeys()],
+            [\App\Support\EmployeePermissions::MANAGE, \App\Support\EmployeePermissions::manageImpliedKeys()],
+            [\App\Support\AttendancePermissions::MANAGE, \App\Support\AttendancePermissions::manageImpliedKeys()],
+            [\App\Support\PayrollPermissions::MANAGE, \App\Support\PayrollPermissions::manageImpliedKeys()],
+            [\App\Support\PayrollPermissions::SALARIES_MANAGE, \App\Support\PayrollPermissions::manageImpliedKeys()],
+            [\App\Support\WorklogPermissions::MANAGE, \App\Support\WorklogPermissions::manageImpliedKeys()],
+            [\App\Support\HrPermissions::MANAGE, \App\Support\HrPermissions::manageImpliedKeys()],
+            [\App\Support\HrPermissions::ORDERS_MANAGE, \App\Support\HrPermissions::ordersManageImpliedKeys()],
+            [\App\Support\HrPermissions::CONTRACTS_MANAGE, \App\Support\HrPermissions::contractsManageImpliedKeys()],
+            [\App\Support\TreasuryPermissions::MANAGE, \App\Support\TreasuryPermissions::manageImpliedKeys()],
+        ];
+
+        foreach ($impliedMaps as [$manageKey, $impliedKeys]) {
+            if (in_array($key, $impliedKeys, true) && $this->hasExactPermission($manageKey)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function hasExactPermission(string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
         return $this->roles()
             ->whereHas('permissions', fn ($query) => $query->where('key', $key))
             ->exists();

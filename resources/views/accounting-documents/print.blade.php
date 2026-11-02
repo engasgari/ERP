@@ -36,6 +36,7 @@
 </head>
 <body class="{{ ($forPdf ?? false) ? 'pdf-document' : '' }}">
 @php
+    $documentId = (int) ($documentId ?? $document->getKey());
     $typeLabels = [
         'manual' => 'دستی',
         'sale_invoice' => 'فاکتور فروش',
@@ -50,8 +51,8 @@
 
 @unless($forPdf ?? false)
     <div class="actions">
-        <a href="{{ route('accounting-documents.show', $document) }}">بازگشت</a>
-        <a href="{{ route('accounting-documents.pdf', $document) }}" data-no-spa>PDF</a>
+        <a href="{{ route('accounting-documents.show', ['accountingDocument' => $documentId]) }}">بازگشت</a>
+        <a href="{{ route('accounting-documents.pdf', ['accountingDocument' => $documentId]) }}" data-no-spa>PDF</a>
         <button type="button" onclick="window.print()">چاپ</button>
     </div>
 @endunless
@@ -72,13 +73,13 @@
             <td class="summary-label">بدهکار</td>
             <td class="summary-label">بستانکار</td>
             <td class="summary-label">تعداد سطر</td>
-            <td class="summary-label">تفصیل‌های بانکی</td>
+            <td class="summary-label">اشخاص/شرکت‌ها</td>
         </tr>
         <tr>
             <td class="summary-value pdf-num">{{ formatMoney((float) $document->lines->sum('debit')) }}</td>
             <td class="summary-value pdf-num">{{ formatMoney((float) $document->lines->sum('credit')) }}</td>
             <td class="summary-value pdf-num">{{ number_format($document->lines->count()) }}</td>
-            <td class="summary-value pdf-num">{{ number_format($document->lines->pluck('detailAccount')->filter()->unique('id')->count()) }}</td>
+            <td class="summary-value pdf-num">{{ number_format($document->lines->pluck('party')->filter()->unique('id')->count()) }}</td>
         </tr>
     </table>
 
@@ -86,7 +87,6 @@
         <thead>
         <tr>
             <th>حساب</th>
-            <th>تفصیل</th>
             <th>شخص/شرکت</th>
             <th>پروژه</th>
             <th>شرح</th>
@@ -103,8 +103,16 @@
                         <div class="bank-tag">بانک: {{ $line->bankAccount->bank_name }} - {{ $line->bankAccount->code }}</div>
                     @endif
                 </td>
-                <td>{{ chartAccountDisplayLabel($line->detailAccount) }}</td>
-                <td>{{ $line->party?->name ?: '-' }}</td>
+                <td>
+                    @if($line->party)
+                        {{ $line->party->name }}
+                        @if($line->party->code || $line->party->detail_code)
+                            <div class="bank-tag">{{ $line->party->code ?: $line->party->detail_code }}</div>
+                        @endif
+                    @else
+                        -
+                    @endif
+                </td>
                 <td>{{ $line->project?->name ?: '-' }}</td>
                 <td>{{ $line->description ?: '-' }}</td>
                 <td class="pdf-num">{{ formatMoney((float) $line->debit) }}</td>

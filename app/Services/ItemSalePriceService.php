@@ -38,7 +38,7 @@ class ItemSalePriceService
 
     public function syncItemSalePricesFromInvoice(Invoice $invoice): void
     {
-        if ($invoice->direction !== 'sale') {
+        if ($invoice->direction !== 'sale' || $invoice->document_type !== 'invoice') {
             return;
         }
 
@@ -53,6 +53,43 @@ class ItemSalePriceService
                 ->whereKey($line->item_id)
                 ->update(['sale_price' => $line->unit_price]);
         }
+    }
+
+    public function updateCatalogSalePrice(Item|int $item, float|string|null $salePrice): Item
+    {
+        $model = $item instanceof Item ? $item : Item::query()->findOrFail($item);
+        $amount = $this->normalizeMoney($salePrice);
+
+        if ($amount < 0) {
+            throw new \InvalidArgumentException('قیمت فروش نمی‌تواند منفی باشد.');
+        }
+
+        $model->update(['sale_price' => $amount]);
+
+        return $model->fresh(['unit']);
+    }
+
+    private function normalizeMoney(float|string|null $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+
+        if (is_float($value) || is_int($value)) {
+            return round((float) $value, 2);
+        }
+
+        $digitMap = [
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ];
+
+        $normalized = strtr((string) $value, $digitMap);
+        $normalized = str_replace(['٬', ',', ' ', '٫'], ['', '', '', '.'], $normalized);
+
+        return round((float) $normalized, 2);
     }
 
     /**

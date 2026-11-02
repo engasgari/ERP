@@ -9,9 +9,12 @@ class StandardPayrollSeeder extends Seeder
 {
     public function run(): void
     {
+        // Catalog defaults mirror documented ۱۴۰۴ figures (SSI 1000/1404/193 + council allowances).
+        // Year-authoritative amounts for calculation live in payroll_legal_parameter_sets —
+        // do NOT invent/copy ۱۴۰۵ here until an official circular row is inserted there.
         $wageSource = [
-            'source_title' => 'بخشنامه تعیین حداقل مزد سال ۱۴۰۵ - سازمان تأمین اجتماعی',
-            'source_url' => 'https://students.tamin.ir/news/item/197539',
+            'source_title' => 'مرجع کاتالوگ ۱۴۰۴ — منبع اجرایی: payroll_legal_parameter_sets',
+            'source_url' => null,
         ];
 
         $insuranceSource = [
@@ -22,10 +25,10 @@ class StandardPayrollSeeder extends Seeder
         $items = [
             [
                 'code' => 'minimum_daily_wage',
-                'title' => 'حداقل مزد روزانه ۱۴۰۵',
+                'title' => 'حداقل مزد روزانه (مرجع کاتالوگ ۱۴۰۴)',
                 'type' => 'earning',
                 'calculation_type' => 'reference',
-                'default_amount' => 5541850,
+                'default_amount' => 3463656,
                 'taxable' => true,
                 'insurable' => true,
                 'is_statutory' => true,
@@ -33,10 +36,10 @@ class StandardPayrollSeeder extends Seeder
             ] + $wageSource,
             [
                 'code' => 'minimum_monthly_wage',
-                'title' => 'حداقل حقوق ماهانه ۱۴۰۵',
+                'title' => 'حداقل حقوق ماهانه (مرجع کاتالوگ ۱۴۰۴)',
                 'type' => 'earning',
                 'calculation_type' => 'reference',
-                'default_amount' => 166255500,
+                'default_amount' => 103909680, // 3,463,656 × 30
                 'taxable' => true,
                 'insurable' => true,
                 'is_statutory' => true,
@@ -47,7 +50,7 @@ class StandardPayrollSeeder extends Seeder
                 'title' => 'حق مسکن',
                 'type' => 'earning',
                 'calculation_type' => 'fixed',
-                'default_amount' => 30000000,
+                'default_amount' => 9000000,
                 'taxable' => true,
                 'insurable' => true,
                 'is_statutory' => true,
@@ -80,9 +83,10 @@ class StandardPayrollSeeder extends Seeder
                 'title' => 'حق اولاد برای هر فرزند',
                 'type' => 'earning',
                 'calculation_type' => 'manual',
-                'default_amount' => 16625550,
-                'taxable' => false,
-                'insurable' => false,
+                // Labor Law Art.86 practice: 3 × min daily wage (1404)
+                'default_amount' => 10390968,
+                'taxable' => true,
+                'insurable' => true,
                 'is_statutory' => true,
                 'sort_order' => 60,
             ] + $wageSource,
@@ -91,7 +95,7 @@ class StandardPayrollSeeder extends Seeder
                 'title' => 'پایه سنوات ماهانه',
                 'type' => 'earning',
                 'calculation_type' => 'manual',
-                'default_amount' => 5000010,
+                'default_amount' => 2820000, // 94,000 × 30 (1404 daily seniority in legal set)
                 'taxable' => true,
                 'insurable' => true,
                 'is_statutory' => true,
@@ -173,6 +177,19 @@ class StandardPayrollSeeder extends Seeder
                 'is_statutory' => false,
                 'sort_order' => 89,
                 'source_title' => 'آیتم سیستمی محاسبه حقوق',
+                'source_url' => null,
+            ],
+            [
+                'code' => 'friday_work',
+                'title' => 'جمعه‌کاری / استراحت هفتگی',
+                'type' => 'earning',
+                'calculation_type' => 'hourly',
+                'default_amount' => 0,
+                'taxable' => true,
+                'insurable' => true,
+                'is_statutory' => false,
+                'sort_order' => 91,
+                'source_title' => 'آیتم سیستمی — متمایز از تعطیل رسمی و اضافه‌کاری',
                 'source_url' => null,
             ],
             [

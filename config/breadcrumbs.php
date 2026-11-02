@@ -90,6 +90,7 @@ return [
         'invoices.create' => 'ثبت سند بازرگانی',
         'invoices.show' => 'مشاهده فاکتور',
         'invoices.edit' => 'ویرایش فاکتور',
+        'commerce.item-pricing.index' => 'قیمت‌گذاری کالا و خدمات',
         'parties.index' => 'اشخاص و شرکت‌ها',
         'parties.create' => 'تعریف شخص/شرکت',
         'crm.customers.index' => 'مشتریان CRM',

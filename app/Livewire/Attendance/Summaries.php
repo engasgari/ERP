@@ -41,6 +41,8 @@ class Summaries extends Component
 
     public function rebuild(): void
     {
+        abort_unless(auth()->user()?->hasPermission('attendance.summaries.rebuild'), 403);
+
         $this->normalizePeriodFilters();
 
         $this->validate([

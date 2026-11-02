@@ -98,7 +98,7 @@ class Manager extends Component
     public function openManualCreateModal(): void
     {
         $user = auth()->user();
-        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.manage')), 403);
+        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.create')), 403);
 
         $this->manualRows = [$this->emptyManualRow()];
         $this->showManualCreateModal = true;
@@ -133,7 +133,7 @@ class Manager extends Component
     public function saveManualEntries(WorkLogManualEntryService $service): void
     {
         $user = auth()->user();
-        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.manage')), 403);
+        abort_unless($user && ($user->isAdmin() || $user->hasPermission('worklogs.create')), 403);
 
         try {
             $created = $service->createMany($this->manualRows, $user);
@@ -173,6 +173,8 @@ class Manager extends Component
 
     public function updateField(int $workLogId, string $field, string $value): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.update'), 403);
+
         $workLog = WorkLog::with('employee')->findOrFail($workLogId);
         $value = trim($value);
         $payload = [];
@@ -338,6 +340,8 @@ class Manager extends Component
 
     public function removeWorkLog(int $workLogId): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.delete'), 403);
+
         WorkLog::findOrFail($workLogId)->delete();
         $this->selected = array_values(array_filter($this->selected, fn ($id) => (int) $id !== $workLogId));
         $this->resetPage();
@@ -346,6 +350,8 @@ class Manager extends Component
 
     public function bulkDelete(): void
     {
+        abort_unless(auth()->user()?->hasPermission('worklogs.delete'), 403);
+
         $ids = $this->selectedIds();
         if ($ids === []) {
             session()->flash('error', 'ابتدا حداقل یک ردیف را انتخاب کنید.');
@@ -423,9 +429,16 @@ class Manager extends Component
 
         $manageEmployees = $employees;
         $user = auth()->user();
-        $canManageWorkLogs = $user && ($user->isAdmin() || $user->hasPermission('worklogs.manage'));
+        $canManageWorkLogs = $user && ($user->isAdmin()
+            || $user->hasPermission('worklogs.manage')
+            || $user->hasPermission('worklogs.create')
+            || $user->hasPermission('worklogs.update')
+            || $user->hasPermission('worklogs.delete'));
         if ($canManageWorkLogs && $user && ! $user->isAdmin()) {
             $allowedIds = $user->accessibleEmployeeIds('worklogs.manage');
+            if ($allowedIds === []) {
+                $allowedIds = $user->accessibleEmployeeIds('worklogs.view');
+            }
             $manageEmployees = $employees->whereIn('id', $allowedIds)->values();
         }
 

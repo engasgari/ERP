@@ -1,12 +1,25 @@
+@php
+    $user = auth()->user();
+    $canCreateInvoice = (bool) $user?->hasPermission('commerce.invoices.create');
+    $canUpdateInvoice = (bool) $user?->hasPermission('commerce.invoices.update');
+    $canDeleteInvoice = (bool) $user?->hasPermission('commerce.invoices.delete');
+    $canCancelInvoice = (bool) $user?->hasPermission('commerce.invoices.cancel');
+    $canConfirmInvoice = (bool) $user?->hasPermission('commerce.invoices.confirm');
+    $canSettleInvoice = (bool) $user?->hasPermission('commerce.invoices.settle');
+    $canConvertInvoice = (bool) $user?->hasPermission('commerce.invoices.convert');
+    $invoiceCreateActions = $canCreateInvoice ? [
+        ['label' => 'پیش‌فاکتور فروش', 'url' => route('invoices.create', ['direction' => 'sale', 'document_type' => 'proforma']), 'class' => 'erp-action-edit'],
+        ['label' => 'فاکتور فروش', 'url' => route('invoices.create', ['direction' => 'sale', 'document_type' => 'invoice']), 'class' => 'erp-action-edit'],
+        ['label' => 'برگشت از فروش', 'url' => route('invoices.create', ['direction' => 'sale', 'document_type' => 'return']), 'class' => 'erp-action-edit'],
+        ['label' => 'فاکتور خرید', 'url' => route('invoices.create', ['direction' => 'purchase', 'document_type' => 'invoice']), 'class' => 'erp-action-edit'],
+        ['label' => 'برگشت از خرید', 'url' => route('invoices.create', ['direction' => 'purchase', 'document_type' => 'return']), 'class' => 'erp-action-edit'],
+    ] : [];
+@endphp
 <x-erp.ui.list-page
     title="فاکتورها و پیش‌فاکتورها"
-    description="فهرست اسناد بازرگانی فروش و خرید با امکان تایید، تسویه و تبدیل پیش‌فاکتور."
+    description="فهرست اسناد بازرگانی فروش، خرید و برگشت با امکان تایید، تسویه و تبدیل پیش‌فاکتور."
     route="invoices.index"
-    :actions="[
-        ['label' => 'پیش‌فاکتور فروش', 'url' => route('invoices.create', ['direction' => 'sale', 'document_type' => 'proforma']), 'class' => 'erp-action-edit'],
-        ['label' => 'فاکتور فروش', 'url' => route('invoices.create', ['direction' => 'sale']), 'class' => 'erp-action-edit'],
-        ['label' => 'فاکتور خرید', 'url' => route('invoices.create', ['direction' => 'purchase']), 'class' => 'erp-action-edit'],
-    ]"
+    :actions="$invoiceCreateActions"
 >
     <x-slot name="filters">
         <x-erp.ui.filter-bar wire:submit.prevent>
@@ -25,12 +38,13 @@
                     <select wire:model.live="document_type">
                         <option value="">همه</option>
                         <option value="invoice">فاکتور</option>
+                        <option value="return">برگشت</option>
                         <option value="proforma">پیش‌فاکتور</option>
                     </select>
                 </label>
                 <label class="erp-filter-field">وضعیت
                     <select wire:model.live="status">
-                        <option value="">همه (به‌جز ابطال‌شده)</option>
+                        <option value="">همه</option>
                         <option value="draft">موقت</option>
                         <option value="confirmed">تایید شده</option>
                         <option value="cancelled">ابطال‌شده</option>
@@ -76,13 +90,12 @@
                         'cancelled' => 'danger',
                         default => 'info',
                     };
-                $typeLabel = ($invoice->direction === 'sale' ? 'فروش' : 'خرید') . ' / ' . ($invoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور');
             @endphp
             <tr wire:key="invoice-{{ $invoice->id }}" data-invoice-row="{{ $invoice->id }}">
                 <td class="text-nowrap font-semibold">
                     <button type="button" class="erp-modal-trigger text-blue-700" wire:click="show({{ $invoice->id }})">{{ $invoice->number }}</button>
                 </td>
-                <td>{{ $typeLabel }}</td>
+                <td>{{ $invoice->typeLabel() }}</td>
                 <td class="text-nowrap">{{ gregorianToJalaliDate($invoice->invoice_date) }}</td>
                 <td>{{ $invoice->party?->name ?: 'طرف حساب حذف شده' }}</td>
                 <td class="text-nowrap font-semibold text-slate-700" dir="ltr">{{ $invoice->project?->project_number ?: '-' }}</td>
@@ -94,33 +107,43 @@
                     <x-erp.ui.row-actions>
                         <x-erp.ui.row-action icon="view" label="جزئیات" wire:click="show({{ $invoice->id }})" />
                         <x-erp.ui.row-action icon="expand" label="نمایش کامل" data-invoice-show="{{ $invoice->id }}" />
-                        <x-erp.ui.row-action icon="edit" label="ویرایش" data-invoice-edit="{{ $invoice->id }}" />
-                        @if($invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
+                        @if($canUpdateInvoice)
+                            <x-erp.ui.row-action icon="edit" label="ویرایش" data-invoice-edit="{{ $invoice->id }}" />
+                        @endif
+                        @if($canConvertInvoice && $invoice->document_type === 'proforma' && $invoice->status !== 'cancelled')
                             <form method="POST" action="{{ route('invoices.convert', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="convert" label="تبدیل به فاکتور" />
                             </form>
-                        @elseif($invoice->document_type !== 'proforma' && $invoice->status === 'draft')
+                        @elseif($canConfirmInvoice && $invoice->document_type !== 'proforma' && $invoice->status === 'draft')
                             <form method="POST" action="{{ route('invoices.confirm', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="confirm" label="تایید و سند" tone="success" />
                             </form>
-                        @elseif($invoice->status === 'confirmed' && ! $invoice->settled_at)
+                        @elseif($canSettleInvoice && $invoice->status === 'confirmed' && ! $invoice->settled_at)
                             <form method="POST" action="{{ route('invoices.settle', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="settle" label="تسویه" tone="success" />
                             </form>
-                        @elseif($invoice->settled_at)
+                        @elseif($canSettleInvoice && $invoice->settled_at)
                             <form method="POST" action="{{ route('invoices.unsettle', $invoice) }}">
                                 @csrf
                                 <x-erp.ui.row-action type="submit" icon="revert" label="خروج از تسویه" />
                             </form>
                         @endif
-                        <form method="POST" action="{{ route('invoices.destroy', $invoice) }}" onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')">
-                            @csrf
-                            @method('DELETE')
-                            <x-erp.ui.row-action type="submit" icon="delete" label="حذف" tone="danger" />
-                        </form>
+                        @if($canCancelInvoice && $invoice->canCancel())
+                            <form method="POST" action="{{ route('invoices.cancel', $invoice) }}" onsubmit="return confirm('این سند ابطال شود؟')">
+                                @csrf
+                                <x-erp.ui.row-action type="submit" icon="reject" label="ابطال" tone="danger" />
+                            </form>
+                        @endif
+                        @if($canDeleteInvoice)
+                            <form method="POST" action="{{ route('invoices.destroy', $invoice) }}" onsubmit="return confirm('فاکتور و همه سندهای مالی و انبار وابسته حذف شوند؟')">
+                                @csrf
+                                @method('DELETE')
+                                <x-erp.ui.row-action type="submit" icon="delete" label="حذف" tone="danger" />
+                            </form>
+                        @endif
                     </x-erp.ui.row-actions>
                 </td>
             </tr>
@@ -133,18 +156,28 @@
         @php
             $modalStatusLabel = $showingInvoice->settled_at
                 ? 'تسویه شده'
-                : ($showingInvoice->status === 'draft' ? 'موقت' : ($showingInvoice->status === 'confirmed' ? 'تایید شده' : $showingInvoice->status));
+                : match ($showingInvoice->status) {
+                    'draft' => 'موقت',
+                    'confirmed' => 'تایید شده',
+                    'cancelled' => 'ابطال‌شده',
+                    default => $showingInvoice->status,
+                };
         @endphp
-        <x-erp.ui.details-modal :title="'فاکتور ' . $showingInvoice->number" :actions="[
-            ['label' => 'نمایش کامل', 'type' => 'button', 'class' => 'erp-action-edit', 'attrs' => ['data-invoice-show' => $showingInvoice->id, 'wire:click' => 'closeModal']],
-            ['label' => 'ویرایش', 'type' => 'button', 'class' => 'erp-action-edit', 'attrs' => ['data-invoice-edit' => $showingInvoice->id, 'wire:click' => 'closeModal']],
-        ]">
+        @php
+            $modalActions = [
+                ['label' => 'نمایش کامل', 'type' => 'button', 'class' => 'erp-action-edit', 'attrs' => ['data-invoice-show' => $showingInvoice->id, 'wire:click' => 'closeModal']],
+            ];
+            if ($canUpdateInvoice) {
+                $modalActions[] = ['label' => 'ویرایش', 'type' => 'button', 'class' => 'erp-action-edit', 'attrs' => ['data-invoice-edit' => $showingInvoice->id, 'wire:click' => 'closeModal']];
+            }
+        @endphp
+        <x-erp.ui.details-modal :title="'فاکتور ' . $showingInvoice->number" :actions="$modalActions">
             <x-slot name="close">
                 <button type="button" class="erp-modal-close" wire:click="closeModal">×</button>
             </x-slot>
             <x-slot name="footer">
                 <a href="{{ route('invoices.print', ['invoice' => $showingInvoice->id]) }}" target="_blank" data-no-spa class="erp-action-btn erp-action-detail">چاپ</a>
-                @if($showingInvoice->settled_at)
+                @if($canSettleInvoice && $showingInvoice->settled_at)
                     <form method="POST" action="{{ route('invoices.unsettle', ['invoice' => $showingInvoice->id]) }}">
                         @csrf
                         <button type="submit" class="erp-action-btn erp-action-detail">خروج از تسویه</button>
@@ -153,7 +186,10 @@
             </x-slot>
             <div class="erp-modal-grid">
                 <div class="erp-modal-field">شماره<div class="erp-modal-value">{{ $showingInvoice->number }}</div></div>
-                <div class="erp-modal-field">نوع<div class="erp-modal-value">{{ ($showingInvoice->direction === 'sale' ? 'فروش' : 'خرید') }} / {{ $showingInvoice->document_type === 'proforma' ? 'پیش‌فاکتور' : 'فاکتور' }}</div></div>
+                <div class="erp-modal-field">نوع<div class="erp-modal-value">{{ $showingInvoice->typeLabel() }}</div></div>
+                @if($showingInvoice->returnedFrom)
+                    <div class="erp-modal-field">فاکتور ابطالی مبنا<div class="erp-modal-value">{{ $showingInvoice->returnedFrom->number }}</div></div>
+                @endif
                 <div class="erp-modal-field">تاریخ<div class="erp-modal-value">{{ gregorianToJalaliDate($showingInvoice->invoice_date) }}</div></div>
                 <div class="erp-modal-field">طرف حساب<div class="erp-modal-value">{{ $showingInvoice->party?->name ?: '-' }}</div></div>
                 <div class="erp-modal-field">پروژه<div class="erp-modal-value" dir="ltr">{{ $showingInvoice->project?->project_number ?: '-' }}</div></div>

@@ -79,6 +79,7 @@ class NewAttendanceEngineService
         $absenceMinutes = 0;
         $overtimeMinutes = 0;
         $holidayMinutes = 0;
+        $fridayMinutes = 0;
         $netPayableMinutes = 0;
         $payableMinutes = 0;
         $nightMinutes = 0;
@@ -112,6 +113,7 @@ class NewAttendanceEngineService
             $dayLeave = (int) $metrics['leave_minutes'];
             $dayMission = (int) $metrics['mission_minutes'];
             $dayHoliday = (int) $metrics['holiday_minutes'];
+            $dayFriday = (int) ($metrics['friday_minutes'] ?? 0);
 
             if ($dayPlanned > 0) {
                 $workingDays++;
@@ -124,7 +126,7 @@ class NewAttendanceEngineService
                 if ($dayAbsence > 0) {
                     $absenceDays += min(1, $dayAbsence / $dayPlanned);
                 }
-            } elseif ($dayWorked > 0 || $dayLeave > 0 || $dayMission > 0 || $dayHoliday > 0) {
+            } elseif ($dayWorked > 0 || $dayLeave > 0 || $dayMission > 0 || $dayHoliday > 0 || $dayFriday > 0) {
                 $presentDays++;
             }
 
@@ -137,6 +139,7 @@ class NewAttendanceEngineService
             $absenceMinutes += $dayAbsence;
             $overtimeMinutes += (int) $metrics['overtime_minutes'];
             $holidayMinutes += $dayHoliday;
+            $fridayMinutes += $dayFriday;
             $netPayableMinutes += (int) $metrics['net_payable_minutes'];
             $payableMinutes += (int) $metrics['payable_minutes'];
             $dailyLeaveDays += (float) $metrics['leave_days'];
@@ -157,6 +160,7 @@ class NewAttendanceEngineService
                 'absence_hours' => round($dayAbsence / 60, 2),
                 'overtime_hours' => round(((int) $metrics['overtime_minutes']) / 60, 2),
                 'holiday_hours' => round($dayHoliday / 60, 2),
+                'friday_hours' => round($dayFriday / 60, 2),
                 'net_payable_hours' => round(((int) $metrics['net_payable_minutes']) / 60, 2),
                 'payable_hours' => round(((int) $metrics['payable_minutes']) / 60, 2),
                 'absence_day_fraction' => $dayPlanned > 0 && $dayAbsence > 0
@@ -239,9 +243,12 @@ class NewAttendanceEngineService
                     'employee_salary_type' => $contractType,
                     'decree_id' => $order?->id,
                     'calculation_rule' => 'shift_based_worked_minutes_with_leave_and_mission',
+                    'friday_hours' => round($fridayMinutes / 60, 2),
                     'daily' => $daily,
                 ],
-            ] + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => $absenceMinutes] : [])
+            ]
+            + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => $absenceMinutes] : [])
+            + (Schema::hasColumn('monthly_attendances', 'friday_hours') ? ['friday_hours' => round($fridayMinutes / 60, 2)] : [])
         );
     }
 
@@ -314,6 +321,7 @@ class NewAttendanceEngineService
                 'absence_hours' => 0,
                 'overtime_hours' => 0,
                 'holiday_hours' => 0,
+                'friday_hours' => 0,
                 'net_payable_hours' => round($dayWorkedMinutes / 60, 2),
                 'payable_hours' => round($dayWorkedMinutes / 60, 2),
             ];
@@ -391,9 +399,12 @@ class NewAttendanceEngineService
                     'employee_salary_type' => $contractType,
                     'decree_id' => $order?->id,
                     'calculation_rule' => 'work_log_only_by_contract_type',
+                    'friday_hours' => 0,
                     'daily' => $daily,
                 ],
-            ] + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => 0] : [])
+            ]
+            + (Schema::hasColumn('monthly_attendances', 'absence_minutes') ? ['absence_minutes' => 0] : [])
+            + (Schema::hasColumn('monthly_attendances', 'friday_hours') ? ['friday_hours' => 0] : [])
         );
     }
 
