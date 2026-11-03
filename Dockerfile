@@ -43,6 +43,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Copy application
 COPY . /var/www/html
 
+# Build Vite assets once; PHP and Nginx use this same public/build output.
+RUN npm ci \
+    && npm run build \
+    && test -f public/build/manifest.json \
+    && test -n "$(find public/build/assets -name 'app-*.css' -print -quit)" \
+    && test -n "$(find public/build/assets -name 'app-*.js' -print -quit)" \
+    && rm -rf node_modules
+
+
+
 # Install PHP dependencies
 RUN composer install \
     --no-interaction \
