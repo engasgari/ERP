@@ -147,6 +147,8 @@ Cash payment requires selecting the cashbox.
 
 Payment posts an accounting document that settles salary payable with party dimension, so it appears on the party statement.
 
+The selected payment date (Jalali in UI) is required and becomes both `payroll_payments.payment_date` and the accounting `document_date` — no silent fallback to today. This allows backdating payments (e.g. Farvardin through current month) when fiscal periods are open.
+
 Payment can be reversed from the payroll payment list while the payroll period is not closed. Reversal voids the payment accounting document via the accounting engine and restores the calculation to payable state.
 
 ---

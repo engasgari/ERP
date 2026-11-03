@@ -698,9 +698,9 @@
                     <label class="block text-sm font-medium text-slate-700">
                         تاریخ پرداخت
                         <div class="mt-1">
-                            <x-erp.ui.jalali-date-input wire:model.blur="paymentDrafts.{{ $modalDraftKey }}.payment_date" class="w-full" />
+                            <x-erp.ui.jalali-date-input wire:model.live="paymentModalDate" class="w-full" />
                         </div>
-                        @error('paymentDrafts.'.$modalDraftKey.'.payment_date') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
+                        @error('paymentModalDate') <span class="text-xs text-red-600">{{ $message }}</span> @enderror
                     </label>
                     <label class="block text-sm font-medium text-slate-700">
                         روش پرداخت

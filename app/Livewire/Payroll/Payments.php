@@ -258,8 +258,15 @@ class Payments extends Component
         $draftAmount = normalizeMoneyValue($draft['amount'] ?? null);
 
         try {
+            $paymentDate = jalaliToGregorianDate($draft['payment_date'] ?? null);
+            if (! $paymentDate) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "paymentDrafts.$draftKey.payment_date" => 'تاریخ پرداخت نامعتبر است.',
+                ]);
+            }
+
             $payment = app(NewPayrollEngineService::class)->payWithDetails($calculation, [
-                'payment_date' => jalaliToGregorianDate($draft['payment_date'] ?? null) ?: now()->toDateString(),
+                'payment_date' => $paymentDate,
                 'amount' => $draftAmount,
                 'method' => $draft['method'] ?? 'bank',
                 'bank_account_id' => ($draft['bank_account_id'] ?? null) ?: null,

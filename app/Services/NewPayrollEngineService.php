@@ -435,11 +435,16 @@ class NewPayrollEngineService
             throw new \RuntimeException('برای پرداخت نقدی، انتخاب صندوق الزامی است.');
         }
 
+        $paymentDate = (string) ($data['payment_date'] ?? '');
+        if ($paymentDate === '') {
+            throw new \RuntimeException('تاریخ پرداخت الزامی است.');
+        }
+
         $payment = PayrollPayment::updateOrCreate(
             ['payroll_calculation_id' => $calculation->id],
             [
                 'employee_id' => $calculation->employee_id,
-                'payment_date' => $data['payment_date'] ?? now()->toDateString(),
+                'payment_date' => $paymentDate,
                 'amount' => $amount,
                 'method' => $method,
                 'bank_account_id' => $method === 'bank' ? $bankAccountId : null,
@@ -451,7 +456,8 @@ class NewPayrollEngineService
             ]
         );
 
-        $document = $this->accountingPosting->fromPayrollPayment($payment->refresh(), $userId);
+        $payment = $payment->refresh();
+        $document = $this->accountingPosting->fromPayrollPayment($payment, $userId);
 
         $payment->update(['accounting_document_id' => $document->id]);
 

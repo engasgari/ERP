@@ -236,7 +236,7 @@
                                             تاریخ پرداخت
                                             <div class="mt-1">
                                                 <x-erp.ui.jalali-date-input
-                                                    wire:model.blur="paymentDrafts.{{ $calculation->id }}.payment_date"
+                                                    wire:model.live="paymentDrafts.{{ $calculation->id }}.payment_date"
                                                     placeholder="1405/01/01"
                                                     class="w-full"
                                                 />

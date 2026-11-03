@@ -35,6 +35,9 @@ class Periods extends Component
 
     public string $paymentModalEmployeeName = '';
 
+    /** Flat Jalali date for the payment modal (avoids nested wire:model sync gaps). */
+    public string $paymentModalDate = '';
+
     public ?int $editingId = null;
 
     /** @var array<int, array<string, mixed>> */
@@ -464,12 +467,15 @@ class Periods extends Component
         $existingPayment = $calculation->payments->first();
         $draftKey = (string) $calculationId;
 
+        $paymentDateJalali = $existingPayment?->payment_date
+            ? formatJalaliDateSafe($existingPayment->payment_date)
+            : todayJalaliDate();
+
         $this->paymentModalCalculationId = $calculationId;
         $this->paymentModalEmployeeName = (string) ($calculation->employee?->full_name ?: 'پرسنل');
+        $this->paymentModalDate = $paymentDateJalali;
         $this->paymentDrafts[$draftKey] = [
-            'payment_date' => $existingPayment?->payment_date
-                ? formatJalaliDateSafe($existingPayment->payment_date)
-                : todayJalaliDate(),
+            'payment_date' => $paymentDateJalali,
             'method' => $existingPayment?->method ?: 'bank',
             'bank_account_id' => $existingPayment?->bank_account_id ?: ($this->defaultBankAccountId ?: ''),
             'cashbox_id' => $existingPayment?->cashbox_id ?: ($this->defaultCashboxId ?: ''),
@@ -493,6 +499,7 @@ class Periods extends Component
 
         $this->paymentModalCalculationId = null;
         $this->paymentModalEmployeeName = '';
+        $this->paymentModalDate = '';
         $this->resetErrorBag();
     }
 
@@ -513,14 +520,22 @@ class Periods extends Component
         $draftKey = (string) $calculationId;
         $draft = $this->paymentDraftFor($calculationId);
 
+        // Prefer flat modal date (datepicker binds here reliably).
+        $jalaliPaymentDate = trim($this->paymentModalDate) !== ''
+            ? trim($this->paymentModalDate)
+            : trim((string) ($draft['payment_date'] ?? ''));
+
         if ($draft !== []) {
             $normalizedAmount = normalizeMoneyValue($draft['amount'] ?? null);
             $draft['amount'] = $normalizedAmount === null ? '' : $normalizedAmount;
+            $draft['payment_date'] = $jalaliPaymentDate;
             $this->paymentDrafts[$draftKey] = $draft;
+        } else {
+            $this->paymentDrafts[$draftKey] = array_merge($draft, ['payment_date' => $jalaliPaymentDate]);
         }
 
         $this->validate([
-            "paymentDrafts.$draftKey.payment_date" => ['required', 'string', 'max:20'],
+            'paymentModalDate' => ['required', 'string', 'max:20'],
             "paymentDrafts.$draftKey.method" => ['required', 'in:cash,bank'],
             "paymentDrafts.$draftKey.amount" => ['required', 'numeric', 'min:1'],
             "paymentDrafts.$draftKey.bank_account_id" => ['nullable', 'required_if:paymentDrafts.'.$draftKey.'.method,bank', 'exists:bank_accounts,id'],
@@ -528,7 +543,7 @@ class Periods extends Component
             "paymentDrafts.$draftKey.reference_number" => ['nullable', 'string', 'max:100'],
             "paymentDrafts.$draftKey.description" => ['nullable', 'string', 'max:500'],
         ], [], [
-            "paymentDrafts.$draftKey.payment_date" => 'تاریخ پرداخت',
+            'paymentModalDate' => 'تاریخ پرداخت',
             "paymentDrafts.$draftKey.method" => 'روش پرداخت',
             "paymentDrafts.$draftKey.bank_account_id" => 'حساب بانکی',
             "paymentDrafts.$draftKey.cashbox_id" => 'صندوق',
@@ -540,14 +555,21 @@ class Periods extends Component
         $engine = app(NewPayrollEngineService::class);
 
         try {
-            $payment = DB::transaction(function () use ($engine, $calculation, $draft, $draftAmount) {
+            $payment = DB::transaction(function () use ($engine, $calculation, $draft, $draftAmount, $jalaliPaymentDate) {
                 if ($calculation->payments->isNotEmpty()) {
                     $engine->reversePayment($calculation, auth()->id());
                     $calculation->refresh()->load('payments');
                 }
 
+                $paymentDate = jalaliToGregorianDate($jalaliPaymentDate);
+                if (! $paymentDate) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'paymentModalDate' => 'تاریخ پرداخت نامعتبر است.',
+                    ]);
+                }
+
                 return $engine->payWithDetails($calculation, [
-                    'payment_date' => jalaliToGregorianDate($draft['payment_date'] ?? null) ?: now()->toDateString(),
+                    'payment_date' => $paymentDate,
                     'amount' => $draftAmount,
                     'method' => $draft['method'] ?? 'bank',
                     'bank_account_id' => ($draft['bank_account_id'] ?? null) ?: null,
@@ -565,6 +587,7 @@ class Periods extends Component
         unset($this->paymentDrafts[$draftKey], $this->paymentDrafts[$calculationId]);
         $this->paymentModalCalculationId = null;
         $this->paymentModalEmployeeName = '';
+        $this->paymentModalDate = '';
         $this->step = 3;
         session()->flash('success', 'پرداخت حقوق ذخیره شد. سند: ' . ($payment->accountingDocument?->number ?: '-'));
     }

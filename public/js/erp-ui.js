@@ -208,17 +208,33 @@ function inputHasWireModel(input) {
     return Array.from(input.attributes).some((attribute) => attribute.name.startsWith('wire:model'));
 }
 
+function inputHasWireModelBlur(input) {
+    return Array.from(input.attributes).some((attribute) => (
+        attribute.name === 'wire:model.blur'
+        || attribute.name.startsWith('wire:model.blur.')
+    ));
+}
+
 function syncLivewireInput(input) {
     // For wire:model fields, only notify via DOM events. Calling Livewire.set() on
     // nested paths like editLines.0.amount can wipe sibling keys (title/locked/id).
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
 
+    // wire:model.blur only updates on blur — picker selection must fire blur too.
+    // Jalali datepicker also blurs so any .blur binding (or pending commit) catches the value.
+    if (
+        inputHasWireModelBlur(input)
+        || ! inputHasWireModel(input)
+        || input.hasAttribute('data-jalali-datepicker')
+        || input.classList.contains('erp-jalali-date-input')
+    ) {
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+    }
+
     if (inputHasWireModel(input)) {
         return;
     }
-
-    input.dispatchEvent(new Event('blur', { bubbles: true }));
 
     const componentEl = input.closest('[wire\\:id]');
 
