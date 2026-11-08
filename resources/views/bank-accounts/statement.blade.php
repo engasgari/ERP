@@ -2,15 +2,19 @@
     <x-slot name="header">
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">گردش حساب بانکی</h2>
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">صورتحساب بانک</h2>
                 <p class="mt-1 text-sm text-slate-500">{{ $bankAccount->code }} - {{ $bankAccount->bank_name }}</p>
                 <p class="mt-1 text-xs text-slate-400">
                     تفصیل: {{ $bankAccount->detailAccount?->code ? $bankAccount->detailAccount->code . ' - ' . $bankAccount->detailAccount->title : 'برای این بانک هنوز تفصیل ثبت نشده است' }}
                 </p>
             </div>
-            <a href="{{ route('bank-accounts.index') }}" class="inline-flex items-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
-                بازگشت به حساب‌های بانکی
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ $printUrl }}" target="_blank" data-no-spa class="erp-action-btn erp-action-detail">فرم چاپی</a>
+                <a href="{{ $excelUrl }}" data-no-spa class="erp-action-btn erp-action-detail">خروجی اکسل</a>
+                <a href="{{ route('bank-accounts.index') }}" class="inline-flex items-center rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200">
+                    بازگشت به حساب‌های بانکی
+                </a>
+            </div>
         </div>
     </x-slot>
 

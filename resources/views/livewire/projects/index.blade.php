@@ -62,17 +62,12 @@
                     <span class="font-bold {{ $profit >= 0 ? 'text-emerald-700' : 'text-red-700' }}">{{ formatMoney($profit) }}</span>
                 </td>
                 <td>
-                    @php
-                        $projectActions = [
-                            ['label' => 'جزئیات', 'url' => route('projects.show', $project), 'class' => 'erp-action-detail'],
-                            ['label' => 'بهای تمام‌شده', 'url' => route('projects.costing', $project), 'class' => 'erp-action-detail'],
-                            ['label' => 'سفارش تولید', 'url' => route('production-orders.create', ['project_id' => $project->id]), 'icon' => 'production', 'class' => 'erp-action-edit'],
-                        ];
-                        if ($canUpdateProject) {
-                            $projectActions[] = ['label' => 'ویرایش کامل', 'url' => route('projects.edit', $project), 'class' => 'erp-action-edit'];
-                        }
-                    @endphp
-                    <x-erp.ui.action-menu :actions="$projectActions" />
+                    <x-erp.ui.action-menu :actions="array_values(array_filter([
+                        ['label' => 'جزئیات', 'url' => route('projects.show', $project), 'class' => 'erp-action-detail'],
+                        ['label' => 'بهای تمام‌شده', 'url' => route('projects.costing', $project), 'class' => 'erp-action-detail'],
+                        ['label' => 'سفارش تولید', 'url' => route('production-orders.create', ['project_id' => $project->id]), 'icon' => 'production', 'class' => 'erp-action-edit'],
+                        $canUpdateProject ? ['label' => 'ویرایش کامل', 'url' => route('projects.edit', $project), 'class' => 'erp-action-edit'] : null,
+                    ]))" />
                 </td>
             </tr>
         @endforeach

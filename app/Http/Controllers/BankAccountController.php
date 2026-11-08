@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\BankAccount;
+use App\Models\CompanySetting;
 use App\Models\Party;
 use App\Models\Project;
 use App\Services\FinancialReportService;
+use App\Support\SimpleXlsxExporter;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BankAccountController extends Controller
 {
@@ -16,6 +19,77 @@ class BankAccountController extends Controller
     }
 
     public function statement(BankAccount $bankAccount, Request $request, FinancialReportService $reports)
+    {
+        $payload = $this->statementPayload($bankAccount, $request, $reports);
+
+        return view('bank-accounts.statement', $payload);
+    }
+
+    public function printStatement(BankAccount $bankAccount, Request $request, FinancialReportService $reports)
+    {
+        $payload = $this->statementPayload($bankAccount, $request, $reports);
+
+        return view('bank-accounts.print.statement', $payload + [
+            'reportTitle' => 'صورتحساب بانک — ' . $bankAccount->code . ' - ' . $bankAccount->bank_name,
+            'company' => CompanySetting::query()->first(),
+            'backRoute' => $payload['statementUrl'] . ($request->getQueryString() ? '?' . $request->getQueryString() : ''),
+            'forPrint' => true,
+        ]);
+    }
+
+    public function excelStatement(BankAccount $bankAccount, Request $request, FinancialReportService $reports): StreamedResponse
+    {
+        $payload = $this->statementPayload($bankAccount, $request, $reports);
+        $report = $payload['report'];
+        $section = $report['sections'][0] ?? [];
+        $columns = $section['columns'] ?? ['date', 'document_number', 'party', 'project', 'description', 'debit', 'credit', 'running_balance'];
+        $headings = collect($section['headers'] ?? [
+            'تاریخ', 'شماره سند', 'طرف حساب', 'پروژه', 'شرح', 'بدهکار', 'بستانکار', 'مانده جاری',
+        ])->map(fn ($header) => (string) $header)->all();
+
+        $rows = collect($section['rows'] ?? [])->map(function ($row) use ($columns) {
+            return array_map(function ($column) use ($row) {
+                $value = data_get($row, $column, '');
+
+                if (is_numeric($value)) {
+                    return (float) $value;
+                }
+
+                return is_scalar($value) || $value === null ? (string) ($value ?? '') : '';
+            }, $columns);
+        })->all();
+
+        $summary = $report['summary'] ?? [];
+        array_unshift($rows, [
+            'مانده افتتاحیه',
+            '',
+            '',
+            '',
+            '',
+            (float) ($summary['opening_balance'] ?? 0),
+            '',
+            (float) ($summary['opening_balance'] ?? 0),
+        ]);
+        $rows[] = [
+            'جمع دوره / مانده نهایی',
+            '',
+            '',
+            '',
+            '',
+            (float) ($summary['period_debit'] ?? 0),
+            (float) ($summary['period_credit'] ?? 0),
+            (float) ($summary['closing_balance'] ?? 0),
+        ];
+
+        $filename = 'bank-statement-' . str()->slug($bankAccount->code . '-' . $bankAccount->bank_name, '-') . '.xlsx';
+
+        return SimpleXlsxExporter::download($filename, $headings, $rows);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function statementPayload(BankAccount $bankAccount, Request $request, FinancialReportService $reports): array
     {
         // Capture the path id up front — never rebuild this URL via route($model)
         // after report queries (UrlGenerationException if route-key is unavailable).
@@ -30,15 +104,18 @@ class BankAccountController extends Controller
         $filters['bank_account_id'] = $bankAccountId;
         $report = $reports->bankTransactions($bankAccount, $filters);
         $statementUrl = url('/bank-accounts/'.$bankAccountId.'/statement');
+        $query = $request->query();
 
-        return view('bank-accounts.statement', [
+        return [
             'bankAccount' => $bankAccount,
             'statementUrl' => $statementUrl,
+            'printUrl' => url('/bank-accounts/'.$bankAccountId.'/statement/print') . ($query ? '?'.http_build_query($query) : ''),
+            'excelUrl' => url('/bank-accounts/'.$bankAccountId.'/statement/excel') . ($query ? '?'.http_build_query($query) : ''),
             'report' => $report,
             'filters' => $filters,
             'parties' => Party::orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
-        ]);
+        ];
     }
 
     /**

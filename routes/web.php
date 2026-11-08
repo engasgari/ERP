@@ -68,6 +68,14 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
         ->whereNumber('bankAccount')
         ->middleware('permission:financial.manage')
         ->name('bank-accounts.statement');
+    Route::get('bank-accounts/{bankAccount}/statement/print', [BankAccountController::class, 'printStatement'])
+        ->whereNumber('bankAccount')
+        ->middleware('permission:financial.manage')
+        ->name('bank-accounts.statement.print');
+    Route::get('bank-accounts/{bankAccount}/statement/excel', [BankAccountController::class, 'excelStatement'])
+        ->whereNumber('bankAccount')
+        ->middleware('permission:financial.manage')
+        ->name('bank-accounts.statement.excel');
     Route::get('company-settings', [CompanySettingController::class, 'edit'])->middleware('permission:settings.manage')->name('company-settings.edit');
     Route::put('company-settings', [CompanySettingController::class, 'update'])->middleware('permission:settings.manage')->name('company-settings.update');
     Route::get('numbering-settings', [NumberingSettingController::class, 'index'])->middleware('permission:settings.manage')->name('numbering-settings.index');

@@ -94,7 +94,9 @@
             'accounts-receivable-aging', 'accounts-payable-aging' => ['code', 'name', 'balance', 'days', 'bucket'],
             'customer-statement', 'supplier-statement' => ['code', 'name', 'debit', 'credit', 'balance', 'balance_type'],
             'outstanding-invoices', 'overdue-invoices' => ['number', 'date', 'party', 'direction', 'total_amount', 'status', 'outstanding_balance'],
-            'cash-book', 'bank-book', 'bank-statement', 'cash-statement' => ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
+            'cash-book', 'bank-book', 'bank-statement', 'cash-statement' => str_contains($title, 'گردش')
+                ? ['date', 'document_number', 'party', 'project', 'description', 'debit', 'credit', 'running_balance']
+                : ['code', 'name', 'opening', 'debit', 'credit', 'closing'],
             'bank-reconciliation' => ['code', 'bank_name', 'account_number', 'opening_balance', 'journal_debit', 'journal_credit', 'statement_balance', 'variance'],
             'cash-flow-by-period' => ['period', 'debit', 'credit', 'net_cash'],
             'sales-tax', 'purchase-tax', 'vat-summary' => ['number', 'date', 'party', 'taxable_amount', 'tax_amount', 'total_amount'],

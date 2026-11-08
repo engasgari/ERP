@@ -38,6 +38,8 @@ Never store balance.
 
 Balance is calculated.
 
+Bank statement screen, printable form, and Excel export must use the same `FinancialReportService::bankTransactions` dataset.
+
 ---
 
 ## Receipt

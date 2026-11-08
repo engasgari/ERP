@@ -26,6 +26,8 @@ Bank balance is calculated.
 
 Never store calculated balances.
 
+Bank account statement (`bank-accounts/{id}/statement`) uses `FinancialReportService::bankTransactions` as the single dataset for screen, printable form, and Excel export.
+
 ---
 
 ## Flow

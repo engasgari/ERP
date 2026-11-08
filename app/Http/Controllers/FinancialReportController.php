@@ -103,13 +103,24 @@ class FinancialReportController extends Controller
         }
 
         $rows = collect($data['export_rows'] ?? []);
+        $section = $data['sections'][0] ?? [];
+
         if ($report === 'income-statement') {
             $fields = ['section', 'code', 'title', 'amount'];
             $headings = ['بخش', 'کد', 'عنوان', 'مبلغ'];
         } else {
-            $firstRow = $rows->first() ?: [];
-            $fields = is_array($firstRow) ? array_keys($firstRow) : [];
-            $headings = collect($data['sections'][0]['headers'] ?? [])->map(fn ($header) => (string) $header)->all();
+            $fields = $section['columns'] ?? [];
+            if (! is_array($fields) || $fields === []) {
+                $firstRow = $rows->first() ?: [];
+                $fields = is_array($firstRow)
+                    ? array_values(array_diff(array_keys($firstRow), ['section']))
+                    : [];
+            }
+
+            $headings = collect($section['headers'] ?? [])->map(fn ($header) => (string) $header)->all();
+            if ($headings === [] || count($headings) !== count($fields)) {
+                $headings = $fields;
+            }
         }
 
         $exportRows = $rows->map(function ($row) use ($fields) {

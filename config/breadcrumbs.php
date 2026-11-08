@@ -129,6 +129,8 @@ return [
         'partner-current-accounts.create' => 'ثبت انتقال',
         'bank-accounts.index' => 'حساب‌های بانکی',
         'bank-accounts.statement' => 'صورتحساب بانک',
+        'bank-accounts.statement.print' => 'فرم چاپی صورتحساب بانک',
+        'bank-accounts.statement.excel' => 'خروجی اکسل صورتحساب بانک',
         'fiscal-periods.index' => 'دوره‌های مالی',
         'inventory-documents.index' => 'اسناد انبار',
         'company-settings.edit' => 'تنظیمات شرکت',
@@ -217,5 +219,7 @@ return [
         'work-logs.project-report' => 'گزارش کارکرد پروژه',
         'work-logs.employee-report' => 'گزارش کارکرد پرسنل',
         'bank-accounts.statement' => 'صورتحساب بانک',
+        'bank-accounts.statement.print' => 'فرم چاپی صورتحساب بانک',
+        'bank-accounts.statement.excel' => 'خروجی اکسل صورتحساب بانک',
     ],
 ];

@@ -160,8 +160,8 @@
     "semantic_hash": "f7ba8245c1fa0f3e7d8591364c8f8943"
   },
   "app/Http/Controllers/BankAccountController.php": {
-    "mtime": 1793444196.097096,
-    "ast_hash": "3e440a4681779778fabc16754b891b80",
+    "mtime": 1794147189.6337132,
+    "ast_hash": "c5c5855d7e7c826ba3fdca58457f27f2",
     "semantic_hash": ""
   },
   "app/Http/Controllers/BomVersionController.php": {
@@ -215,8 +215,8 @@
     "semantic_hash": ""
   },
   "app/Http/Controllers/FinancialReportController.php": {
-    "mtime": 1790144343.6731148,
-    "ast_hash": "1525c3adfa8a17a292d641c5c40a0c5a",
+    "mtime": 1794147211.8887756,
+    "ast_hash": "ff8a59b866eb73df55cb84c4be5b3c71",
     "semantic_hash": ""
   },
   "app/Http/Controllers/FinancialTransactionController.php": {
@@ -1040,8 +1040,8 @@
     "semantic_hash": ""
   },
   "app/Services/FinancialReportService.php": {
-    "mtime": 1793536445.3947203,
-    "ast_hash": "41b04381181a2d55f352fc88060774bc",
+    "mtime": 1794147213.9958508,
+    "ast_hash": "33d0a7d913d83a882adeb9d5750dc8c9",
     "semantic_hash": ""
   },
   "app/Services/FiscalPeriodService.php": {
@@ -1730,8 +1730,8 @@
     "semantic_hash": ""
   },
   "resources/views/bank-accounts/statement.blade.php": {
-    "mtime": 1793444227.256705,
-    "ast_hash": "567aefe541095e8b3abd2a94068c033a",
+    "mtime": 1794147204.0205,
+    "ast_hash": "afdd10cf11ef3b8f6542fe4867fa2134",
     "semantic_hash": ""
   },
   "resources/views/chart-accounts/create.blade.php": {
@@ -1990,8 +1990,8 @@
     "semantic_hash": ""
   },
   "resources/views/financial-reports/partials/report-shell.blade.php": {
-    "mtime": 1790490379.0927515,
-    "ast_hash": "e9d9da182e3709d03115e94213b3314a",
+    "mtime": 1794147215.459591,
+    "ast_hash": "3b4d8075b8ca784fe520c8f77952b1fc",
     "semantic_hash": ""
   },
   "resources/views/financial-reports/print/account-statement.blade.php": {
@@ -2305,8 +2305,8 @@
     "semantic_hash": ""
   },
   "resources/views/livewire/projects/index.blade.php": {
-    "mtime": 1793265137.7374682,
-    "ast_hash": "09a07300a0d0b4fcf99c2801aa548117",
+    "mtime": 1794142673.0496302,
+    "ast_hash": "bf1bcfb82603c555dcfe6efdae6ffcd9",
     "semantic_hash": ""
   },
   "resources/views/livewire/top-navigation.blade.php": {
@@ -2630,8 +2630,8 @@
     "semantic_hash": "3c6ce2e6d16444282b24a9aa63885563"
   },
   "routes/web.php": {
-    "mtime": 1793616391.774868,
-    "ast_hash": "19b4077ff7e9bd157d99ca91bc1e0300",
+    "mtime": 1794147206.9052963,
+    "ast_hash": "0543ebf7f6b1473148b96167fece19c8",
     "semantic_hash": ""
   },
   "storage/app/db-backups/aaleir_erp_before_schema_import_20260609_140503.sql": {
@@ -2695,9 +2695,9 @@
     "semantic_hash": "76aeb45e684918b22d58114aaab08492"
   },
   "docs/architecture/05-Treasury.md": {
-    "mtime": 1782422920.7559156,
-    "ast_hash": "f8ba6c99293b472c5ce37a5326fc7d8e",
-    "semantic_hash": "f8ba6c99293b472c5ce37a5326fc7d8e"
+    "mtime": 1794147216.5206692,
+    "ast_hash": "72e5af45323a0f3d90824878945e07ac",
+    "semantic_hash": ""
   },
   "docs/architecture/06-Inventory.md": {
     "mtime": 1793264306.4223,
@@ -2810,8 +2810,8 @@
     "semantic_hash": "992c6bb88c216ea98348ee9ca0dff9ac"
   },
   "docs/business/treasury-rules.md": {
-    "mtime": 1793265981.5578008,
-    "ast_hash": "a69c948033618411dc35458ed2b0eeb9",
+    "mtime": 1794147244.505087,
+    "ast_hash": "3ad12a1ac0f675c1c335b9409b66abe3",
     "semantic_hash": ""
   },
   "docs/business/vat-rules.md": {
@@ -3650,12 +3650,12 @@
     "semantic_hash": ""
   },
   "resources/views/components/pdf-report-shell.blade.php": {
-    "mtime": 1790144344.153833,
-    "ast_hash": "89a987d221c6b45d74ff1254974d05c6",
+    "mtime": 1794147225.1505673,
+    "ast_hash": "7956b2c91b830f6bf964c2ae07394a9d",
     "semantic_hash": ""
   },
   "storage/app/temp/validate-xml.php": {
-    "mtime": 1793616391.6404326,
+    "mtime": 1794139196.0182514,
     "ast_hash": "8b04ecc4a1e2175a683ba514f3aea3b4",
     "semantic_hash": ""
   },
@@ -3735,8 +3735,8 @@
     "semantic_hash": ""
   },
   "config/breadcrumbs.php": {
-    "mtime": 1793616392.7433126,
-    "ast_hash": "bcd5aff76387381ec1aa4fb8b420e965",
+    "mtime": 1794147220.7033527,
+    "ast_hash": "b52848efef05f89e135c78f5eba6012a",
     "semantic_hash": ""
   },
   "resources/views/management-reports/payroll-summary.blade.php": {
@@ -5730,8 +5730,8 @@
     "semantic_hash": ""
   },
   "storage/framework/views/09cab0174e8c13224eb8c84d6b76f6eb.php": {
-    "mtime": 1793536191.767471,
-    "ast_hash": "c5097a288162539f8f469da2dfceb18b",
+    "mtime": 1793712971.905827,
+    "ast_hash": "e05e70141026164920a707e4ef258b84",
     "semantic_hash": ""
   },
   "storage/framework/views/0e998e506c5d0c27e4c0b0cc331a3790.php": {
@@ -5760,8 +5760,8 @@
     "semantic_hash": ""
   },
   "storage/framework/views/26ba0e44d14b2e03e8490a7cce6bb981.php": {
-    "mtime": 1793536092.5345073,
-    "ast_hash": "357e65c53c7641521b477d60fad745bb",
+    "mtime": 1793712985.8276987,
+    "ast_hash": "451bbc53b33eb691a4611b77c73205c6",
     "semantic_hash": ""
   },
   "storage/framework/views/293bdd524cdd019077c6bec06d797673.php": {
@@ -5915,8 +5915,8 @@
     "semantic_hash": ""
   },
   "storage/framework/views/b47ba2cb67ed62ff2414b32f9bf26d01.php": {
-    "mtime": 1793623098.851151,
-    "ast_hash": "fe7db3bdfb6d38edfe7f75418e87aae8",
+    "mtime": 1793712355.292936,
+    "ast_hash": "15c8a3f9bdfc329fbe47cce73fd68efa",
     "semantic_hash": ""
   },
   "storage/framework/views/33cdbded2eaee27b5916405e34366c56.php": {
@@ -6047,6 +6047,46 @@
   "storage/framework/views/e2160cddd7024000c1fccf8f8fa55dd9.php": {
     "mtime": 1793691983.9925578,
     "ast_hash": "542fba5a3e4355ba185a37b8983a13ca",
+    "semantic_hash": ""
+  },
+  "resources/views/bank-accounts/print/statement.blade.php": {
+    "mtime": 1794147198.8316169,
+    "ast_hash": "3c685b16bb9a9343f0db87245967356d",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/033b56d3bbd7abbb0d6bb0cc915078ff.php": {
+    "mtime": 1794142705.2762568,
+    "ast_hash": "57068e3d698c4623441c773c030cef2e",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/381a5dc44a6aa686f7befc1ad39e47dc.php": {
+    "mtime": 1794142709.788794,
+    "ast_hash": "71f800b877a17b9d71fcee10f62ed700",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/3edc7955a2165296466cdcbf736b0068.php": {
+    "mtime": 1794142687.943987,
+    "ast_hash": "eb9aa9fdc442f74262e42799b89bbb6f",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/62f4c795cda13005a9b8a368f67780dd.php": {
+    "mtime": 1794142749.3517876,
+    "ast_hash": "c2587257010eb95d4e19bdee5a43a170",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/9e820a86069279e603677862085c7d26.php": {
+    "mtime": 1794142705.3654156,
+    "ast_hash": "f06cf35bd4c3aadd9e61c579cd8bb119",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/ba7306996e860c74df34515474080c0f.php": {
+    "mtime": 1794142537.7861676,
+    "ast_hash": "255d42a61a6f79058c4f3fefb79972f5",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/e2ed31f877be2fbfdac29639eaf839ad.php": {
+    "mtime": 1794142709.6765711,
+    "ast_hash": "4bb6bcaf2a91fdbf7a15078cc828be5c",
     "semantic_hash": ""
   }
 }
