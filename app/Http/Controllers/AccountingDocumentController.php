@@ -9,6 +9,7 @@ use App\Models\Party;
 use App\Models\Project;
 use App\Repositories\AccountingDocumentRepository;
 use App\Services\AccountingPostingService;
+use App\Services\ChartOfAccountsStandardizationService;
 use App\Services\NumberingService;
 use App\Support\PersianPdf;
 use Illuminate\Http\Request;
@@ -192,10 +193,6 @@ class AccountingDocumentController extends Controller
 
     private function formData(AccountingDocument $document): array
     {
-        $usedAccountIds = $document->relationLoaded('lines')
-            ? $document->lines->pluck('chart_account_id')->merge($document->lines->pluck('detail_account_id'))->filter()->unique()->all()
-            : [];
-
         $suggestedNumber = null;
 
         if (! $document->exists) {
@@ -208,10 +205,13 @@ class AccountingDocumentController extends Controller
 
         return [
             'document' => $document,
-            'accounts' => ChartAccount::query()
-                ->where(fn ($query) => $query->where('is_active', true)->orWhereIn('id', $usedAccountIds))
-                ->orderBy('code')
-                ->get(),
+            // Include inactive codes so search can explain deprecations (e.g. 210501 → 2102).
+            'accounts' => ChartAccount::query()->orderBy('code')->get(),
+            'deprecatedAccountTargets' => collect(app(ChartOfAccountsStandardizationService::class)->operations())
+                ->where('action', 'DEPRECATE')
+                ->filter(fn (array $operation) => filled($operation['code'] ?? null) && filled($operation['target'] ?? null))
+                ->mapWithKeys(fn (array $operation) => [(string) $operation['code'] => (string) $operation['target']])
+                ->all(),
             'parties' => Party::where('is_active', true)->orderBy('name')->get(),
             'projects' => Project::orderBy('name')->get(),
             'suggestedNumber' => $suggestedNumber,

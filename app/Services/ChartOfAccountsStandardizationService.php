@@ -298,6 +298,10 @@ class ChartOfAccountsStandardizationService
                 if (! $account) {
                     $result['status'] = 'skipped';
                     $result['note'] = 'حساب وجود ندارد';
+                } elseif (($usage['posted_lines'] + $usage['other_lines']) > 0 || $usage['refs'] !== []) {
+                    // Accounts with ledger movement must stay selectable.
+                    $result['status'] = 'done';
+                    $result['note'] = 'گردش/وابستگی دارد؛ حساب فعال می‌ماند';
                 } elseif (! $account->is_active && (! isset($operation['title']) || $account->title === $operation['title'])) {
                     $result['status'] = 'done';
                 }
@@ -307,9 +311,8 @@ class ChartOfAccountsStandardizationService
                 if (! $account) {
                     $result['status'] = 'done';
                 } elseif (! $this->isDeletable($account, $usage)) {
-                    $result['action'] = 'DEPRECATE';
-                    $result['note'] = 'استفاده دارد؛ به جای حذف غیرفعال می‌شود';
-                    $result['status'] = $account->is_active ? 'pending' : 'done';
+                    $result['status'] = 'blocked';
+                    $result['note'] = 'گردش یا وابستگی دارد؛ حذف/غیرفعال مجاز نیست';
                 }
                 break;
         }
@@ -399,6 +402,14 @@ class ChartOfAccountsStandardizationService
                 break;
 
             case 'DEPRECATE':
+                $usage = $this->usage($account);
+                if ($usage['posted_lines'] + $usage['other_lines'] > 0 || $usage['refs'] !== []) {
+                    return array_merge($operation, [
+                        'status' => 'skipped',
+                        'note' => 'گردش/وابستگی دارد؛ حساب فعال می‌ماند',
+                    ]);
+                }
+
                 $account->update(array_filter([
                     'is_active' => false,
                     'title' => $operation['title'] ?? null,
@@ -408,10 +419,10 @@ class ChartOfAccountsStandardizationService
             case 'DELETE':
                 $usage = $this->usage($account);
                 if ($usage['posted_lines'] + $usage['other_lines'] > 0 || $usage['refs'] !== [] || $usage['children'] > 0) {
-                    $account->update(['is_active' => false]);
-                    $operation['action'] = 'DEPRECATE';
-                    $operation['note'] = 'وابستگی داشت؛ به جای حذف غیرفعال شد';
-                    break;
+                    return array_merge($operation, [
+                        'status' => 'blocked',
+                        'note' => 'گردش یا وابستگی دارد؛ حذف/غیرفعال مجاز نیست',
+                    ]);
                 }
                 $account->delete();
                 break;

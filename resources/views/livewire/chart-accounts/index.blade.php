@@ -156,6 +156,13 @@
                     </select>
                     @error('edit_nature') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
                 </label>
+                <label class="erp-filter-field">وضعیت
+                    <select wire:model="edit_is_active">
+                        <option value="1">فعال</option>
+                        <option value="0">غیرفعال</option>
+                    </select>
+                    @error('edit_is_active') <span class="text-sm text-red-600">{{ $message }}</span> @enderror
+                </label>
                 <label class="erp-filter-field md:col-span-2">والد
                     <select wire:model="edit_parent_id">
                         <option value="">بدون والد</option>

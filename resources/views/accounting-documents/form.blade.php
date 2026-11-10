@@ -86,13 +86,30 @@
                     'subsidiary' => 'معین',
                     'detail' => 'تفصیل',
                 ];
+                $deprecatedTargets = $deprecatedAccountTargets ?? [];
                 $accountOptions = searchSelectOptions(
-                    $accounts->map(fn ($account) => [
-                        'id' => $account->id,
-                        'label' => (string) ($account->title ?: ''),
-                        'code' => $account->code ?? null,
-                        'type' => $accountLevelLabels[$account->level] ?? $account->level,
-                    ])
+                    $accounts->map(function ($account) use ($accountLevelLabels, $deprecatedTargets) {
+                        $code = (string) ($account->code ?? '');
+                        $replacement = $deprecatedTargets[$code] ?? null;
+                        $isActive = (bool) $account->is_active;
+                        $levelLabel = $accountLevelLabels[$account->level] ?? $account->level;
+                        $title = (string) ($account->title ?: '');
+
+                        if (! $isActive) {
+                            $title .= $replacement
+                                ? " — غیرفعال؛ به‌جای آن از {$replacement} استفاده کنید"
+                                : ' — غیرفعال';
+                        }
+
+                        return [
+                            'id' => $account->id,
+                            'label' => $title,
+                            'code' => $code !== '' ? $code : null,
+                            'type' => $isActive ? $levelLabel : 'غیرفعال',
+                            'disabled' => ! $isActive,
+                            'replacement_code' => $replacement,
+                        ];
+                    })
                 );
                 $partyOptions = searchSelectOptions(
                     $parties,

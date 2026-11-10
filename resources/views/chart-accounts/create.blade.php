@@ -12,6 +12,12 @@
         <label>سطح <select name="level" class="w-full"><option value="group" @selected(old('level', $account->level ?? '') === 'group')>گروه</option><option value="ledger" @selected(old('level', $account->level ?? '') === 'ledger')>کل</option><option value="subsidiary" @selected(old('level', $account->level ?? '') === 'subsidiary')>معین</option><option value="detail" @selected(old('level', $account->level ?? 'detail') === 'detail')>تفصیل</option></select></label>
         <label>ماهیت <select name="nature" class="w-full"><option value="debit" @selected(old('nature', $account->nature ?? '') === 'debit')>بدهکار</option><option value="credit" @selected(old('nature', $account->nature ?? '') === 'credit')>بستانکار</option><option value="neutral" @selected(old('nature', $account->nature ?? 'neutral') === 'neutral')>خنثی</option></select></label>
         <label>والد <select name="parent_id" class="w-full"><option value="">بدون والد</option>@foreach($parents as $parent)<option value="{{ $parent->id }}" @selected(old('parent_id', $account->parent_id ?? null) == $parent->id)>{{ $parent->code }} - {{ $parent->title }}</option>@endforeach</select></label>
+        <label>وضعیت
+            <select name="is_active" class="w-full">
+                <option value="1" @selected((string) old('is_active', $account->is_active ?? true) === '1')>فعال</option>
+                <option value="0" @selected((string) old('is_active', $account->is_active ?? true) === '0')>غیرفعال</option>
+            </select>
+        </label>
         <div class="md:col-span-2 flex gap-2">
             <button class="bg-blue-500 text-white px-4 py-2 rounded">{{ $isEdit ? 'ذخیره تغییرات' : 'ثبت' }}</button>
             <a href="{{ route('chart-accounts.index') }}" class="bg-gray-500 text-white px-4 py-2 rounded">بازگشت</a>

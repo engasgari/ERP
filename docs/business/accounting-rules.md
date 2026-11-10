@@ -56,6 +56,12 @@ Detail
 
 Floating Detail
 
+Accounts with ledger movement must stay active and selectable.
+
+Inactive codes without turnover remain searchable for guidance and can be toggled from Chart of Accounts edit (`is_active`).
+
+COA standardization must never deactivate an account that already has document lines.
+
 ---
 
 ## Cost Center

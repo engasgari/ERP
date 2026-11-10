@@ -53,6 +53,8 @@ Accounting Documents are immutable after posting.
 
 Posted documents can only be reversed.
 
+Chart accounts with ledger usage must remain active; activation status is editable in Chart of Accounts.
+
 ---
 
 ## Flow

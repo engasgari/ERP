@@ -102,12 +102,17 @@ class ChartAccountController extends Controller
     {
         $ignore = $account ? ',' . $account->id : '';
 
-        return $request->validate([
+        $validated = $request->validate([
             'parent_id' => 'nullable|exists:chart_accounts,id',
             'level' => 'required|in:group,ledger,subsidiary,detail',
             'code' => 'required|string|max:255|unique:chart_accounts,code' . $ignore,
             'title' => 'required|string|max:255',
             'nature' => 'required|in:debit,credit,neutral',
+            'is_active' => 'nullable|boolean',
         ]);
+
+        $validated['is_active'] = $request->boolean('is_active', true);
+
+        return $validated;
     }
 }

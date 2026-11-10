@@ -628,7 +628,7 @@ if (!function_exists('persianNumberToWords')) {
 if (! function_exists('searchSelectOptions')) {
     /**
      * @param  iterable<mixed>  $items
-     * @return list<array{id:int|string,label:string,code:?string,category:?string,type:?string}>
+     * @return list<array{id:int|string,label:string,code:?string,category:?string,type:?string,disabled?:bool,replacement_code?:?string}>
      */
     function searchSelectOptions(
         iterable $items,
@@ -646,6 +646,8 @@ if (! function_exists('searchSelectOptions')) {
                     'code' => $item['code'] ?? null,
                     'category' => $item['category'] ?? null,
                     'type' => isset($item['type']) && is_string($item['type']) ? $item['type'] : null,
+                    'disabled' => (bool) ($item['disabled'] ?? false),
+                    'replacement_code' => $item['replacement_code'] ?? null,
                 ];
 
                 continue;
@@ -658,6 +660,8 @@ if (! function_exists('searchSelectOptions')) {
                     'code' => null,
                     'category' => null,
                     'type' => null,
+                    'disabled' => false,
+                    'replacement_code' => null,
                 ];
 
                 continue;
@@ -669,6 +673,8 @@ if (! function_exists('searchSelectOptions')) {
                 'code' => $codeResolver ? $codeResolver($item) : ($item->code ?? null),
                 'category' => $item->category ?? null,
                 'type' => isset($item->type) && is_string($item->type) ? $item->type : null,
+                'disabled' => false,
+                'replacement_code' => null,
             ];
         }
 

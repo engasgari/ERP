@@ -30,6 +30,8 @@ class Index extends BaseListPage
 
     public string $edit_parent_id = '';
 
+    public string $edit_is_active = '1';
+
     public array $levelLabels = [
         'group' => 'گروه',
         'ledger' => 'کل',
@@ -65,6 +67,7 @@ class Index extends BaseListPage
         $this->edit_level = (string) $account->level;
         $this->edit_nature = (string) $account->nature;
         $this->edit_parent_id = $account->parent_id ? (string) $account->parent_id : '';
+        $this->edit_is_active = $account->is_active ? '1' : '0';
         $this->resetValidation();
     }
 
@@ -76,6 +79,7 @@ class Index extends BaseListPage
         $this->edit_level = 'detail';
         $this->edit_nature = 'neutral';
         $this->edit_parent_id = '';
+        $this->edit_is_active = '1';
         $this->resetValidation();
     }
 
@@ -89,18 +93,31 @@ class Index extends BaseListPage
             'edit_level' => 'required|in:group,ledger,subsidiary,detail',
             'edit_nature' => 'required|in:debit,credit,neutral',
             'edit_parent_id' => 'nullable|exists:chart_accounts,id',
+            'edit_is_active' => 'required|in:0,1',
         ], [], [
             'edit_code' => 'کد',
             'edit_title' => 'عنوان',
             'edit_level' => 'سطح',
             'edit_nature' => 'ماهیت',
             'edit_parent_id' => 'والد',
+            'edit_is_active' => 'وضعیت فعال',
         ]);
 
         if (! empty($validated['edit_parent_id']) && (int) $validated['edit_parent_id'] === (int) $account->id) {
             $this->addError('edit_parent_id', 'حساب نمی‌تواند والد خودش باشد.');
 
             return;
+        }
+
+        $willDeactivate = (string) $validated['edit_is_active'] === '0';
+        if ($willDeactivate) {
+            $usage = $this->usageStats()->get((int) $account->id);
+            $hasTurnover = ((int) ($usage['document_count'] ?? 0) > 0) || ((float) ($usage['turnover'] ?? 0) > 0);
+            if ($hasTurnover) {
+                $this->addError('edit_is_active', 'حساب دارای گردش است و نمی‌تواند غیرفعال شود.');
+
+                return;
+            }
         }
 
         $account->update([
@@ -111,6 +128,7 @@ class Index extends BaseListPage
             'parent_id' => $validated['edit_parent_id'] !== '' && $validated['edit_parent_id'] !== null
                 ? (int) $validated['edit_parent_id']
                 : null,
+            'is_active' => (string) $validated['edit_is_active'] === '1',
         ]);
 
         $this->closeEditModal();
@@ -327,6 +345,7 @@ class Index extends BaseListPage
                     'nature' => (string) $account->nature,
                     'nature_label' => $this->natureLabels[$account->nature] ?? $account->nature,
                     'is_system' => (bool) $account->is_system,
+                    'is_active' => (bool) $account->is_active,
                     'subtree_has_system' => $subtreeHasSystem,
                     'children' => $children,
                     'child_count' => $childCount,

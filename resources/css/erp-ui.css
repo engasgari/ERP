@@ -2460,6 +2460,14 @@ body.erp-shell > main {
     color: #1d4ed8;
 }
 
+.erp-search-select__option.is-disabled,
+.erp-search-select__option.is-disabled:hover,
+.erp-search-select__option.is-disabled.is-active {
+    background: #f8fafc;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
 .erp-search-select__option-label {
     flex: 1;
     min-width: 0;

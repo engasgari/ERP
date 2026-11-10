@@ -64,6 +64,9 @@
 
         <div class="coa-row__meta">
             <span class="coa-nature">{{ $node['nature_label'] }}</span>
+            <span class="coa-system {{ ($node['is_active'] ?? true) ? 'is-manual' : 'is-system' }}" title="وضعیت حساب">
+                {{ ($node['is_active'] ?? true) ? 'فعال' : 'غیرفعال' }}
+            </span>
             <span class="coa-system {{ $node['is_system'] ? 'is-system' : 'is-manual' }}">
                 {{ $node['is_system'] ? 'سیستمی' : 'دستی' }}
             </span>

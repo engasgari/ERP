@@ -1508,21 +1508,26 @@ function formatSearchSelectLabel(option) {
 function filterSearchSelectOptions(options, query) {
     const normalized = normalizeSearchText(query);
 
+    // Keep the default open-list focused on selectable items; surface inactive only when searching.
     if (!normalized) {
-        return options.slice(0, 25);
+        return options.filter((option) => ! option.disabled).slice(0, 25);
     }
 
-    return options
-        .filter((option) => {
-            const haystack = normalizeSearchText([
-                option.label,
-                option.code,
-                option.category,
-                option.type,
-            ].filter(Boolean).join(' '));
+    const matched = options.filter((option) => {
+        const haystack = normalizeSearchText([
+            option.label,
+            option.code,
+            option.category,
+            option.type,
+            option.replacement_code,
+        ].filter(Boolean).join(' '));
 
-            return haystack.includes(normalized);
-        })
+        return haystack.includes(normalized);
+    });
+
+    // Prefer active matches, then inactive guidance rows.
+    return matched
+        .sort((left, right) => Number(Boolean(left.disabled)) - Number(Boolean(right.disabled)))
         .slice(0, 30);
 }
 
@@ -1688,6 +1693,11 @@ function bindErpSearchSelect(root) {
             button.className = 'erp-search-select__option';
             button.dataset.index = String(index);
 
+            if (option.disabled) {
+                button.classList.add('is-disabled');
+                button.setAttribute('aria-disabled', 'true');
+            }
+
             if (hidden.value !== '' && String(option.id) === String(hidden.value)) {
                 button.classList.add('is-selected');
             }
@@ -1737,6 +1747,19 @@ function bindErpSearchSelect(root) {
     };
 
     const selectOption = (option) => {
+        if (option?.disabled) {
+            const replacement = option.replacement_code
+                ? `به‌جای آن کد ${option.replacement_code} را انتخاب کنید.`
+                : 'این حساب غیرفعال است و قابل انتخاب نیست.';
+            if (typeof window.showErpToast === 'function') {
+                window.showErpToast(replacement, 'warning');
+            } else {
+                window.alert(replacement);
+            }
+
+            return;
+        }
+
         state.clearedByUser = false;
         hidden.value = String(option.id ?? '');
         input.value = formatSearchSelectLabel(option);
@@ -1775,6 +1798,10 @@ function bindErpSearchSelect(root) {
         }
 
         const exact = state.options.find((option) => {
+            if (option.disabled) {
+                return false;
+            }
+
             const code = normalizeSearchText(option.code);
             const label = normalizeSearchText(option.label);
             const formatted = normalizeSearchText(formatSearchSelectLabel(option));
@@ -1788,8 +1815,10 @@ function bindErpSearchSelect(root) {
             return;
         }
 
-        if (state.filtered.length === 1) {
-            selectOption(state.filtered[0]);
+        const selectable = state.filtered.filter((option) => ! option.disabled);
+
+        if (selectable.length === 1) {
+            selectOption(selectable[0]);
 
             return;
         }
