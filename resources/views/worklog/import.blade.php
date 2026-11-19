@@ -1,21 +1,46 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">ورود کارکرد از فایل دستگاه تردد</h2>
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">کارکرد پرسنل</h2>
     </x-slot>
 
     <div class="py-12">
         <div class="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto">
             <div class="mb-6 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-2xl font-bold">ورود اکسل کارکرد (Piofy)</h2>
-                    <p class="mt-1 text-sm text-slate-500">
-                        خروجی ماهانه دستگاه تردد (xlsx یا csv) را آپلود کنید. هر جفت ورود/خروج یک رکورد کارکرد می‌سازد و پروژه خالی می‌ماند تا در لیست کارکرد انتخاب شود.
-                    </p>
-                </div>
-                <a href="{{ route('work-logs.index') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+                <h2 class="text-2xl font-bold">کارکرد پرسنل</h2>
+                <a href="{{ route('work-logs.index') }}" class="erp-action-btn erp-action-detail shrink-0">
                     بازگشت
                 </a>
             </div>
+
+            @if($piofyEnabled ?? false)
+                <section class="mb-6 rounded-xl border border-teal-200 bg-teal-50 p-4">
+                    <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-base font-bold text-teal-900">دریافت تردد از دستگاه</h3>
+                            <p class="mt-1 text-sm text-teal-800">
+                                ترددهای ثبت‌نشده از دستگاه خوانده می‌شود و با نام/شناسه پرسنل داخل برنامه ثبت می‌گردد.
+                            </p>
+                            <p class="mt-1 text-xs text-teal-700">
+                                آدرس دستگاه: {{ $piofyBaseUrl ?? '-' }}
+                                @if(! empty($lastSyncAt))
+                                    — آخرین همسان‌سازی: {{ formatJalaliDateTime($lastSyncAt) }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                    <form action="{{ route('worklog.sync-device') }}" method="POST" class="flex flex-wrap items-end gap-3">
+                        @csrf
+                        <label class="block w-36 text-sm font-semibold text-slate-700">
+                            از تاریخ
+                            <x-erp.ui.jalali-date-input name="since_date" :value="old('since_date')" placeholder="1405/01/01" class="mt-1 w-full" />
+                        </label>
+                        <button type="submit" class="rounded bg-teal-600 px-6 py-2 font-bold text-white hover:bg-teal-700"
+                            onclick="return confirm('دریافت تردد از دستگاه شروع شود؟')">
+                            دریافت تردد از دستگاه
+                        </button>
+                    </form>
+                </section>
+            @endif
 
             @if (session('success'))
                 <div class="mb-4 rounded-lg bg-green-50 p-4 text-sm text-green-800">{{ session('success') }}</div>
@@ -33,73 +58,39 @@
                 </div>
             @endif
 
-            <form action="{{ route('worklog.import') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
-                @csrf
-
-                <div>
-                    <label for="file" class="block text-sm font-semibold text-slate-700 mb-2">فایل خروجی دستگاه (xlsx / csv)</label>
-                    <input type="file" id="file" name="file" accept=".xlsx,.xls,.csv,.txt" required
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                    <p class="mt-2 text-xs text-slate-500">
-                        هدر Piofy: شناسه کاربر، نام کاربر، شماره کارت، زمان تردد (شمسی)، زمان تردد (میلادی)، کلید عملیاتی، عنوان کلید عملیاتی
+            <section class="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                <div class="mb-3">
+                    <h3 class="text-base font-bold text-sky-900">دریافت تردد از اکسل</h3>
+                    <p class="mt-1 text-sm text-sky-800">
+                        فایل خروجی دستگاه (xlsx / csv) را آپلود کنید تا ترددها به کارکرد تبدیل شوند.
                     </p>
                 </div>
+                <form action="{{ route('worklog.import') }}" method="POST" enctype="multipart/form-data" class="space-y-3"
+                      x-data="{ fileName: 'فایلی انتخاب نشده است' }">
+                    @csrf
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded">
-                        آپلود و تبدیل
-                    </button>
-                    <a href="{{ route('worklog.template') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded text-center">
-                        دانلود فایل نمونه
-                    </a>
-                    <a href="{{ route('worklog.export') }}" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded text-center">
-                        خروجی کارکردها
-                    </a>
-                </div>
-            </form>
-
-            <div class="mt-6 rounded-lg bg-gray-50 p-4 text-sm text-slate-700">
-                <h3 class="mb-2 font-bold">نحوه تبدیل</h3>
-                <ul class="list-disc space-y-2 pr-5">
-                    <li>پرسنل با شماره کارت، شناسه کاربر، کد پرسنلی یا نام پیدا می‌شود.</li>
-                    <li>بعد از ورود، پروژه همه رکوردها خالی است؛ در لیست کارکرد پروژه را انتخاب کنید.</li>
-                    <li>برای هر پرسنل در هر روز، اولین و آخرین تردد به عنوان ورود و خروج ثبت می‌شود.</li>
-                    <li>فایل خروجی مستقیم دستگاه Piofy با پسوند xlsx قابل آپلود است.</li>
-                </ul>
-            </div>
-
-            <div class="mt-6 rounded-lg bg-gray-50 p-4 text-sm text-slate-700">
-                <h3 class="mb-2 font-bold">نمونه ستون‌های دستگاه</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
-                        <thead>
-                        <tr>
-                            <th>شناسه کاربر</th>
-                            <th>نام کاربر</th>
-                            <th>شماره کارت</th>
-                            <th>زمان تردد (شمسی)</th>
-                            <th>زمان تردد (میلادی)</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td>Employee Name</td>
-                            <td>1001</td>
-                            <td>1405/06/25 08:00:00</td>
-                            <td>2026/09/16 08:00:00</td>
-                        </tr>
-                        <tr>
-                            <td>1</td>
-                            <td>Employee Name</td>
-                            <td>1001</td>
-                            <td>1405/06/25 16:00:00</td>
-                            <td>2026/09/16 16:00:00</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="w-56 shrink-0">
+                            <span class="mb-1 block text-sm font-semibold text-slate-700">فایل (xlsx / csv)</span>
+                            <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-sky-200 bg-white px-2 py-1.5 text-sm text-slate-700">
+                                <span class="min-w-0 flex-1 truncate" x-text="fileName"></span>
+                                <span class="shrink-0 rounded bg-sky-100 px-2 py-1 text-xs font-bold text-sky-800">انتخاب فایل</span>
+                                <input id="file" type="file" name="file" accept=".xlsx,.xls,.csv,.txt" required class="sr-only"
+                                       @change="fileName = $event.target.files[0]?.name || 'فایلی انتخاب نشده است'">
+                            </label>
+                        </div>
+                        <button type="submit" class="rounded bg-sky-600 px-5 py-2 font-bold text-white hover:bg-sky-700">
+                            آپلود و تبدیل
+                        </button>
+                        <a href="{{ route('worklog.template') }}" class="rounded bg-slate-500 px-5 py-2 text-center font-bold text-white hover:bg-slate-600">
+                            دانلود فایل نمونه
+                        </a>
+                    </div>
+                    <p class="text-xs text-sky-700">
+                        هدر: شناسه کاربر، نام کاربر، شماره کارت، زمان تردد (شمسی)، زمان تردد (میلادی)، کلید عملیاتی، عنوان کلید عملیاتی
+                    </p>
+                </form>
+            </section>
         </div>
     </div>
 </x-app-layout>

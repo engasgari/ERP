@@ -374,6 +374,7 @@ use App\Http\Controllers\WorkLogExcelController;
 Route::middleware(['auth', 'permission:worklogs.create', 'active.erp'])->prefix('worklog')->group(function () {
     Route::get('/import', [WorkLogExcelController::class, 'importView'])->name('worklog.import.view');
     Route::post('/import', [WorkLogExcelController::class, 'import'])->name('worklog.import');
+    Route::post('/sync-device', [WorkLogExcelController::class, 'syncFromDevice'])->name('worklog.sync-device');
     Route::get('/export', [WorkLogExcelController::class, 'export'])->name('worklog.export');
     Route::get('/template', [WorkLogExcelController::class, 'downloadTemplate'])->name('worklog.template');
 });

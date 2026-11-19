@@ -9,7 +9,16 @@
     @if($actions)
         <div class="flex flex-col gap-2 sm:flex-row">
             @foreach($actions as $action)
-                <a href="{{ $action['url'] ?? '#' }}" class="erp-action-btn {{ $action['class'] ?? 'erp-action-detail' }} text-center">{{ $action['label'] }}</a>
+                <a
+                    href="{{ $action['url'] ?? '#' }}"
+                    @if(! empty($action['data_no_spa'])) data-no-spa @endif
+                    class="erp-action-btn {{ $action['class'] ?? 'erp-action-detail' }} inline-flex items-center justify-center gap-2 text-center"
+                >
+                    @if(! empty($action['icon']))
+                        <x-erp.ui.action-icon :name="$action['icon']" class="h-4 w-4" />
+                    @endif
+                    <span>{{ $action['label'] }}</span>
+                </a>
             @endforeach
         </div>
     @endif

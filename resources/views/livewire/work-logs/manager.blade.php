@@ -2,6 +2,16 @@
     @include('livewire.partials.flash')
 
     <style>
+        .worklog-page .worklog-filter-row {
+            flex-wrap: nowrap;
+            align-items: flex-end;
+        }
+        .worklog-page .worklog-filter-clear {
+            display: flex;
+            align-items: flex-end;
+            flex: 0 0 auto;
+            padding-bottom: 0.05rem;
+        }
         .worklog-page .worklog-toolbar {
             display: flex;
             align-items: center;
@@ -124,84 +134,112 @@
             accent-color: #2563eb;
             vertical-align: middle;
         }
-        .worklog-page .worklog-project-select {
+        .worklog-page .erp-table-wrap {
             width: 100%;
-            min-width: 11rem;
-            height: 1.35rem;
-            padding: 0;
-            font-size: 0.55rem;
-            line-height: 1.1;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        .worklog-page .worklog-project-select,
+        .worklog-page .worklog-inline,
+        .worklog-page .worklog-time-text {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            min-height: 2rem;
+            padding: 0.35rem 0.5rem;
+            font: inherit;
+            font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
+            font-size: 0.78rem;
+            line-height: 1.3;
             border: 0 !important;
             border-radius: 0;
             background: transparent;
             box-shadow: none !important;
             outline: none;
+        }
+        .worklog-page .worklog-project-select {
             cursor: pointer;
         }
         .worklog-page .worklog-project-select.is-empty {
             color: #1d4ed8;
             background: #eff6ff;
-            padding: 0 0.2rem;
         }
-        .worklog-page .worklog-project-select:focus {
-            background: #dbeafe;
+        .worklog-page .worklog-project-select:focus,
+        .worklog-page .worklog-inline:focus,
+        .worklog-page .worklog-time-wrap:focus-within {
+            background: #eff6ff;
         }
         .worklog-page .worklog-project-select:not(.is-empty) {
             background: #f8fbff;
         }
-        .worklog-page .worklog-inline {
+        .worklog-page .worklog-time-wrap {
+            position: relative;
+            display: block;
             width: 100%;
-            height: 1.35rem;
-            padding: 0 0.15rem;
-            font-size: 0.55rem;
-            line-height: 1.1;
-            border: 0 !important;
-            border-radius: 0;
-            background: transparent;
-            box-shadow: none !important;
-            outline: none;
-        }
-        .worklog-page .worklog-inline:focus {
-            background: #eff6ff;
-        }
-        .worklog-page .worklog-inline[type="time"] {
-            min-width: 5.5rem;
-            padding-inline-end: 0.1rem;
-        }
-        .worklog-page .worklog-inline[type="time"]::-webkit-calendar-picker-indicator {
             cursor: pointer;
-            opacity: 0.65;
-            padding: 0;
+        }
+        .worklog-page .worklog-time-text {
+            display: flex;
+            align-items: center;
+            font-variant-numeric: tabular-nums;
+            direction: ltr;
+            text-align: left;
+            color: inherit;
+            pointer-events: none;
+        }
+        .worklog-page .worklog-time-native {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             margin: 0;
+            padding: 0;
+            border: 0;
+            opacity: 0;
+            pointer-events: none;
+            background: transparent;
+        }
+        .worklog-page .worklog-time-native::-webkit-calendar-picker-indicator {
+            display: none;
         }
         .worklog-page .worklog-inline.erp-jalali-date-input,
         .worklog-page .worklog-inline[data-jalali-datepicker] {
             direction: ltr;
             text-align: left;
-            min-width: 6.75rem;
+            font-variant-numeric: tabular-nums;
         }
         .worklog-page .worklog-code {
-            min-width: 5.5rem;
             text-align: right !important;
             direction: rtl;
             font-variant-numeric: tabular-nums;
             font-weight: 600;
+            font-size: 0.78rem;
+            white-space: nowrap;
         }
         .worklog-page table.erp-ui-data-table {
+            width: max-content !important;
+            min-width: 100% !important;
+            max-width: none !important;
+            table-layout: auto !important;
             border-spacing: 0 !important;
             border-collapse: collapse !important;
-            font-size: 0.72rem !important;
+            font-size: 0.78rem !important;
+            line-height: 1.35 !important;
             border: 1px solid #cbd5e1 !important;
         }
         .worklog-page table.erp-ui-data-table th,
         .worklog-page table.erp-ui-data-table td {
-            padding: 0.15rem 0.35rem !important;
+            padding: 0.35rem 0.5rem !important;
             vertical-align: middle !important;
             white-space: nowrap;
+            font-size: 0.78rem !important;
+            font-weight: 500;
             border: 1px solid #cbd5e1 !important;
         }
         .worklog-page table.erp-ui-data-table thead th {
             background: #f1f5f9 !important;
+            font-weight: 700;
+            font-size: 0.78rem !important;
         }
         .worklog-page table.erp-ui-data-table tbody tr.worklog-incomplete {
             background: #fef2f2 !important;
@@ -211,24 +249,78 @@
             background: #fee2e2 !important;
         }
         .worklog-page .worklog-name {
-            max-width: 9rem;
+            max-width: 12rem;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-size: 0.78rem;
+        }
+        .worklog-page .worklog-incomplete-badge {
+            margin-inline-start: 0.25rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #dc2626;
         }
         .worklog-page .worklog-ltr {
             direction: ltr;
             unicode-bidi: isolate;
             font-variant-numeric: tabular-nums;
-            text-align: right;
+            text-align: left;
+            font-size: 0.78rem;
         }
-        .worklog-page col.col-check { width: 28px; }
-        .worklog-page col.col-code { width: 88px; }
-        .worklog-page col.col-name { width: 120px; }
-        .worklog-page col.col-project { width: 180px; }
-        .worklog-page col.col-date { width: 108px; }
-        .worklog-page col.col-time { width: 78px; }
-        .worklog-page col.col-hours { width: 58px; }
-        .worklog-page col.col-actions { width: 64px; }
+        .worklog-page col.col-check { width: 2.5rem; }
+        .worklog-page col.col-code { width: 1%; }
+        .worklog-page col.col-name { width: auto; }
+        .worklog-page col.col-project { width: auto; }
+        .worklog-page col.col-date { width: 1%; }
+        .worklog-page col.col-time { width: 1%; }
+        .worklog-page col.col-hours { width: 5.75rem; }
+        .worklog-page col.col-actions { width: 2.75rem; }
+        .worklog-page td:has(.worklog-project-select),
+        .worklog-page th:nth-child(4) {
+            min-width: 8rem;
+            max-width: 11rem;
+        }
+        .worklog-page td:has(.worklog-project-select) .worklog-project-select {
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .worklog-page td:has(.erp-jalali-date-input) {
+            min-width: 7.5rem;
+        }
+        .worklog-page td:has(.worklog-time-wrap) {
+            min-width: 5.75rem;
+        }
+        .worklog-page td:has(.worklog-hours-input),
+        .worklog-page th:nth-child(8) {
+            min-width: 5.75rem;
+        }
+        .worklog-page .worklog-hours-input {
+            min-width: 4.5rem;
+            text-align: center;
+            overflow: visible;
+        }
+        .worklog-page .erp-row-actions {
+            justify-content: center;
+        }
+        .worklog-page .erp-row-action-btn,
+        .worklog-page .erp-row-action-btn--danger {
+            width: 1.5rem !important;
+            min-width: 1.5rem !important;
+            max-width: 1.5rem !important;
+            height: 1.5rem !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            color: #b91c1c !important;
+        }
+        .worklog-page .erp-row-action-btn:hover,
+        .worklog-page .erp-row-action-btn--danger:hover {
+            border: 0 !important;
+            background: transparent !important;
+            color: #991b1b !important;
+        }
         .worklog-page .worklog-project-modal-list {
             display: flex;
             flex-direction: column;
@@ -329,14 +421,14 @@
         description="ویرایش مستقیم پروژه، تاریخ، ورود، خروج و ساعت در همین صفحه."
         route="work-logs.index"
         :actions="[
-            ['label' => 'ورود اکسل', 'url' => route('worklog.import.view'), 'class' => 'erp-action-detail'],
-            ['label' => 'خروجی', 'url' => route('worklog.export'), 'class' => 'erp-action-detail'],
+            ['label' => 'کارکرد پرسنل', 'url' => route('worklog.import.view'), 'class' => 'erp-action-detail'],
+            ['label' => 'خروجی', 'url' => route('worklog.export'), 'class' => 'erp-action-detail', 'icon' => 'excel', 'data_no_spa' => true],
         ]"
         panel-class="worklog-page"
     >
         <x-slot name="filters">
             <x-erp.ui.filter-bar wire:submit.prevent>
-                <div class="erp-filter-row erp-filter-row-5">
+                <div class="erp-filter-row erp-filter-row-5 worklog-filter-row">
                     <label class="erp-filter-field">پرسنل
                         <select wire:model.live="employeeId">
                             <option value="">همه پرسنل</option>
@@ -369,9 +461,12 @@
                     <label class="erp-filter-field">تا تاریخ
                         <x-erp.ui.jalali-date-input wire:model.live.debounce.500ms="endDateFa" placeholder="1403/12/29" class="w-full" />
                     </label>
-                </div>
-                <div class="erp-filter-actions mt-2">
-                    <button type="button" wire:click="clearFilters" class="erp-action-btn">حذف فیلترها</button>
+                    <div class="worklog-filter-clear">
+                        <button type="button" wire:click="clearFilters" class="erp-action-btn inline-flex items-center gap-2 whitespace-nowrap">
+                            <x-erp.ui.action-icon name="delete" class="h-4 w-4" />
+                            <span>حذف فیلترها</span>
+                        </button>
+                    </div>
                 </div>
             </x-erp.ui.filter-bar>
         </x-slot>
@@ -470,7 +565,7 @@
                         <td class="worklog-name" title="{{ $workLog->employee?->full_name }}">
                             {{ $workLog->employee?->full_name }}
                             @if($workLog->is_incomplete)
-                                <span class="text-[10px] font-bold text-red-600">ناقص</span>
+                                <span class="worklog-incomplete-badge">ناقص</span>
                             @endif
                         </td>
                         <td>
@@ -501,29 +596,51 @@
                             >
                         </td>
                         <td>
-                            <input
-                                type="time"
-                                class="worklog-inline worklog-ltr"
-                                value="{{ $start }}"
-                                dir="ltr"
-                                step="60"
-                                wire:change="updateField({{ $workLog->id }}, 'start_time', $event.target.value)"
+                            <div
+                                class="worklog-time-wrap"
+                                title="انتخاب ساعت ورود"
+                                @click="
+                                    const input = $el.querySelector('input[type=time]');
+                                    if (input?.showPicker) input.showPicker();
+                                    else input?.focus();
+                                "
                             >
+                                <span class="worklog-time-text">{{ $start !== '' ? toPersianDigits($start) : '—' }}</span>
+                                <input
+                                    type="time"
+                                    class="worklog-time-native"
+                                    value="{{ $start }}"
+                                    step="60"
+                                    tabindex="-1"
+                                    wire:change="updateField({{ $workLog->id }}, 'start_time', $event.target.value)"
+                                >
+                            </div>
                         </td>
                         <td>
-                            <input
-                                type="time"
-                                class="worklog-inline worklog-ltr"
-                                value="{{ $end }}"
-                                dir="ltr"
-                                step="60"
-                                wire:change="updateField({{ $workLog->id }}, 'end_time', $event.target.value)"
+                            <div
+                                class="worklog-time-wrap"
+                                title="انتخاب ساعت خروج"
+                                @click="
+                                    const input = $el.querySelector('input[type=time]');
+                                    if (input?.showPicker) input.showPicker();
+                                    else input?.focus();
+                                "
                             >
+                                <span class="worklog-time-text">{{ $end !== '' ? toPersianDigits($end) : '—' }}</span>
+                                <input
+                                    type="time"
+                                    class="worklog-time-native"
+                                    value="{{ $end }}"
+                                    step="60"
+                                    tabindex="-1"
+                                    wire:change="updateField({{ $workLog->id }}, 'end_time', $event.target.value)"
+                                >
+                            </div>
                         </td>
                         <td>
                             <input
                                 type="text"
-                                class="worklog-inline worklog-ltr"
+                                class="worklog-inline worklog-ltr worklog-hours-input"
                                 value="{{ toPersianDigits($hours) }}"
                                 dir="ltr"
                                 inputmode="decimal"

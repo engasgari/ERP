@@ -12,6 +12,7 @@ use App\Services\Ai\WebSearch\Contracts\WebSearchProvider;
 use App\Services\Ai\WebSearch\NullWebSearchProvider;
 use App\Services\NavigationBreadcrumbService;
 use App\Support\FinancialReportContext;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
@@ -41,6 +42,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         App::setLocale('fa');
+
+        Paginator::defaultView('pagination.erp');
+        Paginator::defaultSimpleView('pagination.simple-erp');
 
         Gate::before(fn ($user) => $user->isAdmin() ? true : null);
         Gate::policy(FinancialReportContext::class, FinancialReportPolicy::class);

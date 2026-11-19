@@ -330,8 +330,8 @@
     "semantic_hash": ""
   },
   "app/Http/Controllers/WorkLogExcelController.php": {
-    "mtime": 1790144343.5442734,
-    "ast_hash": "b839b63c247f16e1665388ac5c8b6874",
+    "mtime": 1795113721.3146822,
+    "ast_hash": "5eeecf6364ab2f9831d017221beef975",
     "semantic_hash": ""
   },
   "app/Http/Controllers/WorkShiftController.php": {
@@ -2335,8 +2335,8 @@
     "semantic_hash": ""
   },
   "resources/views/livewire/work-logs/manager.blade.php": {
-    "mtime": 1791875534.746918,
-    "ast_hash": "82a740ed55926c3908c528e87e418b20",
+    "mtime": 1795114142.8859322,
+    "ast_hash": "85d959d6815dc1fcac7bcd34561be296",
     "semantic_hash": ""
   },
   "resources/views/livewire/work-shifts/index.blade.php": {
@@ -2610,8 +2610,8 @@
     "semantic_hash": "7f449df186a7c175083933b7c49d10a5"
   },
   "resources/views/worklog/import.blade.php": {
-    "mtime": 1790144343.984064,
-    "ast_hash": "14da1840f08d422e6c40e7441ab9b57b",
+    "mtime": 1795114141.697751,
+    "ast_hash": "e65f6dd614be23eb8c99aeeedaf304a7",
     "semantic_hash": ""
   },
   "routes/api.php": {
@@ -2630,8 +2630,8 @@
     "semantic_hash": "3c6ce2e6d16444282b24a9aa63885563"
   },
   "routes/web.php": {
-    "mtime": 1794147206.9052963,
-    "ast_hash": "0543ebf7f6b1473148b96167fece19c8",
+    "mtime": 1795113724.013223,
+    "ast_hash": "7d21b02e4a5e6efb56ab4106d1f676c6",
     "semantic_hash": ""
   },
   "storage/app/db-backups/aaleir_erp_before_schema_import_20260609_140503.sql": {
@@ -2825,9 +2825,9 @@
     "semantic_hash": "dff722769fb14ca7092fe61407b5fa72"
   },
   "docs/project-context.md": {
-    "mtime": 1782435749.143057,
-    "ast_hash": "4520e7844308d18ea555e1d018d953bc",
-    "semantic_hash": "4520e7844308d18ea555e1d018d953bc"
+    "mtime": 1795113852.4506884,
+    "ast_hash": "0ebae42ea8d1f0c7185627da69f08ff1",
+    "semantic_hash": ""
   },
   "docs/refactor/01-health-check.md": {
     "mtime": 1782424551.892283,
@@ -3655,7 +3655,7 @@
     "semantic_hash": ""
   },
   "storage/app/temp/validate-xml.php": {
-    "mtime": 1794139196.0182514,
+    "mtime": 1794410100.3065767,
     "ast_hash": "8b04ecc4a1e2175a683ba514f3aea3b4",
     "semantic_hash": ""
   },
@@ -5995,8 +5995,8 @@
     "semantic_hash": ""
   },
   "storage/framework/views/4b7843f62fbeb2f8ea345190787f1604.php": {
-    "mtime": 1793620054.0929239,
-    "ast_hash": "291e128fd39ca7be12fb8865f59536ba",
+    "mtime": 1795113980.7225494,
+    "ast_hash": "1d621c25fb181e9a596811c3434fcdca",
     "semantic_hash": ""
   },
   "storage/framework/views/7639848f769d2b039f56c406b64a8b05.php": {
@@ -6127,6 +6127,36 @@
   "database/migrations/2026_11_10_161000_reactivate_chart_accounts_with_ledger_usage.php": {
     "mtime": 1794315029.6037045,
     "ast_hash": "51da5754edf9a04c5281f5f7461e0a3e",
+    "semantic_hash": ""
+  },
+  "app/Services/Attendance/PiofyAttendanceSyncService.php": {
+    "mtime": 1795113705.1789205,
+    "ast_hash": "ccde73911cb154a0fc0574e79d5ef290",
+    "semantic_hash": ""
+  },
+  "app/Services/Attendance/PiofyDeviceClient.php": {
+    "mtime": 1795113756.9056938,
+    "ast_hash": "09041f566398ed1c4219f445ffa5f671",
+    "semantic_hash": ""
+  },
+  "app/Services/Attendance/WorkLogAttendanceImportService.php": {
+    "mtime": 1795113686.4988823,
+    "ast_hash": "d38388f5f1cae5608ebd80e31f9d7d34",
+    "semantic_hash": ""
+  },
+  "config/piofy.php": {
+    "mtime": 1795113815.9321704,
+    "ast_hash": "0c5000e8da4c1637df0d3350e18163b9",
+    "semantic_hash": ""
+  },
+  "docs/architecture/20-Attendance-Device-Sync.md": {
+    "mtime": 1795113826.0745437,
+    "ast_hash": "37a4671c49c55fdfb8a5e339178c06e4",
+    "semantic_hash": ""
+  },
+  "storage/framework/views/9f9ef9470a797e5ade1a0f3c88e18263.php": {
+    "mtime": 1795114172.8821008,
+    "ast_hash": "136c614898d11ced01dfae9f01b51128",
     "semantic_hash": ""
   }
 }

@@ -44,6 +44,8 @@ Owns employees, contracts, positions, organization structure, personnel document
 ### Attendance
 Owns work logs, calendars, shifts, leaves, missions, monthly attendance and attendance summaries.
 
+Device sync: Piofy WebPortal punches are imported into Work Logs via `PiofyAttendanceSyncService` (see `docs/architecture/20-Attendance-Device-Sync.md`). Excel import remains supported.
+
 ### Payroll
 Owns payroll periods, payroll items, salary calculation, payslips, insurance and tax calculations.
 

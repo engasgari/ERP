@@ -8720,3 +8720,87 @@ a.sales-intel__kpi:hover {
         background: rgba(255, 255, 255, 0.92);
     }
 }
+
+/* ===== ERP Pagination (site-wide) ===== */
+.erp-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
+}
+
+.erp-pagination__summary {
+    color: #64748b;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+}
+
+.erp-pagination__list {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    direction: ltr;
+}
+
+.erp-pagination__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 2.1rem;
+    height: 2.1rem;
+    padding: 0 0.55rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #334155;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.erp-pagination__btn:hover:not(.is-disabled):not(.is-active):not(.is-ellipsis) {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+
+.erp-pagination__btn.is-active {
+    background: #0f766e;
+    border-color: #0f766e;
+    color: #fff;
+    cursor: default;
+}
+
+.erp-pagination__btn.is-disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+
+.erp-pagination__btn.is-ellipsis {
+    min-width: 1.75rem;
+    border-color: transparent;
+    background: transparent;
+    color: #64748b;
+    cursor: default;
+    pointer-events: none;
+}
+
+button.erp-pagination__btn {
+    appearance: none;
+}
