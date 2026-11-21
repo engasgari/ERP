@@ -89,6 +89,21 @@
             padding: 0.3rem 0.5rem;
             font-size: 0.78rem;
         }
+        .smart-payroll-page .smart-money--compact {
+            min-height: 1.75rem;
+            width: 8.5rem;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.72rem;
+        }
+        .smart-payroll-page .smart-toolbar-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
     </style>
 
     @include('livewire.partials.flash')
@@ -158,13 +173,16 @@
         </label>
     </div>
 
-    <div class="rounded-lg bg-white px-4 py-4 shadow-md sm:px-5">
+    <div class="rounded-lg border border-slate-200 bg-white px-4 py-4 sm:px-5">
         <div class="smart-toolbar">
-            <x-erp.ui.money-input
-                wire:model.blur="defaultNet"
-                placeholder="مبلغ دلخواه"
-                class="smart-money w-44"
-            />
+            <label class="smart-toolbar-label">
+                <span>مبلغ دلخواه</span>
+                <x-erp.ui.money-input
+                    wire:model.blur="defaultNet"
+                    placeholder="۰"
+                    class="smart-money smart-money--compact"
+                />
+            </label>
             <button
                 type="button"
                 class="smart-tool-btn smart-tool-btn--apply"
@@ -203,7 +221,7 @@
                         <th class="px-2 py-2 text-right font-semibold">کد</th>
                         <th class="px-2 py-2 text-right font-semibold">نام</th>
                         <th class="px-2 py-2 text-right font-semibold">خالص فعلی</th>
-                        <th class="px-2 py-2 text-right font-semibold">خالص هدف</th>
+                        <th class="px-2 py-2 text-right font-semibold">مبلغ دلخواه</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
