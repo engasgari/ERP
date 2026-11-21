@@ -124,6 +124,7 @@ class NavigationMenu
                     ['type' => 'divider'],
                     ['label' => 'دوره‌های بیمه', 'route' => 'insurance.periods.index', 'permission' => 'insurance.view'],
                     ['label' => 'پرداخت بیمه', 'route' => 'insurance.payments.index', 'permission' => 'insurance.view'],
+                    ['label' => 'محاسبه هوشمند', 'route' => 'payroll.smart-calculation.index', 'permission' => 'payroll.calculate'],
                 ],
             ],
             [

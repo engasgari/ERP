@@ -151,6 +151,7 @@ return [
         'insurance.periods.index' => 'دوره‌های بیمه',
         'insurance.payments.index' => 'پرداخت بیمه',
         'insurance.payments.show' => 'جزئیات پرداخت بیمه',
+        'payroll.smart-calculation.index' => 'محاسبه هوشمند',
     ],
 
     /*

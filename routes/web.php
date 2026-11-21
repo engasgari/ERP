@@ -344,6 +344,9 @@ Route::middleware(['auth', 'active.erp'])->group(function () {
     Route::view('insurance/periods', 'insurance.periods.index')->middleware('permission:insurance.view')->name('insurance.periods.index');
     Route::view('insurance/payments', 'insurance.payments.index')->middleware('permission:insurance.view')->name('insurance.payments.index');
     Route::get('insurance/payments/{payment}', [InsurancePaymentController::class, 'show'])->middleware('permission:insurance.view')->name('insurance.payments.show');
+    Route::view('payroll/smart-calculation', 'payroll.smart-calculation.index')
+        ->middleware('permission:payroll.calculate')
+        ->name('payroll.smart-calculation.index');
     Route::get('payslips/{payslip}/print', [PayslipController::class, 'print'])->middleware('permission:payroll.view')->name('payslips.print');
     Route::get('payslips/{payslip}/download', [PayslipController::class, 'download'])->middleware('permission:payroll.view')->name('payslips.download');
 
