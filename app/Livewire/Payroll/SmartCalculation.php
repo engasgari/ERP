@@ -17,6 +17,8 @@ class SmartCalculation extends Component
 
     public string $defaultNet = '';
 
+    public bool $headerSelectAll = false;
+
     /** @var array<int, array{employee_id:int,name:string,code:?string,selected:bool,target_net:string,current_net:?float}> */
     public array $rows = [];
 
@@ -39,11 +41,22 @@ class SmartCalculation extends Component
         $this->refreshCurrentNets();
     }
 
-    public function selectAll(bool $value = true): void
+    public function updatedHeaderSelectAll(bool $value): void
+    {
+        $this->setAllSelected($value);
+    }
+
+    public function updatedRows(): void
+    {
+        $this->syncHeaderSelectAll();
+    }
+
+    public function setAllSelected(bool $value = true): void
     {
         foreach ($this->rows as $index => $row) {
             $this->rows[$index]['selected'] = $value;
         }
+        $this->headerSelectAll = $value;
     }
 
     public function applyDefaultNet(): void
@@ -55,11 +68,19 @@ class SmartCalculation extends Component
             return;
         }
 
+        $formatted = moneyInputValue($normalized, 0);
+        $this->defaultNet = $formatted;
+
         foreach ($this->rows as $index => $row) {
             if ($row['selected']) {
-                $this->rows[$index]['target_net'] = (string) (int) round($normalized);
+                $this->rows[$index]['target_net'] = $formatted;
             }
         }
+    }
+
+    public function selectedCount(): int
+    {
+        return collect($this->rows)->where('selected', true)->count();
     }
 
     public function run(SmartPayrollService $smartPayroll): void
@@ -147,6 +168,7 @@ class SmartCalculation extends Component
             'workdayCount' => $workdayCount,
             'years' => range((int) getCurrentPersianYear() - 1, (int) getCurrentPersianYear() + 1),
             'months' => range(1, 12),
+            'selectedCount' => $this->selectedCount(),
         ]);
     }
 
@@ -164,6 +186,7 @@ class SmartCalculation extends Component
             ];
         })->values()->all();
 
+        $this->headerSelectAll = false;
         $this->refreshCurrentNets();
     }
 
@@ -186,5 +209,16 @@ class SmartCalculation extends Component
         foreach ($this->rows as $index => $row) {
             $this->rows[$index]['current_net'] = $nets[$row['employee_id']] ?? null;
         }
+    }
+
+    private function syncHeaderSelectAll(): void
+    {
+        if ($this->rows === []) {
+            $this->headerSelectAll = false;
+
+            return;
+        }
+
+        $this->headerSelectAll = collect($this->rows)->every(fn (array $row): bool => (bool) ($row['selected'] ?? false));
     }
 }

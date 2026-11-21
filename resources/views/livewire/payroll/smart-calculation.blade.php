@@ -13,7 +13,84 @@
     ];
 @endphp
 
-<div dir="rtl" class="space-y-4">
+<div dir="rtl" class="smart-payroll-page space-y-4">
+    <style>
+        .smart-payroll-page .smart-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+            padding: 0.45rem 0.6rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.4rem;
+        }
+        .smart-payroll-page .smart-tool-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            min-height: 2rem;
+            padding: 0.3rem 0.65rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            background: #fff;
+            color: #334155;
+            font-size: 0.78rem;
+            font-weight: 600;
+            line-height: 1;
+            cursor: pointer;
+        }
+        .smart-payroll-page .smart-tool-btn:hover:not(:disabled) {
+            background: #e2e8f0;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+        .smart-payroll-page .smart-tool-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .smart-payroll-page .smart-tool-btn--primary {
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+            background: #eff6ff;
+        }
+        .smart-payroll-page .smart-tool-btn--primary:hover:not(:disabled) {
+            background: #dbeafe;
+            border-color: #93c5fd;
+            color: #1e3a8a;
+        }
+        .smart-payroll-page .smart-tool-btn--apply {
+            color: #0f766e;
+            border-color: #99f6e4;
+            background: #fff;
+        }
+        .smart-payroll-page .smart-tool-btn--apply:hover:not(:disabled) {
+            background: #f0fdfa;
+            border-color: #5eead4;
+            color: #115e59;
+        }
+        .smart-payroll-page .smart-toolbar-count {
+            margin-inline-start: 0.15rem;
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+        .smart-payroll-page .smart-check {
+            width: 13px;
+            height: 13px;
+            margin: 0;
+            border-radius: 0 !important;
+            accent-color: #2563eb;
+            vertical-align: middle;
+        }
+        .smart-payroll-page .smart-money {
+            min-height: 2rem;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.78rem;
+        }
+    </style>
+
     @include('livewire.partials.flash')
 
     <div class="rounded-lg bg-white px-4 py-5 shadow-md sm:px-5 sm:py-6">
@@ -73,7 +150,7 @@
         </div>
 
         <label class="mt-3 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700">
-            <input type="checkbox" wire:model.live="useCalendarAttendance" class="mt-0.5 h-3.5 w-3.5 rounded-none border-gray-300 text-sky-600 focus:ring-sky-500">
+            <input type="checkbox" wire:model.live="useCalendarAttendance" class="smart-check mt-0.5">
             <span>
                 <span class="font-semibold">کارکرد کامل بر اساس تقویم</span>
                 <span class="text-slate-500"> — تردد نادیده؛ همه روزهای کاری با ۸ ساعت</span>
@@ -82,58 +159,51 @@
     </div>
 
     <div class="rounded-lg bg-white px-4 py-4 shadow-md sm:px-5">
-        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-center gap-1.5">
-                <button
-                    type="button"
-                    wire:click="selectAll(true)"
-                    title="انتخاب همه"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                    <x-erp.ui.action-icon name="confirm" class="h-4 w-4" />
-                    <span class="sr-only">انتخاب همه</span>
-                </button>
-                <button
-                    type="button"
-                    wire:click="selectAll(false)"
-                    title="حذف انتخاب"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-300 text-rose-700 hover:bg-rose-50"
-                >
-                    <x-erp.ui.action-icon name="reject" class="h-4 w-4" />
-                    <span class="sr-only">حذف انتخاب</span>
-                </button>
-            </div>
-
-            <div class="flex flex-wrap items-end gap-2">
-                <label class="block">
-                    <span class="text-[10px] font-medium text-slate-600">خالص یکسان (ریال)</span>
-                    <input type="text" inputmode="numeric" wire:model="defaultNet" placeholder="250000000" class="mt-0.5 w-40 rounded-md border-gray-300 py-1.5 text-xs text-right" />
-                </label>
-                <button type="button" wire:click="applyDefaultNet" class="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                    اعمال
-                </button>
-                <button
-                    type="button"
-                    wire:click="run"
-                    wire:confirm="محاسبه هوشمند برای افراد انتخاب‌شده اجرا شود؟"
-                    wire:loading.attr="disabled"
-                    class="rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
-                >
-                    <span wire:loading.remove wire:target="run">اجرای محاسبه هوشمند</span>
-                    <span wire:loading wire:target="run">در حال محاسبه...</span>
-                </button>
-            </div>
+        <div class="smart-toolbar">
+            <x-erp.ui.money-input
+                wire:model.blur="defaultNet"
+                placeholder="مبلغ دلخواه"
+                class="smart-money w-44"
+            />
+            <button
+                type="button"
+                class="smart-tool-btn smart-tool-btn--apply"
+                title="اعمال مبلغ روی انتخاب‌شده‌ها"
+                wire:click="applyDefaultNet"
+                @disabled($selectedCount === 0)
+            >
+                <x-erp.ui.action-icon name="confirm" class="h-4 w-4" />
+                <span>اعمال مبلغ</span>
+            </button>
+            <button
+                type="button"
+                class="smart-tool-btn smart-tool-btn--primary"
+                title="اجرای محاسبه هوشمند"
+                wire:click="run"
+                wire:confirm="محاسبه هوشمند برای افراد انتخاب‌شده اجرا شود؟"
+                wire:loading.attr="disabled"
+                @disabled($selectedCount === 0)
+            >
+                <x-erp.ui.action-icon name="calculate" class="h-4 w-4" />
+                <span wire:loading.remove wire:target="run">محاسبه هوشمند</span>
+                <span wire:loading wire:target="run">در حال محاسبه...</span>
+            </button>
+            @if($selectedCount > 0)
+                <span class="smart-toolbar-count">{{ toPersianDigits($selectedCount) }} مورد</span>
+            @endif
         </div>
 
         <div class="overflow-x-auto">
             <table class="min-w-full text-xs">
                 <thead class="border-b border-slate-200 bg-slate-50 text-slate-600">
                     <tr>
-                        <th class="w-10 px-2 py-2 text-center font-semibold"> </th>
+                        <th class="w-10 px-2 py-2 text-center">
+                            <input type="checkbox" class="smart-check" wire:model.live="headerSelectAll" title="انتخاب همه">
+                        </th>
                         <th class="px-2 py-2 text-right font-semibold">کد</th>
                         <th class="px-2 py-2 text-right font-semibold">نام</th>
                         <th class="px-2 py-2 text-right font-semibold">خالص فعلی</th>
-                        <th class="px-2 py-2 text-right font-semibold">خالص هدف (ریال)</th>
+                        <th class="px-2 py-2 text-right font-semibold">خالص هدف</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -143,22 +213,20 @@
                                 <input
                                     type="checkbox"
                                     wire:model.live="rows.{{ $index }}.selected"
-                                    class="h-3.5 w-3.5 rounded-none border-gray-300 text-sky-600 focus:ring-sky-500"
+                                    class="smart-check"
                                 >
                             </td>
                             <td class="whitespace-nowrap px-2 py-1.5 text-slate-600">{{ $row['code'] ? toPersianDigits($row['code']) : '—' }}</td>
                             <td class="px-2 py-1.5 font-medium text-slate-900">{{ $row['name'] }}</td>
-                            <td class="whitespace-nowrap px-2 py-1.5 text-slate-600">
+                            <td class="whitespace-nowrap px-2 py-1.5 tabular-nums text-slate-600">
                                 {{ $row['current_net'] !== null ? formatMoney($row['current_net']) : '—' }}
                             </td>
                             <td class="px-2 py-1.5">
-                                <input
-                                    type="text"
-                                    inputmode="numeric"
-                                    wire:model.defer="rows.{{ $index }}.target_net"
-                                    class="w-full min-w-[8rem] rounded-md border-gray-300 py-1 text-xs text-right"
-                                    placeholder="250000000"
-                                >
+                                <x-erp.ui.money-input
+                                    wire:model.blur="rows.{{ $index }}.target_net"
+                                    placeholder="مبلغ دلخواه"
+                                    class="smart-money"
+                                />
                             </td>
                         </tr>
                     @empty
