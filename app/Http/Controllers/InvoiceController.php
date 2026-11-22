@@ -97,18 +97,37 @@ class InvoiceController extends Controller
         return view('invoices.show', $data);
     }
 
-    public function print(Invoice $invoice, InvoiceExcelTemplateService $excel)
+    public function print(Invoice $invoice, InvoiceExcelPdfService $excelPdf, InvoiceExcelTemplateService $excel)
     {
-        // Final print always serves the official Excel template (exact layout, no converter hang).
-        return $this->downloadExcel($invoice, $excel);
+        $company = CompanySetting::first();
+
+        try {
+            $pdfPath = $excelPdf->build($invoice, $company);
+            $pdfBase64 = base64_encode((string) file_get_contents($pdfPath));
+            @unlink($pdfPath);
+
+            return view('invoices.print-preview', [
+                'invoice' => $invoice,
+                'pdfBase64' => $pdfBase64,
+                'backUrl' => route('invoices.show', $invoice),
+            ]);
+        } catch (\Throwable) {
+            // Fallback printable HTML page if converter is unavailable.
+            return view('invoices.print', [
+                'invoice' => $invoice,
+                'company' => $company,
+                'print' => $excel->printData($invoice, $company),
+            ]);
+        }
     }
 
     public function downloadPdf(Invoice $invoice, InvoiceExcelPdfService $excelPdf)
     {
-        $artifact = $excelPdf->buildPrintArtifact($invoice, CompanySetting::first());
+        $path = $excelPdf->build($invoice, CompanySetting::first());
+        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
 
-        return response()->download($artifact['path'], $artifact['filename'], [
-            'Content-Type' => $artifact['mime'],
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/pdf',
         ])->deleteFileAfterSend(true);
     }
 

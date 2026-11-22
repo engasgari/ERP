@@ -33,20 +33,44 @@ class CrmCustomerInvoiceController extends Controller
         ]);
     }
 
-    public function print(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
+    public function print(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf, InvoiceExcelTemplateService $excel)
     {
-        // Final print always serves the official Excel template (exact layout, no converter hang).
-        return $this->downloadExcel($request, $invoice, $excel);
+        $this->access->authorize($request->user(), $invoice);
+        $company = CompanySetting::first();
+
+        try {
+            $pdfPath = $excelPdf->build($invoice, $company);
+            $pdfBase64 = base64_encode((string) file_get_contents($pdfPath));
+            @unlink($pdfPath);
+
+            return view('invoices.print-preview', [
+                'invoice' => $invoice,
+                'pdfBase64' => $pdfBase64,
+                'backUrl' => route('crm.invoices.show', $invoice),
+            ]);
+        } catch (\Throwable) {
+            return view('invoices.print', [
+                'invoice' => $invoice,
+                'company' => $company,
+                'print' => $excel->printData($invoice, $company),
+                'routes' => [
+                    'show' => route('crm.invoices.show', $invoice),
+                    'pdf' => route('crm.invoices.pdf', $invoice),
+                    'excel' => route('crm.invoices.excel', $invoice),
+                ],
+            ]);
+        }
     }
 
     public function downloadPdf(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf)
     {
         $this->access->authorize($request->user(), $invoice);
 
-        $artifact = $excelPdf->buildPrintArtifact($invoice, CompanySetting::first());
+        $path = $excelPdf->build($invoice, CompanySetting::first());
+        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
 
-        return response()->download($artifact['path'], $artifact['filename'], [
-            'Content-Type' => $artifact['mime'],
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/pdf',
         ])->deleteFileAfterSend(true);
     }
 
