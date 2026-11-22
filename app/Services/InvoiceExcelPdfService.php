@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CompanySetting;
 use App\Models\Invoice;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 class InvoiceExcelPdfService
@@ -20,11 +21,42 @@ class InvoiceExcelPdfService
     public function build(Invoice $invoice, ?CompanySetting $company): string
     {
         $xlsx = $this->excel->build($invoice, $company);
-        $pdf = $this->convertToPdf($xlsx);
 
-        @unlink($xlsx);
+        try {
+            $pdf = $this->convertToPdf($xlsx);
+        } finally {
+            @unlink($xlsx);
+        }
 
         return $pdf;
+    }
+
+    /**
+     * Prefer PDF from the official Excel template; fall back to the Excel file itself.
+     *
+     * @return array{path:string,filename:string,mime:string}
+     */
+    public function buildPrintArtifact(Invoice $invoice, ?CompanySetting $company, string $filenamePrefix = 'invoice'): array
+    {
+        $safeNumber = preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number) ?: (string) $invoice->id;
+
+        try {
+            $pdf = $this->build($invoice, $company);
+
+            return [
+                'path' => $pdf,
+                'filename' => $filenamePrefix.'-'.$safeNumber.'.pdf',
+                'mime' => 'application/pdf',
+            ];
+        } catch (\Throwable) {
+            $xlsx = $this->excel->build($invoice, $company);
+
+            return [
+                'path' => $xlsx,
+                'filename' => $filenamePrefix.'-'.$safeNumber.'.xlsx',
+                'mime' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ];
+        }
     }
 
     private function convertToPdf(string $xlsxPath): string
@@ -53,25 +85,57 @@ class InvoiceExcelPdfService
             return false;
         }
 
-        $process = new Process([
-            $binary,
-            '--headless',
-            '--nologo',
-            '--nofirststartwizard',
-            '--convert-to',
-            'pdf:calc_pdf_Export',
-            '--outdir',
-            $directory,
-            $xlsxPath,
-        ]);
-        $process->setTimeout(120);
-        $process->setEnv([
-            'HOME' => $directory,
-            'TMPDIR' => $directory,
-        ]);
-        $process->run();
+        $lockPath = storage_path('app/temp/libreoffice-convert.lock');
+        @mkdir(dirname($lockPath), 0775, true);
+        $lock = @fopen($lockPath, 'c+');
 
-        return $process->isSuccessful() && is_file($pdfPath);
+        if ($lock === false) {
+            return false;
+        }
+
+        try {
+            if (! flock($lock, LOCK_EX)) {
+                return false;
+            }
+
+            $profileDir = $directory.DIRECTORY_SEPARATOR.'lo-profile-'.uniqid('', true);
+            @mkdir($profileDir, 0775, true);
+            $profileUri = 'file://'.str_replace('\\', '/', $profileDir);
+
+            $process = new Process([
+                $binary,
+                '--headless',
+                '--nologo',
+                '--nofirststartwizard',
+                '--norestore',
+                '-env:UserInstallation='.$profileUri,
+                '--convert-to',
+                'pdf:calc_pdf_Export',
+                '--outdir',
+                $directory,
+                $xlsxPath,
+            ]);
+            $process->setTimeout(60);
+            $process->setEnv([
+                'HOME' => $profileDir,
+                'TMPDIR' => $directory,
+            ]);
+
+            try {
+                $process->run();
+            } catch (ProcessTimedOutException) {
+                $this->killLibreOffice();
+
+                return false;
+            } finally {
+                $this->deleteDirectory($profileDir);
+            }
+
+            return $process->isSuccessful() && is_file($pdfPath);
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     private function convertWithExcelCom(string $xlsxPath, string $pdfPath): bool
@@ -124,8 +188,13 @@ PS1;
                 '-OutputPath',
                 $pdfPath,
             ]);
-            $process->setTimeout(120);
-            $process->run();
+            $process->setTimeout(60);
+
+            try {
+                $process->run();
+            } catch (ProcessTimedOutException) {
+                return false;
+            }
 
             return $process->isSuccessful() && is_file($pdfPath);
         } finally {
@@ -154,5 +223,45 @@ PS1;
         }
 
         return null;
+    }
+
+    private function killLibreOffice(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            return;
+        }
+
+        $process = Process::fromShellCommandline('pkill -9 -f soffice.bin || true; pkill -9 -f libreoffice || true');
+        $process->setTimeout(10);
+        $process->run();
+    }
+
+    private function deleteDirectory(string $directory): void
+    {
+        if (! is_dir($directory)) {
+            return;
+        }
+
+        $items = scandir($directory);
+
+        if ($items === false) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $path = $directory.DIRECTORY_SEPARATOR.$item;
+
+            if (is_dir($path)) {
+                $this->deleteDirectory($path);
+            } else {
+                @unlink($path);
+            }
+        }
+
+        @rmdir($directory);
     }
 }

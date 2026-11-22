@@ -184,30 +184,20 @@ class CrmProformaController extends Controller
         return $invoices->update($request, $invoice, $inventory);
     }
 
-    public function print(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf)
+    public function print(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
-        $this->access->authorize($request->user(), $invoice);
-
-        $path = $excelPdf->build($invoice, CompanySetting::first());
-        $filename = 'proforma-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
-
-        return response()
-            ->file($path, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            ])
-            ->deleteFileAfterSend(true);
+        // Final print always serves the official Excel template (exact layout, no converter hang).
+        return $this->downloadExcel($request, $invoice, $excel);
     }
 
     public function downloadPdf(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf)
     {
         $this->access->authorize($request->user(), $invoice);
 
-        $path = $excelPdf->build($invoice, CompanySetting::first());
-        $filename = 'proforma-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
+        $artifact = $excelPdf->buildPrintArtifact($invoice, CompanySetting::first(), 'proforma');
 
-        return response()->download($path, $filename, [
-            'Content-Type' => 'application/pdf',
+        return response()->download($artifact['path'], $artifact['filename'], [
+            'Content-Type' => $artifact['mime'],
         ])->deleteFileAfterSend(true);
     }
 

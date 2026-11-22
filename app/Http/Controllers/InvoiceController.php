@@ -97,27 +97,18 @@ class InvoiceController extends Controller
         return view('invoices.show', $data);
     }
 
-    public function print(Invoice $invoice, InvoiceExcelPdfService $excelPdf)
+    public function print(Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
-        // Final print = official Excel template converted to PDF (exact layout).
-        $path = $excelPdf->build($invoice, CompanySetting::first());
-        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
-
-        return response()
-            ->file($path, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$filename.'"',
-            ])
-            ->deleteFileAfterSend(true);
+        // Final print always serves the official Excel template (exact layout, no converter hang).
+        return $this->downloadExcel($invoice, $excel);
     }
 
     public function downloadPdf(Invoice $invoice, InvoiceExcelPdfService $excelPdf)
     {
-        $path = $excelPdf->build($invoice, CompanySetting::first());
-        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
+        $artifact = $excelPdf->buildPrintArtifact($invoice, CompanySetting::first());
 
-        return response()->download($path, $filename, [
-            'Content-Type' => 'application/pdf',
+        return response()->download($artifact['path'], $artifact['filename'], [
+            'Content-Type' => $artifact['mime'],
         ])->deleteFileAfterSend(true);
     }
 
