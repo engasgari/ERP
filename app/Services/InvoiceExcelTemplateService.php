@@ -12,13 +12,24 @@ use ZipArchive;
 
 class InvoiceExcelTemplateService
 {
-    private const LINES_PER_PAGE = 8;
+    public const LINES_PER_PAGE = 8;
+
+    /** Bank footer baked into the official Excel template (visual parity with Excel export). */
+    public const BANK_NOTE = 'شماره حساب بانک مهر ایران : 500601113453787001 / شبا:IR200600500601113453787001';
 
     private const PAGE_HEIGHT = 34;
 
     private const FIRST_LINE_ROW = 21;
 
     private const LAST_LINE_ROW = 28;
+
+    private const ECONOMIC_BOX_COUNT = 12;
+
+    private const REGISTRATION_BOX_COUNT = 6;
+
+    private const POSTAL_BOX_COUNT = 10;
+
+    private const NATIONAL_ID_BOX_COUNT = 11;
 
     /** @var list<string> */
     private const LINE_COLUMNS = ['B', 'D', 'G', 'T', 'W', 'Z', 'AE', 'AL', 'AQ', 'AX', 'BC'];
@@ -37,6 +48,106 @@ class InvoiceExcelTemplateService
 
     /** @var list<string> */
     private const NATIONAL_ID_COLUMNS = ['AY', 'AZ', 'BA', 'BB', 'BC', 'BD', 'BE', 'BF', 'BG', 'BH', 'BI'];
+
+    /**
+     * Normalized invoice print/export dataset shared by Excel, HTML print, and PDF.
+     *
+     * @return array{
+     *     document_title: string,
+     *     invoice_date: string,
+     *     invoice_number: string,
+     *     project_label: string,
+     *     seller: array<string, mixed>,
+     *     buyer: array<string, mixed>,
+     *     pages: list<array{lines: list<array<string, mixed>>, is_last: bool, empty_slots: int}>,
+     *     totals: array{subtotal: float, discount: float, after_discount: float, tax: float, final: float, final_words: string},
+     *     notes: string,
+     *     bank_note: string,
+     *     lines_per_page: int
+     * }
+     */
+    public function printData(Invoice $invoice, ?CompanySetting $company): array
+    {
+        $invoice->loadMissing('party.crmProfile', 'project', 'lines.item.unit');
+
+        $isSale = $invoice->direction === 'sale';
+        $seller = $this->enrichProfile(
+            $isSale ? $this->companyProfile($company) : $this->partyProfile($invoice->party)
+        );
+        $buyer = $this->enrichProfile(
+            $isSale ? $this->partyProfile($invoice->party) : $this->companyProfile($company)
+        );
+
+        $lines = $invoice->lines->values();
+        $pageCount = max(1, (int) ceil($lines->count() / self::LINES_PER_PAGE));
+
+        $subtotal = 0.0;
+        $discountTotal = 0.0;
+        $afterDiscountTotal = 0.0;
+        $taxTotal = 0.0;
+        $finalTotal = 0.0;
+        $normalizedLines = [];
+
+        foreach ($lines as $index => $line) {
+            $item = $line->item;
+            $base = (float) $line->quantity * (float) $line->unit_price;
+            $afterDiscount = max($base - (float) $line->discount_amount, 0);
+            $description = trim(($item?->name ?? 'کالا/خدمت حذف‌شده') . ($line->description ? ' - ' . $line->description : ''));
+
+            $normalizedLines[] = [
+                'row' => $index + 1,
+                'code' => $item?->code ?: '_',
+                'description' => $description,
+                'quantity' => (float) $line->quantity,
+                'unit' => $item?->unit?->name ?: '-',
+                'unit_price' => (float) $line->unit_price,
+                'base' => $base,
+                'discount' => (float) $line->discount_amount,
+                'after_discount' => $afterDiscount,
+                'tax' => (float) $line->tax_amount,
+                'total' => (float) $line->line_total,
+            ];
+
+            $subtotal += $base;
+            $discountTotal += (float) $line->discount_amount;
+            $afterDiscountTotal += $afterDiscount;
+            $taxTotal += (float) $line->tax_amount;
+            $finalTotal += (float) $line->line_total;
+        }
+
+        $pages = [];
+        for ($pageIndex = 0; $pageIndex < $pageCount; $pageIndex++) {
+            $pageLines = array_slice($normalizedLines, $pageIndex * self::LINES_PER_PAGE, self::LINES_PER_PAGE);
+            $pages[] = [
+                'lines' => $pageLines,
+                'is_last' => $pageIndex === $pageCount - 1,
+                'empty_slots' => self::LINES_PER_PAGE - count($pageLines),
+            ];
+        }
+
+        $project = $invoice->project;
+
+        return [
+            'document_title' => $this->documentTitle($invoice),
+            'invoice_date' => gregorianToJalaliDate($invoice->invoice_date),
+            'invoice_number' => (string) $invoice->number,
+            'project_label' => 'پروژه: ' . ($project?->code ? $project->code . ' - ' . $project->name : '-'),
+            'seller' => $seller,
+            'buyer' => $buyer,
+            'pages' => $pages,
+            'totals' => [
+                'subtotal' => $subtotal,
+                'discount' => $discountTotal,
+                'after_discount' => $afterDiscountTotal,
+                'tax' => $taxTotal,
+                'final' => $finalTotal,
+                'final_words' => persianNumberToWords($finalTotal) . ' ریال',
+            ],
+            'notes' => $this->invoiceNotes($invoice),
+            'bank_note' => self::BANK_NOTE,
+            'lines_per_page' => self::LINES_PER_PAGE,
+        ];
+    }
 
     public function build(Invoice $invoice, ?CompanySetting $company): string
     {
@@ -556,6 +667,53 @@ class InvoiceExcelTemplateService
             'province' => '',
             'city' => '',
         ];
+    }
+
+    /**
+     * @param  array{name:string,economic_code:string,registration_number:string,postal_code:string,national_id:string,address:string,phone:string,province:string,city:string}  $profile
+     * @return array{
+     *     name:string,
+     *     economic_code:string,
+     *     registration_number:string,
+     *     postal_code:string,
+     *     national_id:string,
+     *     address:string,
+     *     phone:string,
+     *     province:string,
+     *     city:string,
+     *     economic_digits: list<string>,
+     *     registration_digits: list<string>,
+     *     postal_digits: list<string>,
+     *     national_id_digits: list<string>
+     * }
+     */
+    private function enrichProfile(array $profile): array
+    {
+        $profile['economic_digits'] = $this->digitBoxes($profile['economic_code'], self::ECONOMIC_BOX_COUNT);
+        $profile['registration_digits'] = $this->digitBoxes($profile['registration_number'], self::REGISTRATION_BOX_COUNT);
+        $profile['postal_digits'] = $this->digitBoxes($profile['postal_code'], self::POSTAL_BOX_COUNT);
+        $profile['national_id_digits'] = $this->digitBoxes($profile['national_id'], self::NATIONAL_ID_BOX_COUNT);
+
+        return $profile;
+    }
+
+    /**
+     * Right-aligned digit boxes matching the official Excel template layout.
+     *
+     * @return list<string>
+     */
+    private function digitBoxes(?string $value, int $length): array
+    {
+        $digits = preg_replace('/\D+/', '', (string) $value) ?? '';
+        $offset = max(0, $length - strlen($digits));
+        $boxes = [];
+
+        for ($index = 0; $index < $length; $index++) {
+            $digitIndex = $index - $offset;
+            $boxes[] = ($digitIndex >= 0 && $digitIndex < strlen($digits)) ? $digits[$digitIndex] : '';
+        }
+
+        return $boxes;
     }
 
     /**

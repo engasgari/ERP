@@ -97,23 +97,27 @@ class InvoiceController extends Controller
         return view('invoices.show', $data);
     }
 
-    public function print(Invoice $invoice)
+    public function print(Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
         $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
+        $company = CompanySetting::first();
 
         return view('invoices.print', [
             'invoice' => $invoice,
-            'company' => CompanySetting::first(),
+            'company' => $company,
+            'print' => $excel->printData($invoice, $company),
         ]);
     }
 
-    public function downloadPdf(Invoice $invoice)
+    public function downloadPdf(Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
         $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
+        $company = CompanySetting::first();
 
         $pdf = PersianPdf::loadView('invoices.print', [
             'invoice' => $invoice,
-            'company' => CompanySetting::first(),
+            'company' => $company,
+            'print' => $excel->printData($invoice, $company),
         ], 'a4', 'landscape');
 
         return $pdf->download('invoice-' . $invoice->number . '.pdf');
