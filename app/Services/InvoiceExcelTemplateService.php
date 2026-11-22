@@ -15,7 +15,7 @@ class InvoiceExcelTemplateService
     public const LINES_PER_PAGE = 8;
 
     /** Bank footer baked into the official Excel template (visual parity with Excel export). */
-    public const BANK_NOTE = 'شماره حساب بانک مهر ایران : 500601113453787001 / شبا:IR200600500601113453787001';
+    public const BANK_NOTE = 'شماره حساب بانک مهر ایران: 500601113453787001 / شبا:IR200600500601113453787001';
 
     private const PAGE_HEIGHT = 34;
 

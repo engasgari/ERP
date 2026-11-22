@@ -26,7 +26,7 @@
             margin: 0;
             background: #e5e7eb;
             color: #000;
-            font-family: vazirmatn, Vazirmatn, Tahoma, Arial, sans-serif;
+            font-family: 'B Nazanin', BNazanin, vazirmatn, Vazirmatn, Tahoma, Arial, sans-serif;
             direction: rtl;
             text-align: right;
         }

@@ -43,6 +43,15 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Copy application
 COPY . /var/www/html
 
+# Official invoice print fonts (Excel template uses B Nazanin / B Titr)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fontconfig \
+    && mkdir -p /usr/share/fonts/truetype/erp-invoice \
+    && cp storage/fonts/invoice/*.ttf /usr/share/fonts/truetype/erp-invoice/ \
+    && fc-cache -f \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Build Vite assets once; PHP and Nginx use this same public/build output.
 RUN npm ci \
     && npm run build \

@@ -3,3 +3,5 @@
 !installed-fonts.json
 !Vazirmatn-Regular.ttf
 !Vazirmatn-Bold.ttf
+!invoice/
+!invoice/**
