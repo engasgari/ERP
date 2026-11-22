@@ -99,14 +99,8 @@ class InvoiceController extends Controller
 
     public function print(Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
-        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
-        $company = CompanySetting::first();
-
-        return view('invoices.print', [
-            'invoice' => $invoice,
-            'company' => $company,
-            'print' => $excel->printData($invoice, $company),
-        ]);
+        // Final print must use the official Excel template (exact layout parity).
+        return $this->downloadExcel($invoice, $excel);
     }
 
     public function downloadPdf(Invoice $invoice, InvoiceExcelTemplateService $excel)

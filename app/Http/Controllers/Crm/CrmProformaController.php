@@ -186,21 +186,8 @@ class CrmProformaController extends Controller
 
     public function print(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
     {
-        $this->access->authorize($request->user(), $invoice);
-
-        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
-        $company = CompanySetting::first();
-
-        return view('invoices.print', [
-            'invoice' => $invoice,
-            'company' => $company,
-            'print' => $excel->printData($invoice, $company),
-            'routes' => [
-                'show' => route('crm.proforma.show', $invoice),
-                'pdf' => route('crm.proforma.pdf', $invoice),
-                'excel' => route('crm.proforma.excel', $invoice),
-            ],
-        ]);
+        // Final print must use the official Excel template (exact layout parity).
+        return $this->downloadExcel($request, $invoice, $excel);
     }
 
     public function downloadPdf(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
