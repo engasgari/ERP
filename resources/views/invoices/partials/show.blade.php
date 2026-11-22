@@ -66,7 +66,7 @@
                 <a href="{{ $routes['edit'] ?? route('invoices.edit', $invoiceKey) }}">ویرایش {{ $invoice->typeLabel() }}</a>
             @endif
             @if($urlPrint)
-                <a href="{{ $urlPrint }}" target="_blank" rel="noopener" data-no-spa>چاپ نهایی (اکسل)</a>
+                <a href="{{ $urlPrint }}" target="_blank" rel="noopener" data-no-spa>چاپ نهایی</a>
             @endif
             @if($urlPdf)
                 <a href="{{ $urlPdf }}" @if($embedded) data-embedded-open @else target="_blank" @endif data-no-spa>PDF</a>

@@ -8,8 +8,8 @@ use App\Models\CompanySetting;
 use App\Models\Invoice;
 use App\Services\Crm\CrmCustomerInvoiceAccessService;
 use App\Services\InventoryPostingService;
+use App\Services\InvoiceExcelPdfService;
 use App\Services\InvoiceExcelTemplateService;
-use App\Support\PersianPdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,31 +33,31 @@ class CrmCustomerInvoiceController extends Controller
         ]);
     }
 
-    public function print(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
-    {
-        // Final print must use the official Excel template (exact layout parity).
-        return $this->downloadExcel($request, $invoice, $excel);
-    }
-
-    public function downloadPdf(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
+    public function print(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf)
     {
         $this->access->authorize($request->user(), $invoice);
 
-        $invoice->load(['party.types', 'project', 'warehouse', 'lines.item.unit', 'inventoryDocuments.lines', 'settledBy']);
-        $company = CompanySetting::first();
+        $path = $excelPdf->build($invoice, CompanySetting::first());
+        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
 
-        $pdf = PersianPdf::loadView('invoices.print', [
-            'invoice' => $invoice,
-            'company' => $company,
-            'print' => $excel->printData($invoice, $company),
-            'routes' => [
-                'show' => route('crm.invoices.show', $invoice),
-                'pdf' => route('crm.invoices.pdf', $invoice),
-                'excel' => route('crm.invoices.excel', $invoice),
-            ],
-        ], 'a4', 'landscape');
+        return response()
+            ->file($path, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            ])
+            ->deleteFileAfterSend(true);
+    }
 
-        return $pdf->download('invoice-'.$invoice->number.'.pdf');
+    public function downloadPdf(Request $request, Invoice $invoice, InvoiceExcelPdfService $excelPdf)
+    {
+        $this->access->authorize($request->user(), $invoice);
+
+        $path = $excelPdf->build($invoice, CompanySetting::first());
+        $filename = 'invoice-'.preg_replace('/[^\w\-]+/u', '_', (string) $invoice->number).'.pdf';
+
+        return response()->download($path, $filename, [
+            'Content-Type' => 'application/pdf',
+        ])->deleteFileAfterSend(true);
     }
 
     public function downloadExcel(Request $request, Invoice $invoice, InvoiceExcelTemplateService $excel)
