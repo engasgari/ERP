@@ -1857,15 +1857,19 @@ function bindErpSearchSelect(root) {
 
     input.addEventListener('input', () => {
         const query = normalizeSearchText(input.value);
+        const previousValue = String(hidden.value ?? '');
 
         if (! query) {
             state.clearedByUser = true;
             hidden.value = '';
-            dispatchSearchSelectValueEvents(hidden);
+            // Avoid Livewire re-render on every empty keystroke when already cleared.
+            if (previousValue !== '') {
+                dispatchSearchSelectValueEvents(hidden);
+            }
         } else {
             state.clearedByUser = false;
-            // Typing a new search invalidates the previous selection.
-            if (! isShowingSelectedLabel()) {
+            // Typing a new search invalidates the previous selection once.
+            if (! isShowingSelectedLabel() && previousValue !== '') {
                 hidden.value = '';
                 dispatchSearchSelectValueEvents(hidden);
             }
@@ -1897,9 +1901,18 @@ function bindErpSearchSelect(root) {
         }
 
         if (event.key === 'Enter') {
-            if (!list.hidden && state.activeIndex >= 0 && state.filtered[state.activeIndex]) {
-                event.preventDefault();
+            // Keep Enter inside the search field so CRM/SPA pages do not navigate/submit mid-search.
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (! list.hidden && state.activeIndex >= 0 && state.filtered[state.activeIndex]) {
                 selectOption(state.filtered[state.activeIndex]);
+
+                return;
+            }
+
+            if (! list.hidden && state.filtered.length === 1 && ! state.filtered[0].disabled) {
+                selectOption(state.filtered[0]);
             }
 
             return;

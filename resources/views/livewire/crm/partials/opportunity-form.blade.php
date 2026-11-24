@@ -5,12 +5,19 @@
     </label>
     <label class="erp-filter-field">مشتری
         <span class="erp-field-label-row">
-            <select wire:model.live="form_party_id" class="erp-field-control-grow">
-                <option value="">انتخاب کنید</option>
-                @foreach($parties as $party)
-                    <option value="{{ $party->id }}">{{ $party->name }}</option>
-                @endforeach
-            </select>
+            @php
+                $partyOptions = $parties;
+                if (! empty($selectedParty) && ! $partyOptions->contains('id', $selectedParty->id)) {
+                    $partyOptions = $partyOptions->prepend($selectedParty)->unique('id')->values();
+                }
+            @endphp
+            <x-erp.ui.lookup-select
+                wire:model.live="form_party_id"
+                :value="$form_party_id"
+                :items="$partyOptions"
+                placeholder="جستجوی مشتری..."
+                class="erp-field-control-grow"
+            />
             <button
                 type="button"
                 class="erp-field-add-btn"
